@@ -11,7 +11,7 @@ export function MetricStrip({ children, columns = 4, className }: {
 }) {
   return (
     <div className={cn("vx-metrics-strip grid grid-cols-2", desktopColumns[columns], className)}>
-      {Children.toArray(children).map((child, index) => <div key={index} className="min-w-0 border-r border-b border-border last:border-r-0">{child}</div>)}
+      {Children.toArray(children).map((child, index) => <div key={index} className="min-w-0 -mb-px -mr-px border-r border-b border-border">{child}</div>)}
     </div>
   );
 }

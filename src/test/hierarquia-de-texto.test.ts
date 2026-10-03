@@ -54,14 +54,14 @@ describe("os níveis existem em um lugar só", () => {
     expect(bloco).toContain("font-heading");
   });
 
-  it("cada nível é um degrau distinto", () => {
+  it("a tela tem destaque e seções/painéis usam 16 px", () => {
     const tamanho = (classe: string) => {
       const i = CSS.indexOf(`.${classe} {`);
       return CSS.slice(i, CSS.indexOf("}", i)).match(/text-(xl|base|sm|meta|corpo|2xl)/)?.[1];
     };
     expect(tamanho("vx-titulo-tela")).toBe("xl");
     expect(tamanho("vx-titulo-painel")).toBe("base");
-    expect(tamanho("vx-titulo-secao")).toBe("sm");
+    expect(tamanho("vx-titulo-secao")).toBe("base");
   });
 });
 
@@ -91,12 +91,12 @@ describe("o primitivo de cartão tem o default certo", () => {
 
   it("CardTitle nasce no tamanho de seção", () => {
     // Era `text-2xl`, e 81 dos 86 usos sobrescreviam.
-    expect(CARD).toMatch(/CardTitle[\s\S]*?text-sm font-semibold/);
+    expect(CARD).toMatch(/CardTitle[\s\S]*?text-base font-semibold/);
     expect(CARD).not.toMatch(/CardTitle[\s\S]*?cn\("text-2xl/);
   });
 
   it("CardDescription nasce no tamanho de subtítulo", () => {
-    expect(CARD).toMatch(/CardDescription[\s\S]*?text-label text-muted-foreground/);
+    expect(CARD).toMatch(/CardDescription[\s\S]*?text-xs text-muted-foreground/);
   });
 
   /**

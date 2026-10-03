@@ -114,28 +114,14 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
       },
-      /*
-       * PROPORCIONAL, e não subtração fixa.
-       *
-       * Era `--radius - 2px` e `- 4px`. Com o token em 10px isso dava 10/8/6 e
-       * passava despercebido; quando ele subiu para 16px virou 16/14/12 -- a
-       * escala COLAPSOU, e os três ficaram praticamente iguais.
-       *
-       * O estrago é nos elementos pequenos, que são a maioria: 106 usos de
-       * `rounded-md` e 14 de `rounded-sm`. Um raio de 14px num botão de 32px é
-       * quase uma pílula, e no quadrado de 24px do ícone do StatCard vira
-       * bolha -- justamente o que `visual-do-painel.test.ts` proíbe. O teste
-       * continuava passando porque confere o NOME da classe, não o valor.
-       *
-       * Com fator, os três acompanham o cartão sem se achatar: 16 / 10 / 6.
-       */
+      // Superfícies 6 px, controles 4 px; aliases legados seguem os mesmos tokens.
       borderRadius: {
         xl: "var(--radius)",
         "2xl": "var(--radius)",
         "3xl": "var(--radius)",
         lg: "var(--radius)",                 /* 6px — superfícies */
         md: "var(--radius-control)",   /* 4px — controles */
-        sm: "var(--radius-control)",   /* 2px — pequenos elementos */
+        sm: "var(--radius-control)",   /* 4px — pequenos elementos */
       },
       transitionDuration: { 180: "180ms", 240: "240ms" },
       transitionTimingFunction: { DEFAULT: "cubic-bezier(.2,.8,.2,1)" },

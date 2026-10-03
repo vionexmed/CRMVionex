@@ -162,7 +162,7 @@ describe("os cartões respiram igual", () => {
    * colado no título, e o vão maior vem do conteúdo abaixo.
    */
   it("o cabeçalho fecha com pb-2", () => {
-    expect(CARD).toMatch(/CardHeader[\s\S]*?cn\("flex flex-col space-y-1\.5 vx-respiro pb-2"/);
+    expect(CARD).toMatch(/CardHeader[\s\S]*?cn\("flex flex-col space-y-1 vx-respiro pb-2"/);
   });
 
   /**

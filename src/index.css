@@ -676,8 +676,9 @@
 }
 
 /* Dialogs legados também ficam contidos; novos corpos podem usar flex-1/min-h-0. */
-.vx-dialog { max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); }
-.vx-sheet { max-width: 100vw; max-height: 100dvh; }
+.vx-dialog { width: min(100%, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: hidden; }
+.vx-sheet { max-height: 100dvh; overflow: hidden; }
+@media (max-width: 639px) { .vx-sheet { max-width: 100vw; } }
 .vx-dialog, .vx-sheet { animation-timing-function: var(--motion-ease); }
 
 /* Remove movimento sem zerar transforms de posicionamento (Radix/dnd-kit). */
@@ -691,6 +692,6 @@
   }
   .vx-page, .vx-fade-up, .vx-stagger > *, .vx-shimmer, .vx-pulse-dot,
   .vx-grow-w, .vx-grow-h, .onboarding-slide-in,
-  [data-state].animate-in, [data-state].animate-out { animation: none !important; }
+  .vx-dialog, .vx-sheet, .vx-overlay { animation: none !important; }
   .vx-deal-card:hover, .vx-deal-card:active { transform: none; }
 }

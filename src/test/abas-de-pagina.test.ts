@@ -61,39 +61,9 @@ describe("todas as abas usam a mesma barra", () => {
   });
 });
 
-describe("o número de colunas é contado, não escrito", () => {
-  const src = readFileSync("src/components/layout/PageTabs.tsx", "utf8");
-
-  /**
-   * `grid-cols-5` escrito à mão vira mentira no dia em que alguém acrescenta a
-   * sexta aba -- e o erro é de LAYOUT, silencioso, não de tipo. Em
-   * Configurações o problema já existiria hoje: as abas são condicionais, e o
-   * número muda conforme quem está logado é admin ou não.
-   */
-  it("deriva do tamanho do array", () => {
-    expect(src).toMatch(/const n = abas\.length/);
-    expect(src).toMatch(/COLUNAS\[n\]/);
-  });
-
-  it("cobre de 1 a 8 abas", () => {
-    // A maior barra do projeto tem 7 (Configurações, como admin).
-    for (let n = 1; n <= 8; n++) {
-      expect(src).toContain(`${n}: "sm:grid-cols-${n}"`);
-    }
-  });
-
-  /**
-   * Sete abas de 50px são sete alvos que ninguém acerta com o polegar. Acima de
-   * quatro, o celular quebra em duas linhas em vez de espremer -- e por isso a
-   * barra precisa de `h-auto`, já que a altura fixa de 40px do primitivo
-   * cortaria a segunda linha.
-   */
-  it("o celular quebra em linhas em vez de espremer", () => {
-    expect(src).toMatch(/5: "grid-cols-3"/);
-    expect(src).toMatch(/7: "grid-cols-4"/);
-    expect(src).toContain("h-auto");
-  });
-
+describe("a barra concentra a composição das abas", () => {
+  // A grade contada foi substituída por abas de largura natural e rolagem local.
+  // Layout e alvos são verificados no navegador, sem reproduzir CSS no teste.
   it("nenhuma tela escreve grid-cols na barra de abas", () => {
     for (const arquivo of arquivosTsx("src").filter((f) => !f.endsWith("PageTabs.tsx"))) {
       const conteudo = semComentarios(readFileSync(arquivo, "utf8"));

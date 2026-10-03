@@ -136,7 +136,7 @@ describe("as telas internas usam a mesma casca", () => {
      * o invariante tivesse mudado -- o ritmo continua saindo daqui. Teste que
      * quebra por quebra de linha é teste que alguém desliga.
      */
-    expect(src).toMatch(/cn\(\s*"space-y-4"/);
+    expect(src).toMatch(/cn\(\s*"min-w-0 space-y-6"/);
   });
 
   /**

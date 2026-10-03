@@ -35,7 +35,7 @@ describe("fill-mode de animações que mexem em transform", () => {
   it("encontra os keyframes com transform (guarda contra regex quebrada)", () => {
     const nomes = keyframesComTransform();
     expect(nomes.size).toBeGreaterThan(0);
-    expect(nomes.has("vxPageIn")).toBe(true);
+    expect(nomes.has("vxFadeUp")).toBe(true);
   });
 
   it("nenhuma regra usa `both` ou `forwards` com esses keyframes", () => {

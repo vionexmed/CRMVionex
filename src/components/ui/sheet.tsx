@@ -19,7 +19,7 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "vx-overlay fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className,
     )}
     {...props}
@@ -29,7 +29,7 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  "vx-sheet fixed z-50 flex max-h-dvh flex-col gap-4 overflow-y-auto bg-background p-4 shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-180 data-[state=open]:duration-240 sm:p-6",
+  "vx-sheet fixed z-50 flex max-h-dvh flex-col gap-4 overflow-hidden bg-background p-4 shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-180 data-[state=open]:duration-240 sm:p-6",
   {
     variants: {
       side: {
@@ -56,7 +56,7 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
-        {children}
+        <div data-overlay-scroll className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto [gap:inherit]">{children}</div>
         <SheetPrimitive.Close className="vx-overlay-close absolute right-2 top-2 z-20 flex h-11 w-11 items-center justify-center rounded-md bg-background text-muted-foreground ring-offset-background transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none">
           <X className="h-4 w-4" />
           <span className="sr-only">Fechar</span>

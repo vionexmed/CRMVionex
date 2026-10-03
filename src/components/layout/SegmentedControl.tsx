@@ -2,7 +2,7 @@ import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Grupo de pílulas para alternar visão.
+ * Grupo de opções com divisórias para alternar visão.
  *
  * Existiam quatro cópias deste bloco — Contatos, Empresas, Negócios e Atividades
  * — e elas já haviam divergido: `rounded-lg`/`rounded-md` contra
