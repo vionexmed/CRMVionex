@@ -85,7 +85,7 @@ Os agentes podem trabalhar em páginas independentes depois de fixar os contrato
 
 **Files:** modificar `src/components/CommandPalette.tsx`, `src/components/ui/command.tsx`, `src/pages/{Contacts,Companies}.tsx`, `src/lib/api/{contacts,companies}.ts`. Criar `src/lib/api/global-search.ts`, `src/hooks/queries/useGlobalSearch.ts`, `src/test/search/busca-global.test.tsx`.
 
-**Interfaces:** `SearchResult = {id:string; kind:'contact'|'company'|'deal'; title:string; subtitle?:string; href:string}`; `searchEntities(orgId:string, term:string, signal?:AbortSignal): Promise<{contacts:SearchResult[];companies:SearchResult[];deals:SearchResult[]}>`. `getById(orgId:string,id:string)` nas APIs de contatos/empresas, com escopo de organização. Histórico `vionex-search:<userId>:<orgId>` limitado a cinco termos.
+**Interfaces:** `SearchResult = {id:string; kind:'contact'|'company'|'deal'; title:string; subtitle?:string; href:string}`; `searchEntities(orgId:string, term:string, signal?:AbortSignal): Promise<{contacts:SearchResult[];companies:SearchResult[];deals:SearchResult[];errors?:Partial<Record<'contacts'|'companies'|'deals',string>>}>`. `getById(orgId:string,id:string)` nas APIs de contatos/empresas, com escopo de organização. Histórico `vionex-search:<userId>:<orgId>` limitado a cinco termos.
 
 - [ ] Testar A lenta/B rápida, falha de categoria, termo com pontuação, membro/admin, storage indisponível, contato fora da primeira página e registro inacessível.
 - [ ] Rodar teste red; implementar debounce 300 ms, query key por identidade/termo, cancelamento/geração e estados por categoria.
