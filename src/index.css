@@ -256,8 +256,11 @@
     box-shadow: none;
     transition: background 150ms var(--motion-ease);
   }
-  .vx-btn-primary:hover { background: hsl(var(--primary) / 0.9); }
-  .vx-btn-primary:active { background: hsl(var(--primary) / 0.85); }
+  /* Mistura opaca: o texto mantém contraste independentemente da superfície atrás. */
+  .vx-btn-primary:hover { background: color-mix(in srgb, hsl(var(--primary)), black 8%); }
+  .vx-btn-primary:active { background: color-mix(in srgb, hsl(var(--primary)), black 12%); }
+  .dark .vx-btn-primary:hover { background: color-mix(in srgb, hsl(var(--primary)), white 8%); }
+  .dark .vx-btn-primary:active { background: color-mix(in srgb, hsl(var(--primary)), white 12%); }
   .vx-card { border: 1px solid hsl(var(--border)); box-shadow: none; }
   .vx-card:hover { border-color: hsl(var(--primary) / 0.3); }
 

@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/** Mantém ambos montados para preservar rolagem e rascunhos ao alternar no celular. */
+/** Mantém lista, detalhe e contexto montados para preservar rascunhos ao alternar. */
 export function MasterDetailLayout({ master, detail, selected, onBack, context, className }: {
   master: ReactNode;
   detail: ReactNode;
@@ -21,7 +21,7 @@ export function MasterDetailLayout({ master, detail, selected, onBack, context, 
         {selected && <div className="shrink-0 border-b border-border p-2 lg:hidden"><Button variant="ghost" onClick={onBack}><ArrowLeft aria-hidden="true" />Voltar à lista</Button></div>}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto xl:flex-row">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">{detail}</div>
-          {selected && context && <aside aria-label="Contexto do registro" className="shrink-0 border-t border-border xl:w-80 xl:overflow-y-auto xl:border-l xl:border-t-0">{context}</aside>}
+          {context && <aside hidden={!selected} aria-label="Contexto do registro" className="shrink-0 border-t border-border xl:w-80 xl:overflow-y-auto xl:border-l xl:border-t-0">{context}</aside>}
         </div>
       </div>
     </div>
