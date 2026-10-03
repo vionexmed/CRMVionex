@@ -141,7 +141,7 @@ describe("o backfill declara o que não consegue recuperar", () => {
 
   it("é idempotente", () => {
     // Reaplicar a migração não pode duplicar histórico.
-    const inserts = SQL.match(/INSERT INTO public\.contact_lifecycle_events[\s\S]*?;/g) ?? [];
+    const inserts: string[] = SQL.match(/INSERT INTO public\.contact_lifecycle_events[\s\S]*?;/g) ?? [];
     const doBackfill = inserts.filter((i) => i.includes("FROM public.contacts c"));
     expect(doBackfill.length).toBeGreaterThanOrEqual(4);
     for (const i of doBackfill) expect(i).toContain("NOT EXISTS");

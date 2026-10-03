@@ -57,30 +57,30 @@ export function PageHeader({
   return (
     // Sem cartão, sem gradiente, sem ladrilho de ícone: a separação do conteúdo
     // vem da régua abaixo. Eram 126px antes de qualquer conteúdo, em 19 telas.
-    <div className="border-b border-border pb-3">
+    <header className="shrink-0 border-b border-border pb-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           {rotulo && (
-            <p className="text-label font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               {rotulo}
             </p>
           )}
           {/* A classe, não as utilidades soltas: assim o nível existe em UM
               lugar, e as telas sem casca (entrada, wizard, erro) usam o mesmo. */}
-          <h1 className="vx-titulo-tela truncate">{title}</h1>
+          <h1 className="vx-titulo-tela break-words">{title}</h1>
           {description && <p className="vx-subtitulo-tela">{description}</p>}
           {meta && <div className="mt-2">{meta}</div>}
         </div>
 
-        <div className="flex items-end gap-3 shrink-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-4">
           {contagem && (
             // `tabular-nums` porque o número muda sob os olhos — sem largura fixa
             // de dígito, o total "pula" de lugar a cada filtro aplicado.
             <div className="border-r border-border pr-3 text-right leading-none">
-              <p className="font-heading text-2xl font-bold tabular-nums tracking-tight text-primary">
+              <p className="text-base font-semibold tabular-nums text-foreground">
                 {formatarNumero(contagem.valor)}
               </p>
-              <p className="mt-1 text-label uppercase tracking-[0.09em] text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {unidade}
               </p>
             </div>
@@ -90,6 +90,6 @@ export function PageHeader({
           )}
         </div>
       </div>
-    </div>
+    </header>
   );
 }

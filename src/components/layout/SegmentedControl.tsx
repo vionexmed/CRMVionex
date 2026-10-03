@@ -52,7 +52,7 @@ export function SegmentedControl<T extends string>({
       role="group"
       aria-label={rotuloGrupo}
       className={cn(
-        "flex shrink-0 rounded-lg border border-border bg-muted/50 p-0.5",
+        "flex max-w-full shrink-0 overflow-x-auto rounded-md border border-border bg-background",
         className,
       )}
     >
@@ -68,17 +68,17 @@ export function SegmentedControl<T extends string>({
             aria-pressed={ativo}
             aria-label={`${rotuloGrupo} ${rotulo}`}
             className={cn(
-              "flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors sm:px-3",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "vx-control flex min-h-9 min-w-9 shrink-0 items-center justify-center gap-2 border-r border-border px-3 py-2 text-xs font-medium transition-colors duration-150 last:border-r-0",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
               ativo
-                ? "bg-background shadow-sm"
+                ? "bg-muted"
                 : "text-muted-foreground hover:text-foreground",
               ativo && !corAtiva && "text-foreground",
             )}
             style={ativo && corAtiva ? { color: corAtiva } : undefined}
           >
-            {Icone && <Icone className="h-3.5 w-3.5 shrink-0" />}
-            <span className={compactoNoCelular ? "hidden sm:inline" : undefined}>
+            {Icone && <Icone className="h-4 w-4 shrink-0" />}
+            <span className={compactoNoCelular && Icone ? "hidden sm:inline" : undefined}>
               {rotulo}
             </span>
           </button>

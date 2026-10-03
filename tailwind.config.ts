@@ -131,12 +131,14 @@ export default {
        */
       borderRadius: {
         xl: "var(--radius)",
-        "2xl": "calc(var(--radius) * 1.333)",
-        "3xl": "calc(var(--radius) * 1.667)",
+        "2xl": "var(--radius)",
+        "3xl": "var(--radius)",
         lg: "var(--radius)",                 /* 6px — superfícies */
-        md: "calc(var(--radius) * 0.667)",   /* 4px — controles */
-        sm: "calc(var(--radius) * 0.375)",   /* 2px — pequenos elementos */
+        md: "var(--radius-control)",   /* 4px — controles */
+        sm: "var(--radius-control)",   /* 2px — pequenos elementos */
       },
+      transitionDuration: { 180: "180ms", 240: "240ms" },
+      transitionTimingFunction: { DEFAULT: "cubic-bezier(.2,.8,.2,1)" },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
         "accordion-up": { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } },

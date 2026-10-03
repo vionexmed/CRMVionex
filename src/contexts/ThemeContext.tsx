@@ -23,14 +23,14 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export const useTheme = () => useContext(ThemeContext);
 
-const ACCENT_COLORS: Record<string, { light: string; dark: string; ring: string }> = {
-  // Vionex official teal
-  teal: { light: "187 100% 27%", dark: "187 100% 35%", ring: "187 100% 27%" },
-  blue: { light: "221 83% 53%", dark: "217 91% 60%", ring: "221 83% 53%" },
-  violet: { light: "262 83% 58%", dark: "263 70% 50%", ring: "262 83% 58%" },
-  emerald: { light: "160 84% 39%", dark: "160 84% 39%", ring: "160 84% 39%" },
-  orange: { light: "25 95% 53%", dark: "25 95% 53%", ring: "25 95% 53%" },
-  rose: { light: "347 77% 50%", dark: "347 77% 50%", ring: "347 77% 50%" },
+const ACCENT_COLORS: Record<string, { light: string; dark: string }> = {
+  // Cada variante mantém 4,5:1 para texto sobre superfícies e dentro do botão.
+  teal: { light: "187 100% 25%", dark: "187 100% 35%" },
+  blue: { light: "221 83% 51%", dark: "217 91% 62%" },
+  violet: { light: "262 83% 58%", dark: "263 70% 68%" },
+  emerald: { light: "160 84% 25%", dark: "160 84% 39%" },
+  orange: { light: "25 95% 34%", dark: "25 95% 53%" },
+  rose: { light: "347 77% 45%", dark: "347 77% 63%" },
 };
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -71,9 +71,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const palette = ACCENT_COLORS[color] || ACCENT_COLORS.teal;
     const val = isDark ? palette.dark : palette.light;
     root.style.setProperty("--primary", val);
-    root.style.setProperty("--ring", palette.ring);
+    root.style.setProperty("--primary-foreground", isDark ? "217 72% 8%" : "0 0% 100%");
+    root.style.setProperty("--ring", val);
     root.style.setProperty("--sidebar-primary", val);
-    root.style.setProperty("--sidebar-ring", palette.ring);
+    root.style.setProperty("--sidebar-primary-foreground", isDark ? "217 72% 8%" : "0 0% 100%");
+    root.style.setProperty("--sidebar-ring", val);
   };
 
   useEffect(() => {

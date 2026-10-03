@@ -22,7 +22,7 @@ export function BarraDeFiltros({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-end gap-3 rounded-lg border border-border bg-muted/40 p-3",
+        "flex flex-wrap items-end gap-3 border-y border-border bg-muted/30 py-3",
         className,
       )}
       // O painel aparece e some com um botão. Sem `role`/`aria-label`, quem usa
@@ -59,7 +59,7 @@ export function BarraDeSelecao({
       className={cn(
         // Cor de destaque em vez de cinza: a seleção é um ESTADO, e a faixa
         // precisa dizer isso sem depender de o usuário lembrar que marcou algo.
-        "flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2",
+        "flex flex-wrap items-center gap-2 border-y border-primary/30 bg-primary/5 px-3 py-2",
         className,
       )}
       role="status"
@@ -75,7 +75,7 @@ export function BarraDeSelecao({
         <button
           type="button"
           onClick={onLimpar}
-          className="ml-auto text-label text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
+          className="vx-control ml-auto min-h-9 px-2 text-xs text-muted-foreground underline underline-offset-2 transition-colors hover:text-foreground"
         >
           Limpar seleção
         </button>

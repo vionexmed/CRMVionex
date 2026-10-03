@@ -38,20 +38,20 @@ export function Secao({
   return (
     <section
       className={cn(
-        "space-y-3",
+        "min-w-0 space-y-4",
         contornada && "rounded-lg border border-border p-4",
         className,
       )}
     >
-      {(titulo || acoes) && (
-        <div className="flex items-start justify-between gap-3">
+      {(titulo || descricao || acoes) && (
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             {/* `vx-titulo-secao` é o mesmo nível do CardTitle -- o bloco muda de
                 embalagem, não de hierarquia. */}
             {titulo && <h2 className="vx-titulo-secao">{titulo}</h2>}
-            {descricao && <p className="vx-subtitulo mt-0.5">{descricao}</p>}
+            {descricao && <p className="vx-subtitulo mt-1">{descricao}</p>}
           </div>
-          {acoes && <div className="flex shrink-0 items-center gap-2">{acoes}</div>}
+          {acoes && <div className="flex flex-wrap items-center gap-2">{acoes}</div>}
         </div>
       )}
       {children}
@@ -76,7 +76,7 @@ export function SecoesLadoALado({
   return (
     <div
       className={cn(
-        "grid gap-6 lg:grid-cols-2",
+        "grid min-w-0 gap-6 lg:grid-cols-2",
         // A divisória só existe quando há duas colunas de verdade. No celular
         // as seções empilham, e uma linha vertical entre blocos empilhados
         // apontaria para o nada.
