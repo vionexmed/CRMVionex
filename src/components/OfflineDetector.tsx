@@ -20,7 +20,7 @@ export function OfflineDetector() {
   return (
     <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground" role="alert">
       <WifiOff className="h-4 w-4" />
-      Sem conexão com a internet. As alterações serão sincronizadas quando reconectar.
+      Sem conexão com a internet. Reconecte para carregar dados e salvar alterações.
     </div>
   );
 }

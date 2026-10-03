@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/hooks/useOrg";
 import { LinhaDeAtividade } from "@/components/crm/LinhaDeAtividade";
 import { SeletorDeOrigem } from "@/components/crm/SeletorDeOrigem";
 import { useUpdateActivity, useDeleteActivities } from "@/hooks/queries/useActivities";
 import { useAuth } from "@/contexts/AuthContext";
-import { Sheet, SheetContent} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,8 @@ import { PageTabs } from "@/components/layout/PageTabs";
 import { Activity, Handshake, LayoutList, StickyNote } from "lucide-react";
 import { formatarData, formatarMoeda } from "@/lib/formato";
 import { SeloDeNegocio } from "@/components/crm/SeloDeNegocio";
+
+import { mensagemErro } from "@/lib/erro-supabase";
 
 type Contact = Database["public"]["Tables"]["contacts"]["Row"];
 type Company = Database["public"]["Tables"]["companies"]["Row"];
@@ -122,6 +124,10 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
   const [deals, setDeals] = useState<Deal[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
   const [activityForm, setActivityForm] = useState({ type: "note" as ActivityType, title: "", body: "" });
+  const [activitySaving, setActivitySaving] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const activitySavingRef = useRef(false);
+  const activityTitleRef = useRef<HTMLInputElement>(null);
   // Carregando e falhou eram indistinguíveis de "não tem nada".
   const [carregando, setCarregando] = useState(false);
   const [falhou, setFalhou] = useState(false);
@@ -219,7 +225,10 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
   };
 
   const addActivity = async () => {
-    if (!orgId || !contact || !activityForm.title) return;
+    if (!orgId || !contact || !activityForm.title.trim() || activitySavingRef.current) return;
+    activitySavingRef.current = true;
+    setActivitySaving(true);
+    setActivityError(null);
     // O negócio ABERTO da pessoa, quando há um só.
     //
     // Gravava apenas `contact_id`, então a atividade não aparecia no card do
@@ -233,21 +242,32 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
     const abertos = deals.filter((d) => d.status === "open");
     const negocioUnico = abertos.length === 1 ? abertos[0].id : null;
 
-    await supabase.from("activities").insert({
-      org_id: orgId, contact_id: contact.id, type: activityForm.type,
-      title: activityForm.title, body: activityForm.body, user_id: user?.id,
-      deal_id: negocioUnico,
-      // Mesma correção de DealDetail.addActivity: este formulário registra o que
-      // aconteceu (não tem campo de prazo), e sem completed_at a ligação não era
-      // contada em "Abordagens realizadas" e ficava pendente para sempre na tela
-      // de Atividades. `task` fica de fora -- é o que falta fazer.
-      completed_at: ATIVIDADE_JA_ACONTECEU.includes(activityForm.type)
-        ? new Date().toISOString()
-        : null,
-    });
-    setActivityForm({ type: "note", title: "", body: "" });
-    fetchRelated();
-    toast({ title: "Atividade adicionada" });
+    try {
+      const { error } = await supabase.from("activities").insert({
+        org_id: orgId, contact_id: contact.id, type: activityForm.type,
+        title: activityForm.title, body: activityForm.body, user_id: user?.id,
+        deal_id: negocioUnico,
+        // Mesma correção de DealDetail.addActivity: este formulário registra o que
+        // aconteceu (não tem campo de prazo), e sem completed_at a ligação não era
+        // contada em "Abordagens realizadas" e ficava pendente para sempre na tela
+        // de Atividades. `task` fica de fora -- é o que falta fazer.
+        completed_at: ATIVIDADE_JA_ACONTECEU.includes(activityForm.type)
+          ? new Date().toISOString()
+          : null,
+      });
+      if (error) throw error;
+      setActivityForm({ type: "note", title: "", body: "" });
+      void fetchRelated();
+      toast({ title: "Atividade adicionada" });
+    } catch (error) {
+      const description = mensagemErro(error);
+      setActivityError(description);
+      toast({ title: "Erro ao adicionar atividade", description, variant: "destructive" });
+      activityTitleRef.current?.focus();
+    } finally {
+      activitySavingRef.current = false;
+      setActivitySaving(false);
+    }
   };
 
   /*
@@ -270,7 +290,7 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
 
   return (
     <Sheet open={!!contact} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-[520px] sm:max-w-[520px] overflow-y-auto p-0">
+      <SheetContent aria-describedby={undefined} className="w-[520px] sm:max-w-[520px] overflow-y-auto p-0">
         {/* Header */}
         <div className="border-b border-border p-6">
           <div className="flex items-start gap-4">
@@ -280,7 +300,7 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <h2 className="vx-titulo-painel">{contact.first_name} {contact.last_name}</h2>
+              <SheetTitle className="vx-titulo-painel">{contact.first_name} {contact.last_name}</SheetTitle>
               {contact.title && <p className="text-sm text-muted-foreground">{contact.title}</p>}
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <Badge variant="secondary" className={LIFECYCLE_BADGE[contact.lifecycle_stage ?? "lead"]}>
@@ -566,7 +586,7 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
           <TabsContent value="activities" className="mt-4 space-y-4">
             <div className="space-y-2">
               <div className="flex gap-2">
-                <Select value={activityForm.type} onValueChange={(v) => setActivityForm({ ...activityForm, type: v as ActivityType })}>
+                <Select disabled={activitySaving} value={activityForm.type} onValueChange={(v) => setActivityForm({ ...activityForm, type: v as ActivityType })}>
                   <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {/* A lista compartilhada. Esta cópia escrevia "Email" sem
@@ -578,10 +598,13 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
                     ))}
                   </SelectContent>
                 </Select>
-                <Input className="h-8 text-sm" placeholder="Título" value={activityForm.title} onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })} />
+                <Input ref={activityTitleRef} readOnly={activitySaving} aria-label="Título da atividade" aria-invalid={!!activityError} aria-describedby={activityError ? "activity-save-error" : undefined} className="h-8 text-sm" placeholder="Título" value={activityForm.title} onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })} />
               </div>
-              <Textarea placeholder="Descrição..." value={activityForm.body} onChange={(e) => setActivityForm({ ...activityForm, body: e.target.value })} rows={2} className="text-sm" />
-              <Button size="sm" onClick={addActivity} disabled={!activityForm.title}>Adicionar</Button>
+              <Textarea readOnly={activitySaving} aria-label="Descrição da atividade" placeholder="Descrição..." value={activityForm.body} onChange={(e) => setActivityForm({ ...activityForm, body: e.target.value })} rows={2} className="text-sm" />
+              {activityError && <p id="activity-save-error" role="alert" className="text-sm text-destructive">{activityError}</p>}
+              <Button size="sm" onClick={addActivity} disabled={activitySaving || !activityForm.title.trim()} aria-busy={activitySaving}>
+                {activitySaving ? "Adicionando…" : "Adicionar"}
+              </Button>
             </div>
             <div className="space-y-2">
               {activities.map((a) => (

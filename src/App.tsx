@@ -123,7 +123,7 @@ const queryClient = new QueryClient({
       if (mutation.options.onError) return; // já tratado localmente
       toast({
         title: "Erro ao salvar",
-        description: error instanceof Error ? error.message : String(error),
+        description: mensagemErro(error),
         variant: "destructive",
       });
     },

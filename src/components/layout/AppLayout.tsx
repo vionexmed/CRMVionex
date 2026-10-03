@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
@@ -24,13 +24,18 @@ const OnboardingModal = lazy(() =>
   import("@/components/onboarding/OnboardingModal").then((m) => ({ default: m.OnboardingModal })),
 );
 import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function AppLayout() {
   const [searchOpen, setSearchOpen] = useState(false);
-  const { user, profile, loading, isAdmin } = useAuth();
+  const { user, profile, loading, isAdmin, profileStatus, profileError, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const profileErrorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (profileStatus === "error" || profileStatus === "missing") profileErrorRef.current?.focus();
+  }, [profileStatus]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -49,7 +54,7 @@ export function AppLayout() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  if (loading) {
+  if (loading || profileStatus === "loading") {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -65,12 +70,14 @@ export function AppLayout() {
   if (!profile) {
     return (
       <div className="flex h-screen items-center justify-center bg-background p-6">
-        <div className="max-w-sm space-y-2 text-center">
+        <div ref={profileErrorRef} tabIndex={-1} role="alert" className="max-w-sm space-y-2 text-center outline-none">
           <p className="font-heading text-base font-semibold">Não foi possível carregar seu perfil</p>
           <p className="text-sm text-muted-foreground">
-            Sua conta existe, mas o cadastro dentro da empresa não foi concluído. Peça a um
-            administrador para reenviar seu convite.
+            {profileStatus === "missing"
+              ? "Seu perfil ainda não foi encontrado. Tente novamente. Se o problema continuar, peça a um administrador para conferir seu cadastro ou convite."
+              : profileError || "A consulta do perfil falhou. Tente novamente para continuar."}
           </p>
+          <Button onClick={() => void refreshProfile()}>Tentar novamente</Button>
         </div>
       </div>
     );
