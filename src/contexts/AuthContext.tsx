@@ -59,15 +59,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileError, setProfileError] = useState<string | null>(null);
   const generation = useRef(0);
   const currentUser = useRef<string | null>(null);
+  const loadedProfileUser = useRef<string | null>(null);
   const invalidateProfile = useCallback(() => { ++generation.current; }, []);
 
   const startProfile = useCallback(() => {
     const next = ++generation.current;
-    setLoading(true);
+    // Revalidar a mesma identidade mantém o aplicativo e seus rascunhos montados.
+    const keepMounted = loadedProfileUser.current !== null && loadedProfileUser.current === currentUser.current;
+    setLoading(!keepMounted);
     setProfileStatus("loading");
     setProfileError(null);
-    setProfile(null);
-    setRole(null);
+    if (!keepMounted) {
+      loadedProfileUser.current = null;
+      setProfile(null);
+      setRole(null);
+    }
     return next;
   }, []);
 
@@ -105,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userRole = (data?.role as AppRole) ?? null;
       }
       if (!isCurrent()) return;
+      loadedProfileUser.current = userId;
       setProfile(result);
       setRole(userRole);
       setProfileStatus("ready");
@@ -127,12 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       if (nextSession?.user) {
-        // Marcar loading e invalidar a geração anterior ANTES do callback adiado.
+        // Invalidar a geração anterior ANTES de adiar a consulta; bloquear somente sem perfil desta identidade.
         const request = startProfile();
         if (defer) setTimeout(() => { void loadProfile(nextSession.user.id, request); }, 0);
         else void loadProfile(nextSession.user.id, request);
       } else {
         ++generation.current;
+        loadedProfileUser.current = null;
         setProfile(null);
         setRole(null);
         setProfileStatus("idle");
@@ -174,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error;
     }
     currentUser.current = null;
+    loadedProfileUser.current = null;
     setUser(null);
     setSession(null);
     setProfile(null);

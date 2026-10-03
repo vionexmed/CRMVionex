@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { useState, type ReactNode } from "react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import type { Session } from "@supabase/supabase-js";
 
@@ -30,6 +30,8 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: {
     const query = {
       select: () => query,
       eq: (field: string, value: string) => { if (field === "id" || field === "user_id") id = value; return query; },
+      is: () => query, lte: () => query, gt: () => query, order: () => query, limit: () => query,
+      then: (resolve: (response: Response) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve),
       maybeSingle: () => table === "profiles" ? transport.profile(id) : transport.role(id),
     };
     return query;
@@ -39,7 +41,23 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 const session = (id: string) => ({ user: { id }, access_token: id } as Session);
 const profile = (id: string) => ({ id, org_id: `org-${id}` });
 const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{children}</AuthProvider>;
-const emit = (value: Session | null) => act(() => transport.listener!(value ? "SIGNED_IN" : "SIGNED_OUT", value));
+const emit = (value: Session | null, event = value ? "SIGNED_IN" : "SIGNED_OUT") => act(() => transport.listener!(event, value));
+
+function DraftRoute() {
+  const [draft, setDraft] = useState("");
+  const [continued, setContinued] = useState(false);
+  const { refreshProfile } = useAuth();
+  return <>
+    <input aria-label="Rascunho" value={draft} onChange={(event) => setDraft(event.target.value)} />
+    <button onClick={async () => { await refreshProfile(); setContinued(true); }}>Atualizar perfil</button>
+    {continued && <p>Etapa concluída</p>}
+  </>;
+}
+function mountDraftRoute() {
+  render(<MemoryRouter initialEntries={["/contacts"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <AuthProvider><Routes><Route element={<AppLayout />}><Route path="/contacts" element={<DraftRoute />} /></Route></Routes></AuthProvider>
+  </MemoryRouter>);
+}
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -50,6 +68,40 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("perfil e sessão confiáveis", () => {
+  it.each(["TOKEN_REFRESHED", "SIGNED_IN"])("%s do mesmo usuário preserva o formulário montado e seu rascunho", async (event) => {
+    transport.getSession.mockResolvedValue({ data: { session: session("ana") } });
+    transport.profile.mockResolvedValue({ data: profile("ana"), error: null });
+    mountDraftRoute();
+    const input = await screen.findByRole("textbox", { name: "Rascunho" });
+    fireEvent.change(input, { target: { value: "Proposta em preparação" } });
+    const pending = deferred<Response>();
+    transport.profile.mockReturnValue(pending.promise);
+    emit(session("ana"), event);
+    expect(input).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Rascunho" })).toBe(input);
+    expect(input).toHaveValue("Proposta em preparação");
+    await waitFor(() => expect(transport.profile).toHaveBeenCalledTimes(2));
+    await act(async () => pending.resolve({ data: profile("ana"), error: null }));
+    expect(screen.getByRole("textbox", { name: "Rascunho" })).toBe(input);
+    expect(input).toHaveValue("Proposta em preparação");
+  });
+
+  it("refreshProfile preserva a instância para continuar o fluxo depois do await", async () => {
+    transport.getSession.mockResolvedValue({ data: { session: session("ana") } });
+    transport.profile.mockResolvedValue({ data: profile("ana"), error: null });
+    mountDraftRoute();
+    const input = await screen.findByRole("textbox", { name: "Rascunho" });
+    fireEvent.change(input, { target: { value: "Cadastro em preparação" } });
+    const pending = deferred<Response>();
+    transport.profile.mockReturnValue(pending.promise);
+    fireEvent.click(screen.getByRole("button", { name: "Atualizar perfil" }));
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveValue("Cadastro em preparação");
+    await act(async () => pending.resolve({ data: profile("ana"), error: null }));
+    expect(screen.getByRole("textbox", { name: "Rascunho" })).toBe(input);
+    expect(screen.getByText("Etapa concluída")).toBeInTheDocument();
+  });
+
   it("getSession iniciado antes de signOut não restaura a sessão encerrada", async () => {
     const initial = deferred<{ data: { session: Session | null } }>();
     transport.getSession.mockReturnValue(initial.promise);
