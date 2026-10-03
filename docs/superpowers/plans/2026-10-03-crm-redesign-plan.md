@@ -100,7 +100,7 @@ Os agentes podem trabalhar em páginas independentes depois de fixar os contrato
 
 **Interfaces:** `ConversationKey = {orgId:string;channel:'whatsapp'|'instagram'|'email';identity:string;accountId?:string}`. `useConversationDrafts(key)` expõe draft/setDraft/clearDraft; persistência de texto é em memória por sessão, sem armazenar mensagens em storage global. `ChannelConnectionState` separa checking/connected/disconnected/error.
 
-- [ ] Testar troca de canal com rascunho, envio falha após troca de thread e consulta pendente não mostra desconectado; membro não recebe CTA admin.
+- [ ] Testar troca de canal com rascunho, envio falha após troca de thread e consulta pendente não mostra desconectado; membro não recebe CTA admin. Rascunhos em memória pertencem à sessão do usuário: logout/troca de identidade limpa ou isola o mapa, inclusive entre usuários da mesma organização; renovação da mesma sessão preserva o texto.
 - [ ] Rodar red; integrar shell aos componentes sem alterar payloads/endpoints de envio.
 - [ ] Implementar master/detail responsivo e status real; manter pastas, anexos e conta Gmail; Templates/Sequências permanecem admin.
 - [ ] Paginar histórico sob o contrato atual das APIs; ordenar de forma estável, preservar viewport ao carregar mensagens antigas e indicar alcance da busca. Não prometer busca em todo histórico sem consulta correspondente.
