@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Mail, Lock, User } from "lucide-react";
 import vionexLogo from "@/assets/vionex-logo-sidebar.png";
@@ -98,17 +98,23 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="flex flex-col items-center gap-2">
-          <img src={vionexLogo} alt="VIONEX" className="h-24 w-24 object-contain" />
-          <h1 className="vx-titulo-tela">VIONEX</h1>
-          <p className="vx-subtitulo-tela">Gerencie seus relacionamentos com inteligência</p>
+    <div className="vx-login">
+      <aside className="vx-login-brand" aria-label="Vionex CRM">
+        <img src={vionexLogo} alt="VIONEX" />
+        <div className="vx-login-story">
+          <p className="!mb-5 !mt-0 text-xs uppercase tracking-[0.18em]">Comercial da saúde</p>
+          <h2 className="vx-titulo-tela">Relacionamentos que<br />movem seu negócio.</h2>
+          <p>Contatos, oportunidades e atendimento em um só lugar. Mais clareza para o próximo passo.</p>
         </div>
-
-        <Card className="border-border">
+        <footer>Vionex · Gestão de relacionamentos</footer>
+      </aside>
+      <main className="vx-login-form">
+        <div>
+          <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Seu espaço de trabalho</p>
+          <h1 className="vx-titulo-tela">Acesse o CRM</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Entre para acompanhar sua operação comercial.</p>
           <Tabs defaultValue="login">
-            <CardHeader>
+
               <PageTabs
                 abas={[
                   { valor: "login", rotulo: "Entrar", icone: LogIn },
@@ -118,9 +124,9 @@ export default function Login() {
                   { valor: "magic", rotulo: "Link por e-mail", icone: Wand2, rotuloCurto: "Link" },
                 ]}
               />
-            </CardHeader>
 
-            <CardContent>
+
+            <div>
               <TabsContent value="login" className="mt-0 space-y-4">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
@@ -129,6 +135,7 @@ export default function Login() {
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="login-email"
+                        autoComplete="email"
                         type="email"
                         placeholder="seu@email.com"
                         className="pl-9"
@@ -144,6 +151,7 @@ export default function Login() {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="login-password"
+                        autoComplete="current-password"
                         type="password"
                         placeholder="••••••••"
                         className="pl-9"
@@ -223,10 +231,10 @@ export default function Login() {
                 {magicLinkSent ? (
                   <div className="py-8 text-center">
                     <Mail className="mx-auto mb-4 h-12 w-12 text-primary" />
-                    <CardTitle className="mb-2">Verifique seu email</CardTitle>
-                    <CardDescription className="text-sm">
-                      Enviamos um link mágico para <strong>{email}</strong>
-                    </CardDescription>
+                    <h2 className="vx-titulo-painel mb-2">Verifique seu e-mail</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Enviamos um link de acesso para <strong>{email}</strong>
+                    </p>
                   </div>
                 ) : (
                   <form onSubmit={handleMagicLink} className="space-y-4">
@@ -246,15 +254,15 @@ export default function Login() {
                       </div>
                     </div>
                     <Button type="submit" className="w-full" disabled={loading}>
-                      {loading ? "Enviando..." : "Enviar magic link"}
+                      {loading ? "Enviando..." : "Enviar link de acesso"}
                     </Button>
                   </form>
                 )}
               </TabsContent>
-            </CardContent>
+            </div>
           </Tabs>
-        </Card>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

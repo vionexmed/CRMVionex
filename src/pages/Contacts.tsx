@@ -19,7 +19,7 @@ import { useCompanies } from "@/hooks/queries/useCompanies";
 import { useMembers } from "@/hooks/queries/useMembers";
 import { PAGE_SIZE } from "@/lib/api/contacts";
 import {
-  getContactOrigin, ORIGIN_OPTIONS,
+  getContactOrigin, ORIGIN_OPTIONS, PAISES,
   LIFECYCLE_LABELS, LIFECYCLE_COLORS, type LifecycleStage,
 } from "@/lib/contact-options";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,8 @@ interface ContactFilters {
   lifecycleStage?: string;
   ownerId?: string;
   companyId?: string;
+  country?: string;
+  city?: string;
   origin?: string;
   createdFrom?: string;
   createdTo?: string;
@@ -158,10 +160,11 @@ export default function Contacts() {
 
   // Debounce search to avoid a query on every keystroke
   const debouncedSearch = useDebounce(search, 300);
+  const debouncedFilters = useDebounce(filters, 300);
 
 
   // Reset to page 0 when filters/search/sort change
-  useEffect(() => { setPage(0); }, [debouncedSearch, filters, sortKey, sortDir]);
+  useEffect(() => { setPage(0); }, [debouncedSearch, debouncedFilters, sortKey, sortDir]);
 
   // Seleção não pode sobreviver a mudança de página/filtro/busca —
   // senão ações em lote atingem linhas que o usuário não está mais vendo
@@ -200,7 +203,7 @@ export default function Contacts() {
     search: debouncedSearch || undefined,
     sortKey,
     sortDir,
-    ...filters,
+    ...debouncedFilters,
   };
   const {
     data: result,
@@ -215,7 +218,7 @@ export default function Contacts() {
 
   // Kanban por vendedor precisa de TODOS os contatos, não só a página atual
   const { data: allContactsForKanban = [] } = useAllContacts(
-    { search: debouncedSearch || undefined, ...filters },
+    { search: debouncedSearch || undefined, ...debouncedFilters },
     viewMode === "owner"
   );
 
@@ -516,6 +519,20 @@ export default function Contacts() {
             </Select>
           </div>
           <div className="space-y-1">
+            <Label htmlFor="contact-country" className="text-xs">País</Label>
+            <Select value={filters.country || "all"} onValueChange={(v) => setFilters({ ...filters, country: v === "all" ? undefined : v })}>
+              <SelectTrigger id="contact-country" className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os países</SelectItem>
+                {PAISES.map((pais) => <SelectItem key={pais} value={pais}>{pais}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="contact-city" className="text-xs">Cidade</Label>
+            <Input id="contact-city" placeholder="Ex.: Campinas" className="w-44 h-8 text-xs" value={filters.city ?? ""} onChange={(e) => setFilters({ ...filters, city: e.target.value || undefined })} />
+          </div>
+          <div className="space-y-1">
             <Label className="text-xs">Criado de</Label>
             <Input type="date" className="w-36 h-8 text-xs" value={filters.createdFrom ?? ""} onChange={(e) => setFilters({ ...filters, createdFrom: e.target.value || undefined })} />
           </div>
@@ -529,6 +546,17 @@ export default function Contacts() {
             </Button>
           )}
         </BarraDeFiltros>
+      )}
+
+      {(filters.country || filters.city) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Filtros de localização ativos">
+          <span className="text-muted-foreground">Localização:</span>
+          {([['country', 'País'], ['city', 'Cidade']] as const).map(([key, label]) => filters[key] && (
+            <Button key={key} variant="outline" size="sm" className="h-8 text-xs" aria-label={`Remover filtro de ${label.toLowerCase()}`} onClick={() => setFilters({ ...filters, [key]: undefined })}>
+              {label}: {filters[key]} <X className="h-3 w-3" />
+            </Button>
+          ))}
+        </div>
       )}
 
       {selectedContacts.size > 0 && (

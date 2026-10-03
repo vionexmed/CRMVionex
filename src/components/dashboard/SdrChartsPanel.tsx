@@ -44,7 +44,7 @@ export default function SdrChartsPanel({
 
   if (carregando) {
     return (
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="vx-charts-grid grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         {/* O esqueleto usa a MESMA grade: com duas pilhas aqui e grade depois,
             a tela saltava de um arranjo para outro ao terminar de carregar. */}
         <Skeleton className={`h-[290px] rounded-lg ${AREA.evolucao}`} />
@@ -74,7 +74,7 @@ export default function SdrChartsPanel({
      * conteúdo, e aí os dois de uma fileira terminariam em alturas diferentes.
      * Esticando, a fileira lê como uma fileira.
      */
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+    <div className="vx-charts-grid grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <GraficoEvolucao dados={charts?.serie ?? []} className={AREA.evolucao} />
 
       <GraficoFunil dados={charts?.funil ?? []} className={AREA.funil} />

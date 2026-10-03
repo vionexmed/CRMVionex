@@ -17,27 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-/**
- * A barra lateral, no formato de cartão flutuante.
- *
- * Era navy, encostada na borda, com todos os grupos abertos e um rótulo em
- * versalete sobre cada um. Agora é um cartão claro com respiro em volta -- o
- * `variant="floating"` do primitivo já dá o arredondamento, a borda e a sombra.
- *
- * O QUE MUDA DE ESTRUTURA, e não só de cor:
- *
- * - o PRIMEIRO grupo é plano, sem cabeçalho. São os destinos do dia a dia, e um
- *   rótulo "Trabalho" sobre "Painel / Atividades" não informa nada que os dois
- *   itens já não digam;
- * - os demais viram SEÇÕES RECOLHÍVEIS. Com quatro grupos e catorze itens, quem
- *   não usa Marketing carrega Marketing na tela o dia inteiro;
- * - o topo é só a MARCA, centralizada. Cheguei a pôr ali o nome da organização e
- *   um campo de busca, copiados da referência, e os dois saíram: a conta é de
- *   uma empresa só -- não há troca de workspace -- e a busca duplicava a do
- *   cabeçalho da página, com o mesmo ⌘K abrindo a mesma paleta.
- *
- * Recolhida vira um trilho de ícones, com o nome em tooltip.
- */
+/** Navegação integrada à borda da aplicação, com seções recolhíveis. */
 
 /** Quais seções começam fechadas. Vazio: todas abertas, e a pessoa decide. */
 const FECHADAS_POR_PADRAO = new Set<string>();
@@ -91,7 +71,7 @@ export function AppSidebar() {
       </>
     );
     const classe = cn(
-      "vx-nav-item flex w-full items-center rounded-lg text-sm font-medium text-sidebar-foreground",
+      "vx-nav-item flex w-full items-center rounded-md text-sm font-medium text-sidebar-foreground",
       collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-2.5 py-2",
     );
 
@@ -122,7 +102,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar collapsible="icon" variant="floating" className="border-none">
+      <Sidebar collapsible="icon" variant="sidebar">
         {/* ---------- Cabeçalho: só a marca ---------- */}
         {/*
           O NOME DA ORGANIZAÇÃO E A BUSCA SAÍRAM.

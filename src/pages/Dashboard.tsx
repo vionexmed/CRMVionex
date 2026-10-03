@@ -265,15 +265,9 @@ export default function Dashboard() {
 
         {/* ── Ver o movimento ── */}
         <TabsContent value="visao" className="mt-4 space-y-4">
-          {/* Uma faixa, não quatro cartões.
-              A moldura é uma só e a divisória entre os números é uma linha:
-              os quatro passam a ser uma leitura em vez de quatro objetos. */}
-          {/* Cartões separados, não uma faixa.
-              Cheguei a juntá-los numa moldura só com divisória de 1px, e ali os
-              quatro números liam como linha de tabela. No painel de comando cada
-              métrica é um objeto que se levanta do fundo -- é a elevação que os
-              separa, então não precisam nem de moldura comum nem de divisória. */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {/* Indicadores agrupados em uma faixa contínua. */}
+          <div className="vx-metrics-strip">
+          <div className="-ml-px -mt-px grid grid-cols-2 lg:grid-cols-4">
             {tilesDestaque.map((tile) =>
               isLoading ? (
                 <Skeleton key={tile.key} className="h-[132px] rounded-lg" />
@@ -281,6 +275,7 @@ export default function Dashboard() {
                 <StatCard
                   key={tile.key}
                   emphasis
+                  emFaixa
                   label={tile.label}
                   value={metrics?.[tile.key]?.value ?? null}
                   previous={metrics?.[tile.key]?.previous ?? null}
@@ -315,6 +310,7 @@ export default function Dashboard() {
                 />
               ),
             )}
+          </div>
           </div>
 
           <SdrChartsPanel charts={charts} carregando={loadingCharts} />

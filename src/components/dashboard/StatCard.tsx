@@ -220,7 +220,7 @@ export function StatCard({
          * `nth-child`.
          */
         emFaixa ? "min-w-0 rounded-none border-l border-t border-border" : "vx-elevado",
-        clickable && "cursor-pointer hover:shadow-[0_2px_4px_hsl(217_72%_14%/0.08),0_8px_20px_hsl(217_72%_14%/0.08)]",
+        clickable && "cursor-pointer hover:bg-accent/40",
         noSource && "opacity-60",
       )}
       onClick={clickable ? () => (onCardClick ? onCardClick() : navigate(href!)) : undefined}

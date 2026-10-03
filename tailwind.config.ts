@@ -130,9 +130,12 @@ export default {
        * Com fator, os três acompanham o cartão sem se achatar: 16 / 10 / 6.
        */
       borderRadius: {
-        lg: "var(--radius)",                 /* 16px — cartão, painel */
-        md: "calc(var(--radius) * 0.625)",   /* 10px — botão, campo */
-        sm: "calc(var(--radius) * 0.375)",   /*  6px — selo, caixa de seleção */
+        xl: "var(--radius)",
+        "2xl": "calc(var(--radius) * 1.333)",
+        "3xl": "calc(var(--radius) * 1.667)",
+        lg: "var(--radius)",                 /* 6px — superfícies */
+        md: "calc(var(--radius) * 0.667)",   /* 4px — controles */
+        sm: "calc(var(--radius) * 0.375)",   /* 2px — pequenos elementos */
       },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },

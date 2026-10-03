@@ -45,11 +45,8 @@
     --border: 220 13% 93%;
     --input: 220 12% 91%;
     --ring: 187 100% 27%;
-    /* 16px, e UM raio só. Havia `rounded-md` (115 usos) e `rounded-lg` (92)
-       competindo -- dois arredondamentos diferentes na mesma tela.
-       Subiu de 10px: é a diferença mais visível entre a cara antiga e a nova,
-       e sai de graça em todo cartão porque o raio já vinha do token. */
-    --radius: 1rem;
+    /* Cantos discretos: superfícies 6px, controles 4px. */
+    --radius: 0.375rem;
 
     /*
      * O RESPIRO, POR DENSIDADE.
@@ -251,49 +248,16 @@
 
 @layer components {
 
-  /* ── Botão Primário com Gradiente ─────────────────────── */
-  /* Botão primário, derivado da cor de destaque escolhida.
-   *
-   * O teal estava cravado em cinco valores (dois gradientes e três sombras),
-   * então trocar a cor em Configurações mudava tudo MENOS o botão mais
-   * importante da tela. `color-mix` deriva as pontas do gradiente do próprio
-   * --primary, e a sombra usa o token com alfa -- assim a escolha do usuário
-   * chega até aqui. */
+  /* Controles sólidos, sem elevação decorativa. */
   .vx-btn-primary {
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, hsl(var(--primary)) 88%, #000) 0%,
-      color-mix(in srgb, hsl(var(--primary)) 82%, #fff) 100%
-    );
-    box-shadow:
-      0 1px 3px hsl(var(--primary) / 0.30),
-      inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.1s ease;
+    background: hsl(var(--primary));
+    box-shadow: none;
+    transition: background 0.18s ease;
   }
-  .vx-btn-primary:hover {
-    background: linear-gradient(
-      135deg,
-      color-mix(in srgb, hsl(var(--primary)) 74%, #000) 0%,
-      color-mix(in srgb, hsl(var(--primary)) 92%, #000) 100%
-    );
-    box-shadow:
-      0 3px 10px hsl(var(--primary) / 0.40),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  }
-  .vx-btn-primary:active {
-    transform: translateY(1px);
-    box-shadow: 0 1px 4px hsl(var(--primary) / 0.25);
-  }
-
-  /* ── Cards com Sombra e Hover ─────────────────────────── */
-  .vx-card {
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.2s ease, transform 0.15s ease;
-  }
-  .vx-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
-  }
+  .vx-btn-primary:hover { background: hsl(var(--primary) / 0.9); }
+  .vx-btn-primary:active { background: hsl(var(--primary) / 0.85); }
+  .vx-card { border: 1px solid hsl(var(--border)); box-shadow: none; }
+  .vx-card:hover { border-color: hsl(var(--primary) / 0.3); }
 
   /* ── Badge Pills ──────────────────────────────────────── */
   /* Override global .badge para pill */
@@ -433,7 +397,7 @@
        `border-radius` maior (0.75rem contra os 0.5 do token) porque o cabeçalho
        da coluna usa `rounded-xl`: cartões da mesma pilha com raios diferentes
        leem como coisas diferentes. */
-    border-radius: 0.75rem;
+    border-radius: var(--radius);
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
     /* 14px NOS QUATRO LADOS, e não 12/14. O rodapé de ações sangra até a borda
@@ -630,27 +594,42 @@
   .overflow-x-auto > * { scroll-snap-align: start; }
 }
 
-/* Um plano acima do fundo.
- *
- * Duas camadas de sombra: a curta e mais opaca ancora o cartão na superfície, a
- * longa e difusa dá a altura. Só a longa faz o objeto parecer flutuar sem
- * apoio; só a curta não levanta nada.
- *
- * A cor vem do navy da marca, não de preto puro: sombra preta sobre um fundo
- * levemente azulado fica cinza-morta. */
-.vx-elevado {
-  box-shadow:
-    0 1px 2px hsl(217 72% 14% / 0.06),
-    0 4px 12px hsl(217 72% 14% / 0.05);
+/* Superfícies delimitadas por linha, sem cartões flutuantes. */
+.vx-elevado { border: 1px solid hsl(var(--border)); box-shadow: none; }
+.dark .vx-elevado { box-shadow: none; }
+
+/* Áreas contínuas de leitura do painel. */
+.vx-metrics-strip { overflow: hidden; border-block: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
+.vx-metrics-strip > div { background: transparent; }
+.vx-charts-grid { gap: 0; border-bottom: 1px solid hsl(var(--border)); }
+.vx-charts-grid > div { border: 0; border-top: 1px solid hsl(var(--border)); border-radius: 0; background: transparent; box-shadow: none; }
+@media (min-width: 1024px) {
+  .vx-charts-grid > div:nth-child(even) { border-left: 1px solid hsl(var(--border)); }
 }
 
-.dark .vx-elevado {
-  /* No escuro a sombra quase não existe -- não há luz para bloquear. A
-   * separação vem de uma linha de realce no topo, que é como uma superfície
-   * elevada se lê num ambiente escuro. */
-  box-shadow:
-    0 0 0 1px hsl(0 0% 100% / 0.06),
-    0 2px 8px hsl(0 0% 0% / 0.3);
+/* Entrada: formulário direto, marca em um plano independente. */
+.vx-login { min-height: 100dvh; display: grid; background: hsl(var(--card)); }
+.vx-login-brand { display: flex; flex-direction: column; justify-content: space-between; gap: 3rem; padding: 2rem; background: #102c3a; color: #fff; }
+.vx-login-brand img { width: 148px; height: auto; }
+.vx-login-story h2 { color: #fff; max-width: 520px; font-size: clamp(2rem, 3.5vw, 3.6rem); font-weight: 500; line-height: 1.12; letter-spacing: -0.04em; }
+.vx-login-story p { margin-top: 1.5rem; max-width: 380px; color: #b9cbd2; font-size: 15px; line-height: 1.7; }
+.vx-login-brand footer { color: #b9cbd2; font-size: 12px; }
+.vx-login-form { display: flex; align-items: center; justify-content: center; padding: 2.5rem 1.5rem; }
+.vx-login-form > div { width: 100%; max-width: 380px; }
+.vx-login-form h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.035em; }
+.vx-login-form input { height: 46px; background: hsl(var(--card)); }
+.vx-login-form [role=tablist] { margin: 1.5rem 0; background: transparent; border-bottom: 1px solid hsl(var(--border)); border-radius: 0; padding: 0; gap: 0; }
+.vx-login-form [role=tab] { border-radius: 0; border-bottom: 2px solid transparent; padding: 12px 4px; box-shadow: none; }
+.vx-login-form [role=tab][data-state=active] { color: hsl(var(--primary)); border-bottom-color: hsl(var(--primary)); background: transparent; box-shadow: none; }
+@media (min-width: 1024px) {
+  .vx-login { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .vx-login-brand { padding: 3.5rem; }
+}
+@media (max-width: 1023px) {
+  .vx-login-brand { padding: 1.5rem; gap: 0; }
+  .vx-login-story, .vx-login-brand footer { display: none; }
+  .vx-login { grid-template-rows: auto 1fr; }
+  .vx-login-form { align-items: flex-start; padding-top: 3rem; }
 }
 
 /* ── Hierarquia de texto ──────────────────────────────────────────────────

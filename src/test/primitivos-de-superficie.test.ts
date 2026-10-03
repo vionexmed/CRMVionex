@@ -58,22 +58,15 @@ describe("o cartão não tem dois sinais para a mesma coisa", () => {
     expect(CARD).not.toMatch(/cn\("[^"]*\bborder\b/);
   });
 
-  /**
-   * Duas camadas: a curta e opaca ancora o cartão na superfície, a longa e
-   * difusa dá a altura. Só a longa faz o objeto flutuar sem apoio.
-   */
-  it("a elevação tem duas camadas", () => {
+  it("as superfícies são separadas por linha sem sombra", () => {
     const i = CSS.indexOf(".vx-elevado {");
     const bloco = CSS.slice(i, CSS.indexOf("}", i));
-    expect((bloco.match(/hsl\(/g) ?? []).length).toBe(2);
+    expect(bloco).toContain("border: 1px solid hsl(var(--border))");
+    expect(bloco).toContain("box-shadow: none");
   });
 
-  /**
-   * No escuro não há luz para bloquear -- sombra preta sobre fundo preto não
-   * existe. A separação vem de uma linha de realce no topo.
-   */
-  it("no tema escuro a elevação é realce, não sombra", () => {
-    expect(CSS).toMatch(/\.dark \.vx-elevado \{[\s\S]*?0 0 0 1px/);
+  it("no tema escuro também não há sombra decorativa", () => {
+    expect(CSS).toMatch(/\.dark \.vx-elevado \{[^}]*box-shadow: none/);
   });
 
   /**

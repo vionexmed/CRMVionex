@@ -22,6 +22,8 @@ export interface ContactListParams {
   lifecycleStage?: string;
   ownerId?: string;
   companyId?: string;
+  country?: string;
+  city?: string;
   createdFrom?: string;
   createdTo?: string;
   /**
@@ -48,7 +50,7 @@ export interface ContactListResult {
 const sanitizeSearch = (s: string) => s.replace(/[,()"\\]/g, " ").trim();
 
 const buildListQuery = (orgId: string, params: ContactListParams) => {
-  const { search, lifecycleStage, ownerId, companyId, createdFrom, createdTo, origin, sortKey = "created_at", sortDir = "desc" } = params;
+  const { search, lifecycleStage, ownerId, companyId, country, city, createdFrom, createdTo, origin, sortKey = "created_at", sortDir = "desc" } = params;
 
   // Contatos é a lista de TODAS as pessoas da organização.
   //
@@ -71,6 +73,13 @@ const buildListQuery = (orgId: string, params: ContactListParams) => {
   }
   if (ownerId && ownerId !== "all") query = query.eq("owner_id", ownerId);
   if (companyId && companyId !== "all") query = query.eq("company_id", companyId);
+  // A localização é salva no metadata pelo cadastro e pela importação.
+  // ilike evita diferenciar maiúsculas; cidade aceita parte do nome.
+  const pais = country?.trim();
+  const cidade = city?.trim();
+  const literal = (value: string) => value.replace(/[\\%_*]/g, (char) => `\\${char}`);
+  if (pais) query = query.ilike("metadata->>pais", literal(pais));
+  if (cidade) query = query.ilike("metadata->>cidade", `%${literal(cidade)}%`);
   if (createdFrom) query = query.gte("created_at", createdFrom);
   if (createdTo) query = query.lte("created_at", createdTo);
   // Filtro por origem (metadata.source). Agrupa valores em buckets amigáveis.

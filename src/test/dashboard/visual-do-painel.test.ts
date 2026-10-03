@@ -59,24 +59,14 @@ describe("o tile de métrica tem presença sem competir", () => {
   });
 });
 
-describe("cartão solto no destaque, faixa no detalhe", () => {
-  /**
-   * Duas decisões OPOSTAS, e as duas deliberadas.
-   *
-   * Nos quatro do destaque, cada métrica é um objeto que se levanta do fundo --
-   * a elevação separa, e não precisa de moldura comum. Cheguei a juntá-los numa
-   * faixa com divisória de 1px e ali os quatro liam como linha de tabela.
-   *
-   * Nos DEZESSEIS de Indicadores é o contrário: cartões soltos seriam dezesseis
-   * objetos flutuando, e a elevação deixaria de significar "isto importa" para
-   * significar "isto é um cartão". Ali a moldura por grupo é o que faz o grupo
-   * se ler como grupo.
-   */
-  it("o destaque usa cartões separados", () => {
+describe("indicadores agrupados em faixas", () => {
+  it("o destaque usa uma faixa com divisórias", () => {
     const i = PAINEL.indexOf('value="visao"');
     const bloco = PAINEL.slice(i, i + 700);
-    expect(bloco).toMatch(/grid grid-cols-2 gap-3[^"]*lg:grid-cols-4/);
-    expect(bloco).not.toContain("gap-px");
+    expect(bloco).toContain("vx-metrics-strip");
+    expect(bloco).toMatch(/grid grid-cols-2[^"\n]*lg:grid-cols-4/);
+    expect(bloco).toContain("emFaixa");
+    expect(bloco).not.toContain("gap-3");
   });
 
   it("os indicadores usam a faixa", () => {
