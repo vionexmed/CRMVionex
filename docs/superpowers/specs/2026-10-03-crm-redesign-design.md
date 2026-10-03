@@ -8,6 +8,19 @@ Reescrever a apresentação visual de todas as páginas para tornar o CRM agrad�
 
 A primeira rodada já está aplicada localmente: login sem cartão flutuante, raio reduzido, botões sólidos, sidebar integrada, indicadores em faixa, gráficos com divisórias e filtros de país/cidade. Isso é uma base parcial; a nova arquitetura e a revisão página por página descritas aqui ainda serão implementadas.
 
+## Referências de produto verificadas
+
+Consulta em 03/10/2026 às fontes oficiais e às capturas de interface publicadas pelos produtos. O usuário pediu referências de CRMs ativos e consolidados. Estes padrões orientam a implementação; a marca, os dados e as permissões continuam sendo do Vionex.
+
+| Referência | Padrão observado | Aplicação no Vionex |
+|---|---|---|
+| [Attio — navegação e busca](https://attio.com/help/reference/productivity-collaborating/navigating-your-workspace) | Busca no topo da sidebar; tabela contínua com ferramentas próximas dos registros; ações por teclado | Busca abaixo da marca, contraste discreto na seleção, separadores finos, ferramentas alinhadas à tabela |
+| [Attio — fichas](https://attio.com/help/reference/managing-your-data/records/create-and-view-records) | Dados e histórico relacionados acessíveis a partir do registro | Fichas de contatos e empresas com propriedades agrupadas e atividade no mesmo contexto |
+| [Pipedrive — funil](https://support.pipedrive.com/en/article/pipeline-view) | Etapas legíveis; negócio resume título, contato, valor e responsável; atividade acessível | Cartões compactos somente para negócios arrastáveis, prioridade de informação e acesso ao detalhe |
+| [HubSpot — caixa de conversas](https://knowledge.hubspot.com/inbox/use-the-conversations-inbox) | Lista à esquerda, conversa no centro, contexto do contato à direita; filtros operacionais | Comunicação com canais, lista/detalhe integrados, composer persistente e contexto sem caixas redundantes |
+
+Direção editorial decorrente: fundos neutros, bordas leves, densidade útil, tipografia consistente, ações primárias sólidas e cor reservada a seleção e estados. Evitar gradientes decorativos, ícones em ladrilhos, cards de informação repetidos, textos promocionais artificiais e elementos sem função. Animações devem explicar abertura, seleção, envio e arraste, sem competir com os dados. Os seis destinos e os tempos de movimento são decisões próprias aprovadas para Vionex, não alegações de que existem exatamente assim nas referências.
+
 ## Princípios de composição
 
 Uma página é uma área de trabalho, não uma coleção de caixas. Cabeçalho, ferramentas, dados e ações formam uma superfície contínua, com divisórias somente onde há mudança de contexto. Cartões continuam apropriados para unidades independentes, como negócios arrastáveis e produtos com imagens. Seções informativas não usam cartões por padrão. Nenhuma tela ganha dados fictícios para parecer completa.
