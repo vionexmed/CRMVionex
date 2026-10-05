@@ -8,6 +8,7 @@ import { Users as UsersIcon } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/hooks/useOrg";
+import { useContactFromSearch } from "@/hooks/queries/useGlobalSearch";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useContacts, useAllContacts, useLastActivities, useDeleteContacts,
@@ -126,7 +127,7 @@ function OriginBadge({ metadata }: { metadata: unknown }) {
 
 export default function Contacts() {
   const { orgId } = useOrg();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -140,10 +141,21 @@ export default function Contacts() {
   const [exclusao, setExclusao] = useState<{ ids: string[]; negocios: number; atividades: number } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
-  const [drawerContact, setDrawerContact] = useState<Contact | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const recordId = searchParams.get("id");
+  const detail = useContactFromSearch(recordId);
+  const drawerContact = !detail.isError && detail.data?.org_id === orgId && detail.data?.id === recordId ? detail.data : null;
+  const setDrawerContact = (record: Contact | null) => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (record) next.set("id", record.id);
+      else next.delete("id");
+      return next;
+    });
+  };
+
   /**
    * As origens que EXISTEM na base, para o filtro deixar de ser lista fixa.
    *
@@ -173,8 +185,9 @@ export default function Contacts() {
   useEffect(() => {
     if (searchParams.get("action") === "new") {
       setCreateOpen(true);
-      searchParams.delete("action");
-      setSearchParams(searchParams, { replace: true });
+      const next = new URLSearchParams(searchParams);
+      next.delete("action");
+      setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 
@@ -419,6 +432,18 @@ export default function Contacts() {
         </>
       }
     >
+      {recordId && detail.isPending && <p role="status" className="text-sm text-muted-foreground">Abrindo contato…</p>}
+      {recordId && (detail.isError || (detail.isSuccess && !drawerContact)) && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">{detail.isError ? "Não foi possível abrir contato" : "Contato indisponível"}</p>
+            <p className="text-xs text-muted-foreground">{detail.isError ? mensagemErro(detail.error) : "O registro foi removido ou você não tem acesso nesta organização."}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void detail.refetch()}>Tentar novamente</Button>
+          <Button variant="ghost" size="sm" onClick={() => setDrawerContact(null)}>Voltar à lista</Button>
+        </div>
+      )}
+
 
 
       <div className="relative">
@@ -812,6 +837,7 @@ export default function Contacts() {
       </Dialog>
 
       <ContactDrawer
+        key={`${user?.id}:${orgId}:${recordId}`}
         contact={drawerContact}
         onClose={() => setDrawerContact(null)}
         onUpdate={invalidate}

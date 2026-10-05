@@ -3,7 +3,9 @@ import { PageShell } from "@/components/layout/PageShell";
 import { Building2 as Building2Icon } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { useOrg } from "@/hooks/useOrg";
+import { useCompanyFromSearch } from "@/hooks/queries/useGlobalSearch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +22,7 @@ import {
   Plus, Search, LayoutGrid, List, Filter, Upload, Download,
   Trash2, X, Building2,
 } from "lucide-react";
+import { mensagemErro } from "@/lib/erro-supabase";
 import { useToast } from "@/hooks/use-toast";
 import { CompanyDrawer } from "@/components/crm/CompanyDrawer";
 import { CompanyCreateModal } from "@/components/crm/CompanyCreateModal";
@@ -51,6 +54,7 @@ interface CompanyFilters {
 
 export default function Companies() {
   const { orgId } = useOrg();
+  const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -70,16 +74,28 @@ export default function Companies() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
 
-  const [drawerCompany, setDrawerCompany] = useState<Company | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const recordId = searchParams.get("id");
+  const detail = useCompanyFromSearch(recordId);
+  const drawerCompany = !detail.isError && detail.data?.org_id === orgId && detail.data?.id === recordId ? detail.data : null;
+  const setDrawerCompany = (record: Company | null) => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (record) next.set("id", record.id);
+      else next.delete("id");
+      return next;
+    });
+  };
+
 
   useEffect(() => {
     if (searchParams.get("action") === "new") {
       setCreateOpen(true);
-      searchParams.delete("action");
-      setSearchParams(searchParams, { replace: true });
+      const next = new URLSearchParams(searchParams);
+      next.delete("action");
+      setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 
@@ -198,6 +214,18 @@ export default function Companies() {
         </>
       }
     >
+      {recordId && detail.isPending && <p role="status" className="text-sm text-muted-foreground">Abrindo empresa…</p>}
+      {recordId && (detail.isError || (detail.isSuccess && !drawerCompany)) && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">{detail.isError ? "Não foi possível abrir empresa" : "Empresa indisponível"}</p>
+            <p className="text-xs text-muted-foreground">{detail.isError ? mensagemErro(detail.error) : "O registro foi removido ou você não tem acesso nesta organização."}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void detail.refetch()}>Tentar novamente</Button>
+          <Button variant="ghost" size="sm" onClick={() => setDrawerCompany(null)}>Voltar à lista</Button>
+        </div>
+      )}
+
 
 
       <div className="relative">
@@ -378,7 +406,7 @@ export default function Companies() {
         onMudar={setPage}
       />
 
-      <CompanyDrawer company={drawerCompany} onClose={() => setDrawerCompany(null)} onUpdate={invalidate} />
+      <CompanyDrawer key={`${user?.id}:${orgId}:${recordId}`} company={drawerCompany} onClose={() => setDrawerCompany(null)} onUpdate={invalidate} />
       <CompanyCreateModal open={createOpen} onOpenChange={setCreateOpen} onCreated={invalidate} />
       <CSVImportModal open={csvOpen} onOpenChange={setCsvOpen} onImported={invalidate} entityType="companies" />
     </PageShell>

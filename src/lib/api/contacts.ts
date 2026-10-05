@@ -138,6 +138,15 @@ const buildListQuery = (orgId: string, params: ContactListParams) => {
 export const PREFIXO_ORIGEM_EXATA = "src:";
 
 export const contactsApi = {
+  getById: async (orgId: string, id: string, signal?: AbortSignal): Promise<Contact | null> => {
+    if (!orgId || !id) return null;
+    const query = supabase.from(TABLES.CONTACTS).select("*").eq("org_id", orgId).eq("id", id);
+    if (signal) query.abortSignal(signal);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
   /**
    * As origens que existem na base, com contagem.
    *
