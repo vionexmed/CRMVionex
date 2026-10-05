@@ -174,11 +174,11 @@ describe("a tela de Leads saiu inteira", () => {
     }
   });
 
-  /** O grupo "Trabalho" continua existindo, com os dois que sobraram. */
+  /** Leads continua sendo filtro de Clientes; o destino primário fica coerente. */
   it("a lateral segue coerente", () => {
-    expect(grupoDaRota("/dashboard")).toBe("Trabalho");
-    expect(grupoDaRota("/activities")).toBe("Trabalho");
-    expect(grupoDaRota("/contacts")).toBe("Registros");
+    expect(grupoDaRota("/dashboard")).toBe("Painel");
+    expect(grupoDaRota("/activities")).toBe("Atividades");
+    expect(grupoDaRota("/contacts")).toBe("Clientes");
   });
 });
 

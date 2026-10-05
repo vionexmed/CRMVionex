@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { CommunicationLayout, LegacyChannelRedirect } from "@/components/layout/CommunicationLayout";
 import { RequireAdmin } from "@/components/layout/RequireAdmin";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineDetector } from "@/components/OfflineDetector";
@@ -205,12 +206,19 @@ const App = () => (
                     20260909140000 o histórico de e-mail e de conversa é da
                     organização, como o resto do CRM. */}
                 <Route path="/settings/email" element={<SuspenseRoute><MyEmail /></SuspenseRoute>} />
-                <Route path="/inbox" element={<SuspenseRoute><Inbox /></SuspenseRoute>} />
-                {/* Um canal por rota. O componente é o mesmo; o que muda é o
-                    canal, que vem daqui e não de query string -- ver o comentário
-                    em `navegacao.ts` sobre o `isActive`. */}
-                <Route path="/conversations" element={<SuspenseRoute><Conversations canal="whatsapp" /></SuspenseRoute>} />
-                <Route path="/instagram" element={<SuspenseRoute><Conversations canal="instagram" /></SuspenseRoute>} />
+                <Route path="/conversations" element={<LegacyChannelRedirect to="/comunicacao/whatsapp" />} />
+                <Route path="/instagram" element={<LegacyChannelRedirect to="/comunicacao/instagram" />} />
+                <Route path="/inbox" element={<LegacyChannelRedirect to="/comunicacao/email" />} />
+                <Route path="/comunicacao" element={<LegacyChannelRedirect to="/comunicacao/whatsapp" />} />
+                <Route element={<CommunicationLayout />}>
+                  <Route path="/comunicacao/whatsapp" element={<SuspenseRoute><Conversations key="whatsapp" canal="whatsapp" /></SuspenseRoute>} />
+                  <Route path="/comunicacao/instagram" element={<SuspenseRoute><Conversations key="instagram" canal="instagram" /></SuspenseRoute>} />
+                  <Route path="/comunicacao/email" element={<SuspenseRoute><Inbox /></SuspenseRoute>} />
+                  <Route element={<RequireAdmin />}>
+                    <Route path="/email-templates" element={<SuspenseRoute><EmailTemplates /></SuspenseRoute>} />
+                    <Route path="/email-sequences" element={<SuspenseRoute><EmailSequences /></SuspenseRoute>} />
+                  </Route>
+                </Route>
 
                 {/* Todo mundo vê quem é da equipe. As ações (trocar papel, remover,
                     convidar) já são protegidas por isAdmin dentro da própria página. */}
@@ -221,8 +229,6 @@ const App = () => (
 
                 {/* Rotas restritas a owner/admin — Comercial é redirecionado */}
                 <Route element={<RequireAdmin />}>
-                  <Route path="/email-templates" element={<SuspenseRoute><EmailTemplates /></SuspenseRoute>} />
-                  <Route path="/email-sequences" element={<SuspenseRoute><EmailSequences /></SuspenseRoute>} />
                   <Route path="/lead-scoring" element={<SuspenseRoute><LeadScoring /></SuspenseRoute>} />
                   <Route path="/automations" element={<SuspenseRoute><Automations /></SuspenseRoute>} />
                   {/* Marketing continua ACESSÍVEL, só saiu da navegação: seis

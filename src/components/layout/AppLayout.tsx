@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense, type CSSProperties } from "react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { AreaNavigation } from "./CommunicationLayout";
+import { getActiveSection } from "./navegacao";
+import { cn } from "@/lib/utils";
 /**
  * Os três pesam no PRIMEIRO acesso e quase nunca são usados nele.
  *
@@ -29,6 +32,19 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 export function AppLayout() {
   const [searchOpen, setSearchOpen] = useState(false);
+  const onOpenSearch = useCallback(() => setSearchOpen(true), []);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { return localStorage.getItem("vx-sidebar-open") !== "0"; }
+    catch { return true; }
+  });
+  const onSidebarOpenChange = useCallback((open: boolean) => {
+    setSidebarOpen(open);
+    try { localStorage.setItem("vx-sidebar-open", open ? "1" : "0"); }
+    catch { /* A preferência não é requisito para navegar. */ }
+  }, []);
+  const { pathname } = useLocation();
+  const activeSection = getActiveSection(pathname);
+  const communication = activeSection === "comunicacao";
   const { user, profile, loading, isAdmin, profileStatus, profileError, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -45,14 +61,14 @@ export function AppLayout() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k" && !e.isComposing) {
         e.preventDefault();
-        setSearchOpen(true);
+        onOpenSearch();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [onOpenSearch]);
 
   if (loading || (!profile && profileStatus === "loading")) {
     return (
@@ -84,7 +100,7 @@ export function AppLayout() {
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider open={sidebarOpen} onOpenChange={onSidebarOpenChange} style={{ "--sidebar-width": "232px", "--sidebar-width-icon": "64px" } as CSSProperties}>
       {/*
         A CASCA É FIXA; quem rola é o CONTEÚDO.
 
@@ -100,11 +116,12 @@ export function AppLayout() {
         de flex nasce com `min-height: auto`, e sem isso o `<main>` cresce com o
         conteúdo em vez de rolar -- a correção não vale nada sem ele.
       */}
-      <div className="flex h-screen w-full overflow-hidden">
-        <AppSidebar />
+      <div className="flex h-dvh w-full overflow-hidden">
+        <AppSidebar onOpenSearch={onOpenSearch} />
         <div className="flex min-h-0 flex-1 flex-col min-w-0">
-          <AppHeader onOpenSearch={() => setSearchOpen(true)} />
-          <main className="vx-page min-h-0 flex-1 overflow-y-auto p-3 pb-20 sm:p-6 md:pb-6">
+          <AppHeader onOpenSearch={onOpenSearch} />
+          {activeSection && !communication && <AreaNavigation sectionId={activeSection} />}
+          <main className={cn("vx-page min-h-0 min-w-0 flex-1 overflow-y-auto", communication ? "p-0" : "p-4 md:p-6", "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6")}>
             <Outlet />
           </main>
         </div>

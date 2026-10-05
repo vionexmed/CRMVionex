@@ -54,7 +54,7 @@ describe("o rótulo do cabeçalho sai da mesma lista que desenha a lateral", () 
    * `/deals/:id` não está na lista e precisa herdar de `/deals`.
    */
   it("rota filha herda o grupo do pai", () => {
-    expect(grupoDaRota("/deals/9f3a-1b2c")).toBe("Registros");
+    expect(grupoDaRota("/deals/9f3a-1b2c")).toBe("Negócios");
     expect(grupoDaRota("/marketing/visao-geral")).toBe("Análise");
   });
 
