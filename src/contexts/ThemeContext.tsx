@@ -91,12 +91,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const palette = ACCENT_COLORS[color] || ACCENT_COLORS.blue;
     const val = isDark ? palette.dark : palette.light;
     root.style.setProperty("--primary", val);
-<<<<<<< HEAD
     root.style.setProperty("--primary-foreground", isDark ? "211 68% 7%" : "0 0% 100%");
-    root.style.setProperty("--ring", val);
-    root.style.setProperty("--sidebar-primary", val);
-    root.style.setProperty("--sidebar-primary-foreground", isDark ? "211 68% 7%" : "0 0% 100%");
-=======
     /*
      * O ANEL DE FOCO SEGUE O TEMA, não só a cor escolhida.
      *
@@ -109,7 +104,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
      */
     root.style.setProperty("--ring", val);
     root.style.setProperty("--sidebar-primary", val);
->>>>>>> origin/main
+    root.style.setProperty("--sidebar-primary-foreground", isDark ? "211 68% 7%" : "0 0% 100%");
     root.style.setProperty("--sidebar-ring", val);
   };
 
