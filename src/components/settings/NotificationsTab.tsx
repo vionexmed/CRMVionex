@@ -88,7 +88,7 @@ export function NotificationsTab({ orgId, userId }: { orgId: string | null; user
 
       <Card>
         <CardHeader>
-          <CardTitle>Notificações por Email</CardTitle>
+          <CardTitle className="vx-titulo-secao">Notificações por Email</CardTitle>
           <CardDescription>Quais emails você deseja receber</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -113,7 +113,7 @@ export function NotificationsTab({ orgId, userId }: { orgId: string | null; user
         </CardContent>
       </Card>
 
-      <Button size="sm" className="h-8 text-xs" onClick={save}>Salvar Preferências</Button>
+      <div className="flex justify-end"><Button size="sm" className="h-8 text-xs" onClick={save}>Salvar Preferências</Button></div>
     </div>
   );
 }

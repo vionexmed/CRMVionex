@@ -1,18 +1,20 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
 import { useOrg } from "@/hooks/useOrg";
 import { LinhaDeAtividade } from "@/components/crm/LinhaDeAtividade";
 import { SeletorDeOrigem } from "@/components/crm/SeletorDeOrigem";
 import { useUpdateActivity, useDeleteActivities } from "@/hooks/queries/useActivities";
 import { useAuth } from "@/contexts/AuthContext";
-import { Sheet, SheetContent} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Iniciais } from "@/components/layout/ListaV1";
+import { EstagioSelo, OrigemSelo } from "@/components/clientes/CelulasDeCliente";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -63,14 +65,6 @@ type Stage = Database["public"]["Tables"]["pipeline_stages"]["Row"];
  *  - o valor padrão do Select era "prospect", então salvar um contato sem status
  *    definido o marcava como qualificado sem ninguém ter qualificado.
  */
-const LIFECYCLE_BADGE: Record<LifecycleStage, string> = {
-  lead: "bg-muted text-muted-foreground",
-  contacted: "bg-primary/10 text-primary",
-  qualified: "bg-primary/10 text-primary",
-  opportunity: "bg-warning/10 text-warning",
-  customer: "bg-success/10 text-success",
-  disqualified: "bg-destructive/10 text-destructive",
-};
 // Ícone e rótulo de atividade agora moram em `LinhaDeAtividade`, que é quem
 // desenha a linha do histórico -- e continuam vindo de lib/atividade-tipos.ts.
 
@@ -129,6 +123,10 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
   const [deals, setDeals] = useState<Deal[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
   const [activityForm, setActivityForm] = useState({ type: "note" as ActivityType, title: "", body: "" });
+  const [activitySaving, setActivitySaving] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const activitySavingRef = useRef(false);
+  const activityTitleRef = useRef<HTMLInputElement>(null);
   // Carregando e falhou eram indistinguíveis de "não tem nada".
   const [carregando, setCarregando] = useState(false);
   const [falhou, setFalhou] = useState(false);
@@ -292,7 +290,10 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
   };
 
   const addActivity = async () => {
-    if (!orgId || !contact || !activityForm.title) return;
+    if (!orgId || !contact || !activityForm.title.trim() || activitySavingRef.current) return;
+    activitySavingRef.current = true;
+    setActivitySaving(true);
+    setActivityError(null);
     // O negócio ABERTO da pessoa, quando há um só.
     //
     // Gravava apenas `contact_id`, então a atividade não aparecia no card do
@@ -306,21 +307,32 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
     const abertos = deals.filter((d) => d.status === "open");
     const negocioUnico = abertos.length === 1 ? abertos[0].id : null;
 
-    await supabase.from("activities").insert({
-      org_id: orgId, contact_id: contact.id, type: activityForm.type,
-      title: activityForm.title, body: activityForm.body, user_id: user?.id,
-      deal_id: negocioUnico,
-      // Mesma correção de DealDetail.addActivity: este formulário registra o que
-      // aconteceu (não tem campo de prazo), e sem completed_at a ligação não era
-      // contada em "Abordagens realizadas" e ficava pendente para sempre na tela
-      // de Atividades. `task` fica de fora -- é o que falta fazer.
-      completed_at: ATIVIDADE_JA_ACONTECEU.includes(activityForm.type)
-        ? new Date().toISOString()
-        : null,
-    });
-    setActivityForm({ type: "note", title: "", body: "" });
-    fetchRelated();
-    toast({ title: "Atividade adicionada" });
+    try {
+      const { error } = await supabase.from("activities").insert({
+        org_id: orgId, contact_id: contact.id, type: activityForm.type,
+        title: activityForm.title, body: activityForm.body, user_id: user?.id,
+        deal_id: negocioUnico,
+        // Mesma correção de DealDetail.addActivity: este formulário registra o que
+        // aconteceu (não tem campo de prazo), e sem completed_at a ligação não era
+        // contada em "Abordagens realizadas" e ficava pendente para sempre na tela
+        // de Atividades. `task` fica de fora -- é o que falta fazer.
+        completed_at: ATIVIDADE_JA_ACONTECEU.includes(activityForm.type)
+          ? new Date().toISOString()
+          : null,
+      });
+      if (error) throw error;
+      setActivityForm({ type: "note", title: "", body: "" });
+      void fetchRelated();
+      toast({ title: "Atividade adicionada" });
+    } catch (error) {
+      const description = mensagemErro(error);
+      setActivityError(description);
+      toast({ title: "Erro ao adicionar atividade", description, variant: "destructive" });
+      activityTitleRef.current?.focus();
+    } finally {
+      activitySavingRef.current = false;
+      setActivitySaving(false);
+    }
   };
 
   /*
@@ -343,38 +355,21 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
 
   return (
     <Sheet open={!!contact} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-[520px] sm:max-w-[520px] overflow-y-auto p-0">
+      <SheetContent aria-describedby={undefined} className="w-[520px] sm:max-w-[520px] overflow-y-auto p-0">
         {/* Header */}
         <div className="border-b border-border p-6">
           <div className="flex items-start gap-4">
-            <Avatar className="h-14 w-14">
-              <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                {contact.first_name?.[0] || "?"}{contact.last_name?.[0] || ""}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <h2 className="vx-titulo-painel">{contact.first_name} {contact.last_name}</h2>
+            <Iniciais nome={`${contact.first_name} ${contact.last_name ?? ""}`} tamanho="lg" className="h-12 w-12 text-sm" />
+            <div className="min-w-0 flex-1">
+              <SheetTitle className="vx-titulo-painel">{contact.first_name} {contact.last_name}</SheetTitle>
               {contact.title && <p className="text-sm text-muted-foreground">{contact.title}</p>}
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className={LIFECYCLE_BADGE[contact.lifecycle_stage ?? "lead"]}>
-                  {LIFECYCLE_LABELS[contact.lifecycle_stage ?? "lead"]}
-                </Badge>
+              <div className="mt-1.5 flex flex-wrap items-center gap-3">
+                <EstagioSelo stage={contact.lifecycle_stage} />
                 {/* DE ONDE VEIO, ao lado de em que ponto está.
                     A lista mostrava a origem e a ficha não -- então abrir o
                     contato PERDIA a informação, e era preciso voltar e procurar
                     a linha para saber de qual planilha ou campanha ele saiu. */}
-                {(() => {
-                  const o = getContactOrigin((contact as Record<string, unknown>).metadata as Record<string, unknown> | null);
-                  return (
-                    <span
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-2 py-0.5 text-label font-medium text-muted-foreground"
-                      title={`Origem: ${o.label}`}
-                    >
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: o.color }} />
-                      {o.label}
-                    </span>
-                  );
-                })()}
+                <OrigemSelo metadata={(contact as Record<string, unknown>).metadata} />
               </div>
             </div>
             {/* mr-8 afasta do X de fechar do Sheet (que fica em right-4 top-4) */}
@@ -664,76 +659,88 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
                 <Button onClick={handleSave} className="w-full"><Save className="mr-2 h-4 w-4" />Salvar alterações</Button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {contact.email && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <a href={`mailto:${contact.email}`} className="text-primary hover:underline">{contact.email}</a>
-                  </div>
-                )}
-                {contact.phone && (() => {
-                  const cleanPhone = contact.phone.replace(/@s\.whatsapp\.net$/i, "").replace(/@lid$/i, "").replace(/@c\.us$/i, "");
-                  const digits = cleanPhone.replace(/\D/g, "");
-                  const wa = `https://wa.me/${digits.startsWith("55") ? digits : "55" + digits}`;
-                  return (
-                    <div className="flex items-center gap-3 text-sm">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span>{cleanPhone}</span>
-                      {digits && (
-                        <a href={wa} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-label text-green-600 hover:underline">
-                          <MessageCircle className="h-3 w-3" />WhatsApp
-                        </a>
-                      )}
+              <div className="space-y-4">
+                <h3 className="vx-titulo-secao">Dados do contato</h3>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  {contact.email && (
+                    <div className="min-w-0">
+                      <dt className="text-xs text-muted-foreground">E-mail</dt>
+                      <dd className="truncate"><a href={`mailto:${contact.email}`} className="text-primary hover:underline">{contact.email}</a></dd>
                     </div>
-                  );
-                })()}
-                {contact.title && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Briefcase className="h-4 w-4 text-muted-foreground" />
-                    <span>{contact.title}</span>
-                  </div>
-                )}
-                {contact.linkedin_url && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="text-muted-foreground">LinkedIn</span>
-                    <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">{contact.linkedin_url}</a>
-                  </div>
-                )}
-                {(() => {
-                  const comp = companies.find((c) => c.id === (contact as any).company_id);
-                  const meta = (contact as any).metadata as Record<string, string> | null;
-                  const empresaManual = meta?.empresa_manual;
-                  const empresa = comp?.name || empresaManual;
-                  return empresa ? (
-                    <div className="flex items-center gap-3 text-sm">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span>{empresa}</span>
+                  )}
+                  {contact.phone && (() => {
+                    const cleanPhone = contact.phone.replace(/@s\.whatsapp\.net$/i, "").replace(/@lid$/i, "").replace(/@c\.us$/i, "");
+                    const digits = cleanPhone.replace(/\D/g, "");
+                    const wa = `https://wa.me/${digits.startsWith("55") ? digits : "55" + digits}`;
+                    return (
+                      <div className="min-w-0">
+                        <dt className="text-xs text-muted-foreground">Telefone</dt>
+                        <dd className="flex flex-wrap items-center gap-x-2">
+                          <span>{cleanPhone}</span>
+                          {digits && (
+                            <a href={wa} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-label text-success hover:underline">
+                              <MessageCircle className="h-3 w-3" />WhatsApp
+                            </a>
+                          )}
+                          {/* A chave da thread é `whatsapp:<contact_id>` (ver o
+                              agrupamento em Conversations.tsx). Só abre algo se já
+                              houver mensagem ligada ao contato; sem ela a tela abre
+                              sem conversa selecionada, e `wa.me` ao lado cobre o
+                              primeiro contato. */}
+                          <Link
+                            to={`/comunicacao/whatsapp?thread=${encodeURIComponent(`whatsapp:${contact.id}`)}`}
+                            onClick={onClose}
+                            className="text-label text-primary hover:underline"
+                          >
+                            Abrir conversa
+                          </Link>
+                        </dd>
+                      </div>
+                    );
+                  })()}
+                  {contact.title && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Área de atuação</dt>
+                      <dd>{contact.title}</dd>
                     </div>
-                  ) : null;
-                })()}
-                {(() => {
-                  const meta = (contact as any).metadata as Record<string, string> | null;
-                  if (!meta) return null;
-                  const pais = meta.pais;
-                  const cidade = meta.cidade;
-                  const localStr = [cidade, pais].filter(Boolean).join(", ");
-                  return localStr ? (
-                    <div className="flex items-center gap-3 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{localStr}</span>
+                  )}
+                  {(() => {
+                    const comp = companies.find((c) => c.id === (contact as any).company_id);
+                    const meta = (contact as any).metadata as Record<string, string> | null;
+                    const empresa = comp?.name || meta?.empresa_manual;
+                    return empresa ? (
+                      <div className="min-w-0">
+                        <dt className="text-xs text-muted-foreground">Empresa</dt>
+                        <dd className="flex items-center gap-2"><Iniciais nome={empresa} forma="empresa" tamanho="sm" /><span className="truncate">{empresa}</span></dd>
+                      </div>
+                    ) : null;
+                  })()}
+                  {(() => {
+                    const meta = (contact as any).metadata as Record<string, string> | null;
+                    const localStr = [meta?.cidade, meta?.pais].filter(Boolean).join(", ");
+                    return localStr ? (
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Localização</dt>
+                        <dd>{localStr}</dd>
+                      </div>
+                    ) : null;
+                  })()}
+                  {(() => {
+                    const interesse = ((contact as any).metadata as Record<string, string> | null)?.interesse;
+                    return interesse ? (
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Interesse</dt>
+                        <dd>{interesse}</dd>
+                      </div>
+                    ) : null;
+                  })()}
+                  {contact.linkedin_url && (
+                    <div className="min-w-0">
+                      <dt className="text-xs text-muted-foreground">LinkedIn</dt>
+                      <dd className="truncate"><a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{contact.linkedin_url}</a></dd>
                     </div>
-                  ) : null;
-                })()}
-                {(() => {
-                  const meta = (contact as any).metadata as Record<string, string> | null;
-                  const interesse = meta?.interesse;
-                  return interesse ? (
-                    <div className="flex items-center gap-3 text-sm">
-                      <Star className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-foreground">{interesse}</span>
-                    </div>
-                  ) : null;
-                })()}
+                  )}
+                </dl>
 
                 {/* Dados do cadastro (formulário de captação) — cidade e interesse
                     já aparecem acima, então são omitidos aqui para não repetir */}
@@ -746,7 +753,7 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
                   if (extra.length === 0) return null;
                   return (
                     <div className="rounded-md border border-border p-3 space-y-2 mt-1">
-                      <p className="text-label font-semibold uppercase tracking-wider text-muted-foreground">Dados do cadastro</p>
+                      <h3 className="vx-titulo-secao">Dados do cadastro</h3>
                       <div className="space-y-1.5">
                         {extra.map((f) => (
                           <div key={f.key} className="flex items-start justify-between gap-3 text-sm">
@@ -847,7 +854,7 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
           <TabsContent value="activities" className="mt-4 space-y-4">
             <div className="space-y-2">
               <div className="flex gap-2">
-                <Select value={activityForm.type} onValueChange={(v) => setActivityForm({ ...activityForm, type: v as ActivityType })}>
+                <Select disabled={activitySaving} value={activityForm.type} onValueChange={(v) => setActivityForm({ ...activityForm, type: v as ActivityType })}>
                   <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {/* A lista compartilhada. Esta cópia escrevia "Email" sem
@@ -859,10 +866,13 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
                     ))}
                   </SelectContent>
                 </Select>
-                <Input className="h-8 text-sm" placeholder="Título" value={activityForm.title} onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })} />
+                <Input ref={activityTitleRef} readOnly={activitySaving} aria-label="Título da atividade" aria-invalid={!!activityError} aria-describedby={activityError ? "activity-save-error" : undefined} className="h-8 text-sm" placeholder="Título" value={activityForm.title} onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })} />
               </div>
-              <Textarea placeholder="Descrição..." value={activityForm.body} onChange={(e) => setActivityForm({ ...activityForm, body: e.target.value })} rows={2} className="text-sm" />
-              <Button size="sm" onClick={addActivity} disabled={!activityForm.title}>Adicionar</Button>
+              <Textarea readOnly={activitySaving} aria-label="Descrição da atividade" placeholder="Descrição..." value={activityForm.body} onChange={(e) => setActivityForm({ ...activityForm, body: e.target.value })} rows={2} className="text-sm" />
+              {activityError && <p id="activity-save-error" role="alert" className="text-sm text-destructive">{activityError}</p>}
+              <Button size="sm" onClick={addActivity} disabled={activitySaving || !activityForm.title.trim()} aria-busy={activitySaving}>
+                {activitySaving ? "Adicionando…" : "Adicionar"}
+              </Button>
             </div>
             <div className="space-y-2">
               {activities.map((a) => (

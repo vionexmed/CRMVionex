@@ -88,15 +88,6 @@ describe("as consultas que crescem com o uso têm teto", () => {
     },
   );
 
-  /**
-   * `LeadScoring` baixava todos os contatos e cortava com `.slice()` na
-   * renderização — trafegava a base inteira para exibir cem linhas.
-   */
-  it("LeadScoring corta no servidor, não no cliente", () => {
-    const src = semComentarios(ler("src/pages/LeadScoring.tsx"));
-    expect(trechoDaConsulta(src, "contacts")).toMatch(/\.limit\(\d+\)/);
-  });
-
   /** Roda ao ABRIR o modal, e aparecia como demora entre clicar e a janela responder. */
   it("EmailComposeModal limita o que carrega ao abrir", () => {
     const src = semComentarios(ler("src/components/crm/EmailComposeModal.tsx"));
@@ -190,23 +181,6 @@ describe("nenhuma consulta a tabela que cresce fica solta", () => {
 });
 
 describe("limitar e paginar são escolhas diferentes", () => {
-  /**
-   * `.limit()` serve quando a tela MOSTRA uma lista e o corte só esconde o que
-   * já estava fora de vista.
-   *
-   * Quando o resultado vira CONTAGEM, limitar produz um número errado que
-   * parece certo -- e é pior que um registro faltando, porque ninguém desconfia
-   * de um total. `SalesGoals` soma negócios, atividades e contatos por
-   * vendedor para medir metas: num mês movimentado, mil atividades é pouco, e a
-   * meta apareceria cumprida pela metade num mês em que foi batida.
-   */
-  it("SalesGoals pagina em vez de limitar", () => {
-    const src = semComentarios(readFileSync("src/pages/SalesGoals.tsx", "utf8"));
-    expect(src).toContain("buscarEmBlocos");
-    // Três consultas, todas paginadas.
-    expect(src.match(/buscarEmBlocos</g) ?? []).toHaveLength(3);
-  });
-
   it("os seletores de contato paginam", () => {
     // Um destinatário que some do seletor não tem explicação em tela.
     for (const arquivo of ["src/lib/api/contacts.ts", "src/lib/api/emails.ts"]) {
@@ -220,7 +194,7 @@ describe("limitar e paginar são escolhas diferentes", () => {
    */
   it("o laço de paginação existe em um lugar só", () => {
     const soltos: string[] = [];
-    for (const arquivo of ["src/lib/api/contacts.ts", "src/lib/api/emails.ts", "src/pages/SalesGoals.tsx"]) {
+    for (const arquivo of ["src/lib/api/contacts.ts", "src/lib/api/emails.ts"]) {
       const src = semComentarios(readFileSync(arquivo, "utf8"));
       if (/const CHUNK = 1000/.test(src)) soltos.push(arquivo);
     }

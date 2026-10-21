@@ -18,7 +18,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         // `text-base md:text-sm` fica: 16px no celular é o que impede o iOS de
         // dar zoom ao focar o campo.
         className={cn(
-          "flex h-9 w-full rounded-md border border-input bg-card px-3 py-1.5 text-base ring-offset-background transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground hover:border-input/70 focus-visible:outline-none focus-visible:border-ring focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          "vx-control vx-campo flex h-control w-full rounded-md border border-input bg-card px-3 py-1.5 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60 md:text-sm",
           className,
         )}
         ref={ref}

@@ -98,7 +98,7 @@ export default function OrcamentoPublico() {
 
   if (carregando) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
@@ -106,7 +106,7 @@ export default function OrcamentoPublico() {
 
   if (!dados) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
         <div className="max-w-sm text-center">
           <FileText className="mx-auto h-8 w-8 text-muted-foreground/50" />
           <p className="mt-3 text-sm font-semibold">{erro ?? "Orçamento não encontrado"}</p>
@@ -122,49 +122,61 @@ export default function OrcamentoPublico() {
   const aprovado = dados.status === "aprovado";
   const podeDecidir = !decidido && !dados.expirado;
 
+  const marca = dados.empresa ?? "Vionex";
+
   return (
-    <div className="min-h-screen bg-muted/30 px-4 py-8">
-      <div className="mx-auto max-w-2xl space-y-4">
-        <header className="rounded-lg border border-border bg-card p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="min-h-screen bg-background px-4 py-8">
+      {/* Um cartão só, como a proposta do V1: quem abre o link lê UM documento,
+          e não uma pilha de caixas. Só tokens, para seguir o tema do navegador
+          sem cor fixa. */}
+      <article className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-border bg-card">
+        <header className="p-6 pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-2">
+              <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-base font-bold text-primary-foreground">
+                {marca.charAt(0).toUpperCase()}
+              </span>
+              <span className="truncate text-sm font-semibold">{marca}</span>
+            </span>
+            {dados.valido_ate && (
+              <span className={cn("shrink-0 text-xs", dados.expirado ? "font-semibold text-warning" : "text-muted-foreground")}>
+                válido até {formatarData(dados.valido_ate)}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              {dados.empresa && (
-                <p className="text-label font-semibold uppercase tracking-wide text-muted-foreground">
-                  {dados.empresa}
-                </p>
-              )}
               {/* `vx-titulo-tela` e nao classes a mao: era exatamente a
                   mesma composicao, e escrever de novo criaria mais um
                   titulo solto que aquele arquivo existe para evitar. */}
-              <h1 className="vx-titulo-tela mt-1">
+              <h1 className="vx-titulo-tela">Proposta comercial</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
                 {dados.titulo || `Orçamento #${dados.numero}`}
-              </h1>
-              <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                Nº {dados.numero}
-                {dados.valido_ate && ` · válido até ${formatarData(dados.valido_ate)}`}
               </p>
+              <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">Nº {dados.numero}</p>
             </div>
 
             {decidido ? (
               <span className={cn(
                 "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
-                aprovado ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
+                aprovado ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive",
               )}>
                 {aprovado ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                 {aprovado ? "Aprovado" : "Recusado"}
               </span>
             ) : dados.expirado ? (
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1 text-xs font-semibold text-warning">
                 <Clock className="h-3.5 w-3.5" />Vencido
               </span>
             ) : null}
           </div>
         </header>
 
-        <section className="overflow-hidden rounded-lg border border-border bg-card">
-          <ul className="divide-y divide-border">
+        <section className="px-6">
+          <ul className="divide-y divide-border border-t border-border">
             {dados.itens.map((item, i) => (
-              <li key={i} className="flex items-start justify-between gap-4 p-4">
+              <li key={i} className="flex items-start justify-between gap-4 py-3.5">
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{item.nome}</p>
                   {item.descricao && (
@@ -172,7 +184,7 @@ export default function OrcamentoPublico() {
                       {item.descricao}
                     </p>
                   )}
-                  <p className="mt-1 text-label tabular-nums text-muted-foreground">
+                  <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                     {item.quantidade} {item.unidade} × {formatarMoeda(item.preco_unit, dados.moeda)}
                     {item.desconto > 0 && ` − ${formatarMoeda(item.desconto, dados.moeda)}`}
                   </p>
@@ -184,106 +196,110 @@ export default function OrcamentoPublico() {
             ))}
           </ul>
 
-          <div className="space-y-1.5 border-t border-border bg-muted/30 p-4">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="tabular-nums">{formatarMoeda(dados.subtotal, dados.moeda)}</span>
-            </div>
+          <div className="space-y-1.5 border-t border-border py-4">
             {dados.desconto > 0 && (
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Desconto</span>
-                <span className="tabular-nums text-success">
-                  − {formatarMoeda(dados.desconto, dados.moeda)}
-                </span>
-              </div>
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="tabular-nums">{formatarMoeda(dados.subtotal, dados.moeda)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Desconto</span>
+                  <span className="font-medium tabular-nums text-success">
+                    − {formatarMoeda(dados.desconto, dados.moeda)}
+                  </span>
+                </div>
+              </>
             )}
-            <div className="flex items-baseline justify-between border-t border-border pt-2">
+            <div className="flex items-baseline justify-between pt-1">
               <span className="text-sm font-semibold">Total</span>
-              <span className="font-heading text-2xl font-bold tabular-nums">
+              <span className="text-2xl font-bold tabular-nums tracking-tight">
                 {formatarMoeda(dados.total, dados.moeda)}
               </span>
             </div>
           </div>
         </section>
 
-        {decidido ? (
-          <div className="rounded-lg border border-border bg-card p-5 text-center">
-            <p className="text-sm font-medium">
-              {aprovado ? "Você aprovou este orçamento." : "Você recusou este orçamento."}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {dados.decidido_por} · {formatarData(dados.decidido_em)}
-            </p>
-            {dados.motivo_recusa && (
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                “{dados.motivo_recusa}”
+        <div className="border-t border-border bg-surface-2 p-6">
+          {decidido ? (
+            <div className="text-center">
+              <p className="text-sm font-medium">
+                {aprovado ? "Você aprovou este orçamento." : "Você recusou este orçamento."}
               </p>
-            )}
-          </div>
-        ) : dados.expirado ? (
-          <div className="rounded-lg border border-warning/30 bg-warning/5 p-5 text-center">
-            <p className="text-sm font-medium text-warning">Este orçamento venceu</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Peça um novo a quem enviou — os preços podem ter mudado.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3 rounded-lg border border-border bg-card p-5">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Seu nome *</Label>
-              <Input
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Como você assina"
-                className="h-9 text-sm"
-              />
-              {/* Dizer POR QUE o nome é pedido: sem isso, um campo obrigatório
-                  numa página pública lê como coleta de dado. */}
-              <p className="text-label text-muted-foreground">
-                Fica registrado junto da sua resposta, para quem enviou saber quem respondeu.
+              <p className="mt-1 text-xs text-muted-foreground">
+                {dados.decidido_por} · {formatarData(dados.decidido_em)}
+              </p>
+              {dados.motivo_recusa && (
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  “{dados.motivo_recusa}”
+                </p>
+              )}
+            </div>
+          ) : dados.expirado ? (
+            <div className="text-center">
+              <p className="text-sm font-medium text-warning">Este orçamento venceu</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Peça um novo a quem enviou — os preços podem ter mudado.
               </p>
             </div>
-
-            {recusando && (
+          ) : (
+            <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">O que não ficou bom?</Label>
-                <Textarea
-                  value={motivo}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  placeholder="Preço, prazo, escopo… (opcional)"
-                  className="min-h-[70px] text-sm"
+                <Label className="text-xs">Seu nome *</Label>
+                <Input
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Como você assina"
+                  className="text-sm"
                 />
+                {/* Dizer POR QUE o nome é pedido: sem isso, um campo obrigatório
+                    numa página pública lê como coleta de dado. */}
+                <p className="text-label text-muted-foreground">
+                  Fica registrado junto da sua resposta, para quem enviou saber quem respondeu.
+                </p>
               </div>
-            )}
 
-            {erro && <p className="text-xs text-destructive">{erro}</p>}
+              {recusando && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">O que não ficou bom?</Label>
+                  <Textarea
+                    value={motivo}
+                    onChange={(e) => setMotivo(e.target.value)}
+                    placeholder="Preço, prazo, escopo… (opcional)"
+                    className="min-h-[70px] text-sm"
+                  />
+                </div>
+              )}
 
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                className="flex-1"
-                disabled={!nome.trim() || enviando || !podeDecidir}
-                onClick={() => decidir("aprovado")}
-              >
-                {enviando && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                <CheckCircle2 className="mr-1.5 h-4 w-4" />Aprovar orçamento
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                disabled={enviando || !podeDecidir}
-                onClick={() => (recusando ? decidir("recusado") : setRecusando(true))}
-              >
-                <XCircle className="mr-1.5 h-4 w-4" />
-                {recusando ? "Confirmar recusa" : "Recusar"}
-              </Button>
+              {erro && <p className="text-xs text-destructive">{erro}</p>}
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  className="flex-1"
+                  disabled={!nome.trim() || enviando || !podeDecidir}
+                  onClick={() => decidir("aprovado")}
+                >
+                  {enviando && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                  <CheckCircle2 className="mr-1.5 h-4 w-4" />Aprovar orçamento
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled={enviando || !podeDecidir}
+                  onClick={() => (recusando ? decidir("recusado") : setRecusando(true))}
+                >
+                  <XCircle className="mr-1.5 h-4 w-4" />
+                  {recusando ? "Confirmar recusa" : "Recusar"}
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      </article>
 
-        <p className="pb-4 text-center text-label text-muted-foreground">
-          Este orçamento foi enviado por {dados.empresa ?? "seu contato"}.
-        </p>
-      </div>
+      <p className="mx-auto max-w-2xl py-4 text-center text-label text-muted-foreground">
+        Este orçamento foi enviado por {dados.empresa ?? "seu contato"}.
+      </p>
     </div>
   );
 }

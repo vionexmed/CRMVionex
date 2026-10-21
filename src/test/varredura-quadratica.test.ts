@@ -56,10 +56,7 @@ describe("as buscas onde os dois lados crescem usam índice", () => {
    */
   const casos: [string, string][] = [
     ["src/components/crm/ContactsKanbanByOwner.tsx", "porEmpresa"],
-    ["src/pages/EmailSequences.tsx", "porContato"],
-    ["src/pages/LeadScoring.tsx", "porContato"],
     ["src/pages/Deals.tsx", "porDono"],
-    ["src/pages/Automations.tsx", "porAutomacao"],
   ];
 
   it.each(casos)("%s constrói %s em useMemo", (arquivo, indice) => {

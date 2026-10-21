@@ -25,8 +25,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Kanban, List, TrendingUp, Plus, Filter, Settings2, Loader2, ChevronLeft, ChevronRight, Trophy, XCircle, Trash2 } from "lucide-react";
+import { Kanban, List, TrendingUp, Plus, Settings2, Loader2, ChevronLeft, ChevronRight, Trophy, XCircle, Trash2 } from "lucide-react";
 import { BarraDeSelecao } from "@/components/layout/BarraDeAcoes";
+import { ErrorState, LoadingState } from "@/components/layout/EstadoDaLista";
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { DealsKanban } from "@/components/crm/DealsKanban";
@@ -45,11 +46,67 @@ import { LinhaDeEtapa, COR_PADRAO_DE_ETAPA } from "@/components/crm/LinhaDeEtapa
 import { SemOrganizacao } from "@/components/layout/SemOrganizacao";
 import type { DealWithRelations } from "@/lib/api/deals";
 import { SeletorDeContato } from "@/components/crm/SeletorDeContato";
+import { SeletorDeFunil, TimeDoFunil } from "@/components/negocios/CabecalhoDoFunil";
+import { FaixaDoFunil } from "@/components/negocios/FaixaDoFunil";
+import { ChipsDoFunil } from "@/components/negocios/ChipsDoFunil";
+import { PainelDoNegocio } from "@/components/negocios/PainelDoNegocio";
+import type { TipoParaRegistrar } from "@/components/negocios/acoes-rapidas";
+import { filtrarPorSinal, resumirFunil, type FiltroDeSinal } from "@/components/negocios/sinais";
 export type { DealWithRelations } from "@/lib/api/deals";
 
 type Deal = Database["public"]["Tables"]["deals"]["Row"];
 type ContactRow = Database["public"]["Tables"]["contacts"]["Row"];
 type ViewMode = "kanban" | "list" | "forecast";
+
+const VISOES: ViewMode[] = ["kanban", "list", "forecast"];
+
+/** Nome na URL de cada campo de DealFilters. Lista explícita: ver `filtrosDaUrl`. */
+const CHAVE_DO_FILTRO: Record<keyof DealFilters, string> = {
+  ownerId: "dono",
+  minValue: "min",
+  maxValue: "max",
+  closeDateFrom: "de",
+  closeDateTo: "ate",
+};
+
+/**
+ * Campo a campo, sem espalhar: renomear uma chave de DealFilters passa a dar erro
+ * de tipo aqui, em vez de o filtro parar de filtrar em silêncio.
+ * Número inválido na URL vira "sem filtro" em vez de NaN, que descartaria tudo.
+ */
+function filtrosDaUrl(sp: URLSearchParams): DealFilters {
+  const num = (k: string) => {
+    const v = sp.get(k);
+    if (v === null || v === "") return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  return {
+    ownerId: sp.get(CHAVE_DO_FILTRO.ownerId) || undefined,
+    minValue: num(CHAVE_DO_FILTRO.minValue),
+    maxValue: num(CHAVE_DO_FILTRO.maxValue),
+    closeDateFrom: sp.get(CHAVE_DO_FILTRO.closeDateFrom) || undefined,
+    closeDateTo: sp.get(CHAVE_DO_FILTRO.closeDateTo) || undefined,
+  };
+}
+
+/**
+ * Os chips de sinal ("Atividade atrasada", "Parados há N+ dias") também moram
+ * na URL, pelo mesmo motivo dos filtros: voltar do negócio não pode desligá-los.
+ * `parados` guarda o NÚMERO de dias -- o chip liga com 7, o link da faixa de
+ * indicadores com 14, e os dois são o mesmo filtro.
+ */
+function sinaisDaUrl(sp: URLSearchParams): FiltroDeSinal {
+  const dias = Number(sp.get("parados"));
+  return {
+    atrasada: sp.get("atrasada") === "1",
+    paradosHa: Number.isInteger(dias) && dias > 0 ? dias : null,
+  };
+}
+
+/** Painel lateral só onde há largura para ele ao lado do quadro (lg do Tailwind). */
+const cabePainel = () =>
+  typeof window !== "undefined" && !!window.matchMedia?.("(min-width: 1024px)").matches;
 
 export default function Deals() {
   const { orgId } = useOrg();
@@ -58,10 +115,53 @@ export default function Deals() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  // Declare view state FIRST — used in conditional query params below
-  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
-  const [selectedPipeline, setSelectedPipeline] = useState<string>("");
+  // Visão e filtros moram na URL (replace: não empilha histórico a cada clique).
+  //
+  // Eram useState: recarregar a página ou voltar do detalhe de um negócio
+  // devolvia o quadro ao kanban sem filtro, e não dava para mandar o link de
+  // "meus negócios acima de 10 mil" para alguém.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewMode: ViewMode = VISOES.includes(searchParams.get("visao") as ViewMode)
+    ? (searchParams.get("visao") as ViewMode)
+    : "kanban";
+  const setViewMode = useCallback((v: ViewMode) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (v === "kanban") next.delete("visao");
+      else next.set("visao", v);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+  // Memoizado: `filters` é lido por efeitos e pelo filtro do quadro, e um objeto
+  // novo a cada render faria ambos reavaliar sem que nada tivesse mudado.
+  const filters = useMemo(() => filtrosDaUrl(searchParams), [searchParams]);
+  const setFilters = useCallback((f: DealFilters) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const k of Object.values(CHAVE_DO_FILTRO)) next.delete(k);
+      for (const [campo, chave] of Object.entries(CHAVE_DO_FILTRO) as [keyof DealFilters, string][]) {
+        const v = f[campo];
+        if (v !== undefined && v !== "") next.set(chave, String(v));
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+  const sinais = useMemo(() => sinaisDaUrl(searchParams), [searchParams]);
+  const setSinais = useCallback((f: FiltroDeSinal) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (f.atrasada) next.set("atrasada", "1"); else next.delete("atrasada");
+      if (f.paradosHa !== null) next.set("parados", String(f.paradosHa)); else next.delete("parados");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
   const [listPage, setListPage] = useState(0);
+  // Filtro novo, página 1: na página 4 de uma lista que encolheu para duas, a
+  // tela mostraria "nenhum negócio" com negócios existindo. Pela chave em
+  // texto, e não pelo objeto: `filters` é refeito a cada mudança de URL --
+  // inclusive as que não são filtro, como abrir o painel de um negócio.
+  const chaveDosFiltros = JSON.stringify(filters);
+  useEffect(() => { setListPage(0); }, [chaveDosFiltros]);
 
   // Supporting data
   const { data: allStages = [], isLoading: stagesLoading, isError: stagesError } = usePipelineStages();
@@ -71,12 +171,46 @@ export default function Deals() {
   const { data: companies = [] } = useCompanies();
   const { data: members = [] } = useMembers();
 
-  // Kanban + Forecast: all deals (no pagination needed)
-  const { data: allDealsResult = { data: [], count: 0 } } = useDeals();
-  // List: server-side paginated
-  const { data: listDealsResult = { data: [], count: 0 }, isFetching: listFetching } = useDeals(
-    viewMode === "list" ? { page: listPage, pageSize: DEFAULT_PAGE_SIZE } : {}
+  // Kanban + Forecast: todos os negócios (sem paginação). Desligada na lista:
+  // ela baixava o funil inteiro, com atividades embutidas, só para não usar.
+  const precisaDeTodos = viewMode !== "list";
+  const {
+    data: allDealsResult = { data: [], count: 0 },
+    isLoading: todosCarregando,
+    isError: todosFalhou,
+    refetch: recarregarTodos,
+  } = useDeals({}, { enabled: precisaDeTodos });
+  // Lista: paginada no servidor. Só roda na lista (antes, fora dela, repetia a
+  // consulta dos "todos" com a mesma chave).
+  const {
+    data: listDealsResult = { data: [], count: 0 },
+    isFetching: listFetching,
+    isLoading: listaCarregando,
+    isError: listaFalhou,
+    refetch: recarregarLista,
+  } = useDeals(
+    {
+      page: listPage,
+      pageSize: DEFAULT_PAGE_SIZE,
+      // A lista paginada filtra NO SERVIDOR -- antes ela ignorava os filtros, que
+      // só valiam no quadro, e com os chips agora sempre à vista isso seria um
+      // filtro anunciado que não filtra. Campo a campo, sem espalhar: renomear
+      // uma chave de DealFilters precisa dar erro de tipo aqui.
+      ownerId: filters.ownerId,
+      minValue: filters.minValue,
+      maxValue: filters.maxValue,
+      closeDateFrom: filters.closeDateFrom,
+      closeDateTo: filters.closeDateTo,
+    },
+    { enabled: viewMode === "list" },
   );
+
+  /**
+   * O PostgREST corta em 1000 linhas sem avisar. A consulta já pede
+   * `count: "exact"`, então count > data.length É o sinal de truncamento --
+   * sem ele o quadro mostraria um funil menor do que o real e ninguém saberia.
+   */
+  const truncado = precisaDeTodos && allDealsResult.count > allDealsResult.data.length;
 
   const listTotalPages = Math.ceil((listDealsResult.count) / DEFAULT_PAGE_SIZE);
 
@@ -116,8 +250,37 @@ export default function Deals() {
    * ele compararia, veria diferente, e renderizaria igual -- pagando a
    * comparação sem pular nada.
    */
-  const abrirNegocio = useCallback(
+  const abrirPagina = useCallback(
     (d: DealWithRelations) => navigate(`/deals/${d.id}`),
+    [navigate],
+  );
+
+  /**
+   * No quadro, o clique abre o PAINEL ao lado (desktop) e guarda o negócio na
+   * URL -- voltar da página do negócio reabre o mesmo painel. Sem largura para
+   * o painel, segue para a página, como sempre foi.
+   *
+   * Continua estável durante o arraste: `setSearchParams` só troca de
+   * identidade quando a URL muda, e arrastar não mexe na URL.
+   */
+  const abrirNegocio = useCallback((d: DealWithRelations) => {
+    if (!cabePainel()) { navigate(`/deals/${d.id}`); return; }
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("negocio", d.id);
+      return next;
+    }, { replace: true });
+  }, [navigate, setSearchParams]);
+  const fecharPainel = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("negocio");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+  /** Nota, Ligar e Tarefa do painel: o formulário de atividade mora na página. */
+  const registrarNoNegocio = useCallback(
+    (d: DealWithRelations, tipo: TipoParaRegistrar) => navigate(`/deals/${d.id}?registrar=${tipo}`),
     [navigate],
   );
 
@@ -138,11 +301,9 @@ export default function Deals() {
   const [editing, setEditing] = useState<Deal | null>(null);
   const [form, setForm] = useState<Partial<Deal>>({});
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<DealFilters>({});
   const [, setPresetStageId] = useState<string | null>(null);
   /** Marcado: salvar também cria a pessoa. Ver `handleSave`. */
   const [criarContato, setCriarContato] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
 
   // Loss reason modal
   const [lossModalOpen, setLossModalOpen] = useState(false);
@@ -160,13 +321,23 @@ export default function Deals() {
   const [pipelineDialogOpen, setPipelineDialogOpen] = useState(false);
   const [editingStages, setEditingStages] = useState<EditingStage[]>([]);
 
-  // Initialize selectedPipeline once pipelines load
-  useEffect(() => {
-    if (pipelines.length && !selectedPipeline) {
-      const def = pipelines.find((p) => p.is_default) || pipelines[0];
-      setSelectedPipeline(def.id);
-    }
-  }, [pipelines, selectedPipeline]);
+  // O funil ativo vem da URL (`?funil=`), e cai no padrão quando ausente ou
+  // inválido. Era um useState preenchido por efeito: nascia "" e só depois
+  // virava o padrão, e trocar de funil não sobrevivia a voltar do negócio.
+  const funilDaUrl = searchParams.get("funil");
+  const selectedPipeline =
+    pipelines.find((p) => p.id === funilDaUrl)?.id
+    ?? (pipelines.find((p) => p.is_default) || pipelines[0])?.id
+    ?? "";
+  const setSelectedPipeline = useCallback((id: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("funil", id);
+      // O painel é de um negócio do funil anterior.
+      next.delete("negocio");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   // Realtime subscription — invalidate cache on remote changes
   useEffect(() => {
@@ -203,8 +374,11 @@ export default function Deals() {
   useEffect(() => {
     if (shouldOpenNew && pipelineStages.length > 0) {
       openNew();
-      searchParams.delete("action");
-      setSearchParams(searchParams, { replace: true });
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("action");
+        return next;
+      }, { replace: true });
     }
   }, [shouldOpenNew, pipelineStages]);
 
@@ -229,19 +403,47 @@ export default function Deals() {
   };
 
   // Apply client-side filters to all deals (Kanban/Forecast)
-  const filteredAllDeals = allDeals.filter((d) => {
+  const passaNosFiltros = (d: DealWithRelations) => {
     if (filters.ownerId && d.owner_id !== filters.ownerId) return false;
     if (filters.minValue && (Number(d.value) || 0) < filters.minValue) return false;
     if (filters.maxValue && (Number(d.value) || 0) > filters.maxValue) return false;
     if (filters.closeDateFrom && d.close_date && d.close_date < filters.closeDateFrom) return false;
     if (filters.closeDateTo && d.close_date && d.close_date > filters.closeDateTo) return false;
-    const stageIds = pipelineStages.map((s) => s.id);
-    if (d.stage_id && !stageIds.includes(d.stage_id) && d.status === "open") return false;
     return true;
-  });
+  };
+  // Um Set montado uma vez, e não `pipelineStages.map(...)` DENTRO do filtro --
+  // aquilo refazia a lista de etapas para cada negócio.
+  //
+  // Ganhos e perdidos também passaram a ser DO FUNIL: com as pílulas de funil
+  // à vista, "Ganhos" do funil de Renovações mostrando as vendas do outro
+  // funil contradiz o número da pílula. O negócio encerrado guarda a etapa em
+  // que estava, e é por ela que se sabe o funil. Sem etapa, segue aparecendo
+  // em qualquer funil, como antes.
+  const etapasDoFunil = new Set(pipelineStages.map((s) => s.id));
+  const filteredAllDeals = allDeals.filter(
+    (d) => passaNosFiltros(d) && (!d.stage_id || etapasDoFunil.has(d.stage_id)),
+  );
 
+  // Abertos por funil, para as pílulas. Mesmos filtros, sem o de funil.
+  const funilDaEtapa = new Map(allStages.map((s) => [s.id, s.pipeline_id]));
+  const abertosPorFunil = new Map<string, number>();
+  if (precisaDeTodos && !todosCarregando) {
+    for (const d of allDeals) {
+      if (d.status !== "open" || !d.stage_id || !passaNosFiltros(d)) continue;
+      const funil = funilDaEtapa.get(d.stage_id);
+      if (funil) abertosPorFunil.set(funil, (abertosPorFunil.get(funil) ?? 0) + 1);
+    }
+  }
+
+  // Arraste e trilha do painel passam por aqui. Com o toast: antes uma falha
+  // ao mover virava rejeição de promessa sem dono, e o card voltava sozinho
+  // para a coluna antiga sem dizer por quê.
   const handleDragEnd = async (dealId: string, newStageId: string) => {
-    await updateStage({ id: dealId, stageId: newStageId });
+    try {
+      await updateStage({ id: dealId, stageId: newStageId });
+    } catch (e: unknown) {
+      toast({ title: "Erro ao mover negócio", description: mensagemErro(e), variant: "destructive" });
+    }
   };
 
   /**
@@ -431,6 +633,31 @@ export default function Deals() {
   const lostDeals = filteredAllDeals.filter((d) => d.status === "lost");
   const totalCount = viewMode === "list" ? listDealsResult.count : filteredAllDeals.length;
 
+  // Os indicadores contam o que o quadro MOSTRA em colunas: aberto sem etapa
+  // não aparece em coluna nenhuma, e somá-lo faria "Em aberto" discordar da
+  // soma das colunas e da pílula do funil.
+  const agora = Date.now();
+  const resumo = resumirFunil({
+    abertos: openDeals.filter((d) => d.stage_id && etapasDoFunil.has(d.stage_id)),
+    ganhos: wonDeals,
+    perdidos: lostDeals,
+    etapas: pipelineStages,
+    agora,
+  });
+  // Os chips de sinal estreitam o QUADRO e a previsão, não os indicadores: a
+  // faixa continua dizendo o tamanho do funil enquanto se olha só os atrasados.
+  const abertosVisiveis = filtrarPorSinal(openDeals, sinais, agora);
+
+  const negocioAbertoId = searchParams.get("negocio");
+  const negocioAberto = viewMode === "kanban" && negocioAbertoId
+    ? allDeals.find((d) => d.id === negocioAbertoId) ?? null
+    : null;
+  // As etapas do funil DO NEGÓCIO aberto -- um ganho sem etapa, ou um negócio
+  // aberto por link, pode não ser do funil ativo.
+  const funilDoAberto = negocioAberto?.stage_id ? funilDaEtapa.get(negocioAberto.stage_id) : undefined;
+  const etapasDoAberto = funilDoAberto ? allStages.filter((s) => s.pipeline_id === funilDoAberto) : pipelineStages;
+  const quadroPronto = !funilCarregando && !funilFalhou && !semFunil && !todosFalhou && !todosCarregando;
+
   return (
     <PageShell
       /* Só no kanban: a coluna é que rola, e para isso o quadro precisa de
@@ -448,46 +675,99 @@ export default function Deals() {
       }
       actions={
         <>
-          {/* Era um grupo de pílulas escrito à mão, o quarto do projeto, com
-              medidas próprias e sem `aria-pressed` -- nenhuma das quatro cópias
-              anunciava a seleção para leitor de tela. */}
-          <SegmentedControl<ViewMode>
-            rotuloGrupo="Visualização"
-            valor={viewMode}
-            onChange={setViewMode}
-            opcoes={[
-              { valor: "kanban", rotulo: "Kanban", icone: Kanban },
-              { valor: "list", rotulo: "Lista", icone: List },
-              { valor: "forecast", rotulo: "Previsão", icone: TrendingUp },
-            ]}
-          />
-          {pipelines.length > 0 && (
-            <Select value={selectedPipeline} onValueChange={setSelectedPipeline}>
-              <SelectTrigger className="h-8 w-40 border-border text-xs" aria-label="Funil">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
           {isAdmin && (
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={openPipelineEditor} aria-label="Personalizar funil">
-              <Settings2 className="h-3.5 w-3.5" />
+            <Button variant="outline" size="icon" onClick={openPipelineEditor} aria-label="Personalizar funil" title="Personalizar etapas do funil">
+              <Settings2 className="h-4 w-4" />
             </Button>
           )}
-          <Button variant="outline" size="sm" className="h-8" onClick={() => setShowFilters(!showFilters)} aria-label="Alternar filtros">
-            <Filter className="mr-1 h-3 w-3" /><span className="hidden sm:inline">Filtro</span>
-          </Button>
-          <Button onClick={() => openNew()} size="sm" className="h-8 gap-1">
-            <Plus className="h-3.5 w-3.5" />
+          <Button onClick={() => openNew()} className="gap-1">
+            <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Negócio</span>
           </Button>
         </>
       }
+      /*
+        A LINHA DOS FUNIS, com a equipe e a troca de visão à direita.
+
+        Os funis saíram do select do cabeçalho e viraram pílulas com contagem.
+        "+ Funil" só para admin: criar funil existe em Configurações → Funis e
+        etapas, que é aba de admin -- oferecer a quem não pode seria uma porta
+        fechada.
+      */
+      toolbar={
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {pipelines.length > 0 ? (
+            <SeletorDeFunil
+              funis={pipelines}
+              valor={selectedPipeline}
+              onChange={setSelectedPipeline}
+              contagens={precisaDeTodos && !todosCarregando && !todosFalhou ? abertosPorFunil : undefined}
+              linkNovoFunil={isAdmin ? "/settings?aba=pipelines" : undefined}
+            />
+          ) : <span />}
+          <div className="flex flex-wrap items-center gap-2">
+            <TimeDoFunil membros={members} />
+            {/* Era um grupo de pílulas escrito à mão, o quarto do projeto, com
+                medidas próprias e sem `aria-pressed` -- nenhuma das quatro cópias
+                anunciava a seleção para leitor de tela. */}
+            <SegmentedControl<ViewMode>
+              rotuloGrupo="Visualização"
+              valor={viewMode}
+              onChange={setViewMode}
+              opcoes={[
+                { valor: "kanban", rotulo: "Kanban", icone: Kanban },
+                { valor: "list", rotulo: "Lista", icone: List },
+                { valor: "forecast", rotulo: "Previsão", icone: TrendingUp },
+              ]}
+            />
+          </div>
+        </div>
+      }
     >
+      {/* Um respiro só entre faixa, chips e quadro. A casca em modo de altura
+          cheia não põe espaço entre os filhos. */}
+      <div className={viewMode === "kanban" ? "flex min-h-0 min-w-0 flex-1 flex-col gap-4" : "min-w-0 space-y-4"}>
+
+      {/* Os indicadores precisam do funil inteiro carregado: na lista, que é
+          paginada, eles mediriam só a página. Na previsão também não: ela tem a
+          própria faixa (comprometido/provável), e duas faixas empilhadas
+          disputariam a mesma atenção. */}
+      {viewMode === "kanban" && quadroPronto && (
+        <FaixaDoFunil
+          resumo={resumo}
+          onVerParados={() => setSinais({ ...sinais, paradosHa: 14 })}
+        />
+      )}
+
+      {!semFunil && (
+        <ChipsDoFunil
+          filtros={filters}
+          onFiltros={setFilters}
+          membros={members}
+          sinais={precisaDeTodos ? sinais : undefined}
+          onSinais={precisaDeTodos ? setSinais : undefined}
+          onAbrirFiltros={() => setShowFilters(!showFilters)}
+        />
+      )}
+
       {showFilters && (
         <DealsFilters filters={filters} onFiltersChange={setFilters} members={members} />
+      )}
+
+      {/* Falha de consulta de negócios não pode parecer funil vazio. */}
+      {precisaDeTodos && todosFalhou && (
+        <ErrorState
+          titulo="Não foi possível carregar os negócios"
+          descricao="A consulta falhou. Nenhum negócio foi alterado."
+          onTentarNovamente={() => recarregarTodos()}
+        />
+      )}
+      {precisaDeTodos && todosCarregando && !funilCarregando && <LoadingState linhas={6} />}
+
+      {truncado && !todosFalhou && (
+        <p role="status" className="rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-xs text-warning">
+          Exibindo {allDealsResult.data.length} de {allDealsResult.count} negócios — refine os filtros
+        </p>
       )}
 
       {/* Carregando, falhou e "não existe" pedem respostas diferentes. */}
@@ -544,46 +824,79 @@ export default function Deals() {
         </BarraDeSelecao>
       )}
 
-      {viewMode === "kanban" && !funilCarregando && !funilFalhou && !semFunil && (
-        <DealsKanban
-          deals={openDeals}
-          wonDeals={wonDeals}
-          lostDeals={lostDeals}
-          stages={pipelineStages}
-          onDragEnd={handleDragEnd}
-          onDealClick={abrirNegocio}
-          onContactClick={setContatoNoPainel}
-          onAddDeal={openNew}
-          onEditDeal={abrirEdicao}
-          onMarkWon={markAsWon}
-          onMarkLost={openLossModal}
-          onComposeEmail={escreverEmail}
-          selectedDeals={selectedDeals}
-          onSelectionChange={setSelectedDeals}
-        />
+      {viewMode === "kanban" && quadroPronto && (
+        // Quadro e painel lado a lado. O painel NÃO envolve o quadro: nenhum
+        // wrapper de kanban ganha transform/filter (CLAUDE.md), e o painel é
+        // irmão, não ancestral.
+        <div className="flex min-h-0 min-w-0 flex-1 gap-4">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <DealsKanban
+              deals={abertosVisiveis}
+              wonDeals={wonDeals}
+              lostDeals={lostDeals}
+              stages={pipelineStages}
+              onDragEnd={handleDragEnd}
+              onDealClick={abrirNegocio}
+              onOpenPage={abrirPagina}
+              openDealId={negocioAberto?.id ?? null}
+              onContactClick={setContatoNoPainel}
+              onAddDeal={openNew}
+              onEditDeal={abrirEdicao}
+              onMarkWon={markAsWon}
+              onMarkLost={openLossModal}
+              onComposeEmail={escreverEmail}
+              selectedDeals={selectedDeals}
+              onSelectionChange={setSelectedDeals}
+            />
+          </div>
+          {negocioAberto && (
+            <div className="hidden min-h-0 w-[360px] shrink-0 lg:flex">
+              <PainelDoNegocio
+                deal={negocioAberto}
+                etapas={etapasDoAberto}
+                onFechar={fecharPainel}
+                onGanho={markAsWon}
+                onPerdido={openLossModal}
+                onMudarEtapa={handleDragEnd}
+                onEditar={abrirEdicao}
+                onEscreverEmail={escreverEmail}
+                onRegistrar={registrarNoNegocio}
+              />
+            </div>
+          )}
+        </div>
       )}
 
-      {viewMode === "list" && (
+      {viewMode === "list" && listaFalhou && (
+        <ErrorState
+          titulo="Não foi possível carregar os negócios"
+          descricao="A consulta falhou. Nenhum negócio foi alterado."
+          onTentarNovamente={() => recarregarLista()}
+        />
+      )}
+      {viewMode === "list" && listaCarregando && <LoadingState linhas={8} />}
+
+      {viewMode === "list" && !listaFalhou && !listaCarregando && (
         <>
           <DealsList
             deals={listDeals}
             stages={allStages}
             selectedDeals={selectedDeals}
             onSelectionChange={setSelectedDeals}
-            onDealClick={abrirNegocio}
+            onDealClick={abrirPagina}
             onBatchAction={handleBatchAction}
             canDelete={isAdmin}
           />
           {listTotalPages > 1 && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 Página {listPage + 1} de {listTotalPages} · {listDealsResult.count} negócios
               </span>
               <div className="flex gap-1">
-                <Button variant="outline" size="sm" disabled={listPage === 0} onClick={() => setListPage(listPage - 1)}>
+                <Button variant="outline" size="sm" disabled={listPage === 0} onClick={() => setListPage(listPage - 1)} aria-label="Página anterior">
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="sm" disabled={listPage >= listTotalPages - 1} onClick={() => setListPage(listPage + 1)}>
+                <Button variant="outline" size="sm" disabled={listPage >= listTotalPages - 1} onClick={() => setListPage(listPage + 1)} aria-label="Próxima página">
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -592,9 +905,10 @@ export default function Deals() {
         </>
       )}
 
-      {viewMode === "forecast" && (
-        <DealsForecast deals={openDeals} stages={pipelineStages} />
+      {viewMode === "forecast" && !todosFalhou && !todosCarregando && (
+        <DealsForecast deals={abertosVisiveis} stages={pipelineStages} />
       )}
+      </div>
 
       {/* Create/Edit Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

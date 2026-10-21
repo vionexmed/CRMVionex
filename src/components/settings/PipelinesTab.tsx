@@ -125,7 +125,7 @@ export function PipelinesTab({ orgId }: { orgId: string | null }) {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Funis e etapas</CardTitle>
+          <CardTitle className="vx-titulo-secao">Funis e etapas</CardTitle>
           <CardDescription>Gerencie seus funis de venda e as etapas de cada um</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -154,7 +154,7 @@ export function PipelinesTab({ orgId }: { orgId: string | null }) {
       {selectedPipeline && (
         <Card>
           <CardHeader>
-            <CardTitle>Etapas</CardTitle>
+            <CardTitle className="vx-titulo-secao">Etapas</CardTitle>
             {/* Dizia "Arraste para reordenar" e não havia arraste nenhum. */}
             <CardDescription>Configure as etapas do funil selecionado. Use as setas para reordenar.</CardDescription>
           </CardHeader>
@@ -202,7 +202,7 @@ export function PipelinesTab({ orgId }: { orgId: string | null }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Razões de Perda</CardTitle>
+          <CardTitle className="vx-titulo-secao">Razões de Perda</CardTitle>
           <CardDescription>Motivos customizáveis quando um negócio é marcado como perdido</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

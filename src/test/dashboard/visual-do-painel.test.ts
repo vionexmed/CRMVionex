@@ -28,6 +28,8 @@ describe("o tile de métrica tem presença sem competir", () => {
    * Cheguei a tirar tudo, inclusive a elevação, e ficou chapado demais: sem
    * barra e sem sombra o cartão deixava de ser um objeto e virava um retângulo
    * desenhado. O meio-termo mantém a elevação e o ícone, e larga a barra.
+   * (No Visual 01 o ícone também saiu -- ver o teste da bolha abaixo -- e a
+   * elevação virou a borda de 1px do cartão, sem sombra.)
    */
   it("sem barra colorida no topo", () => {
     expect(TILE).not.toMatch(/h-\[3px\]/);
@@ -39,14 +41,17 @@ describe("o tile de métrica tem presença sem competir", () => {
 
   /**
    * A bolha circular dava ao ícone o contorno de um botão -- e ele não é
-   * clicável. Quadrado com raio o assenta sem fingir que se pode tocar.
+   * clicável. O meio-termo foi um quadrado com raio.
+   *
+   * No Visual 01 o ícone SAIU do tile: rótulo, número e variação, e nada mais.
+   * Numa faixa de quatro números lidos juntos ele só repetia o rótulo, e era a
+   * última decoração disputando com o número. A intenção protegida continua a
+   * mesma -- nada no tile finge ser botão --, então o que se trava agora é que
+   * a bolha não volte, nem como ícone nem como fundo redondo.
    */
-  it("o ícone tem fundo quadrado, não bolha", () => {
-    // A regex casava a lista de classes na ordem exata, então acrescentar um
-    // `shrink-0` reprovava sem que nada da INTENÇÃO tivesse mudado. Agora ela
-    // cobra o que importa: caixa de 24px e raio, não círculo.
-    expect(TILE).toMatch(/h-6 w-6[^"]*rounded-md/);
+  it("nenhuma bolha decorativa no tile", () => {
     expect(TILE).not.toMatch(/rounded-full[\s\S]{0,60}<Icon/);
+    expect(TILE).not.toMatch(/<Icon\b/);
   });
 
   /**
@@ -59,24 +64,14 @@ describe("o tile de métrica tem presença sem competir", () => {
   });
 });
 
-describe("cartão solto no destaque, faixa no detalhe", () => {
-  /**
-   * Duas decisões OPOSTAS, e as duas deliberadas.
-   *
-   * Nos quatro do destaque, cada métrica é um objeto que se levanta do fundo --
-   * a elevação separa, e não precisa de moldura comum. Cheguei a juntá-los numa
-   * faixa com divisória de 1px e ali os quatro liam como linha de tabela.
-   *
-   * Nos DEZESSEIS de Indicadores é o contrário: cartões soltos seriam dezesseis
-   * objetos flutuando, e a elevação deixaria de significar "isto importa" para
-   * significar "isto é um cartão". Ali a moldura por grupo é o que faz o grupo
-   * se ler como grupo.
-   */
-  it("o destaque usa cartões separados", () => {
+describe("indicadores agrupados em faixas", () => {
+  it("o destaque usa uma faixa com divisórias", () => {
     const i = PAINEL.indexOf('value="visao"');
     const bloco = PAINEL.slice(i, i + 700);
-    expect(bloco).toMatch(/grid grid-cols-2 gap-3[^"]*lg:grid-cols-4/);
-    expect(bloco).not.toContain("gap-px");
+    expect(bloco).toContain("vx-metrics-strip");
+    expect(bloco).toMatch(/grid grid-cols-2[^"\n]*lg:grid-cols-4/);
+    expect(bloco).toContain("emFaixa");
+    expect(bloco).not.toContain("gap-3");
   });
 
   it("os indicadores usam a faixa", () => {
@@ -196,15 +191,20 @@ describe("o funil é um tom em intensidades", () => {
    * `CHART_COLORS[i]` dava uma cor da paleta por etapa -- e na ordem,
    * "Clientes", que é o OBJETIVO do funil, caía no vermelho: a cor de erro.
    *
-   * Um funil é uma coisa avançando, não quatro coisas distintas.
+   * Um funil é uma coisa avançando, não quatro coisas distintas. Era um degradê
+   * de opacidade sobre `--primary`; no Visual 01 virou a escala `--stage-1…6`,
+   * que COMEÇA em `--primary` (segue a cor de destaque) e termina no verde de
+   * venda -- continua um tom avançando, agora com a chegada em verde.
    */
-  it("a cor vem do token de destaque, não da paleta por índice", () => {
+  it("a cor vem da escala de etapa, não da paleta por índice", () => {
     const src = semComentarios(
       readFileSync("src/components/dashboard/SdrCharts.tsx", "utf8"),
     );
-    const i = src.indexOf("backgroundColor:");
-    expect(src.slice(i, i + 120)).toContain("var(--primary)");
-    expect(src.slice(i, i + 120)).not.toContain("CHART_COLORS");
+    const i = src.indexOf("export function GraficoFunil");
+    const funil = src.slice(i, src.indexOf("export function", i + 10));
+    expect(funil).toContain("COR_DA_ETAPA");
+    expect(funil).not.toContain("CHART_COLORS");
+    expect(src).toMatch(/const COR_DA_ETAPA = \["bg-stage-1"/);
   });
 });
 

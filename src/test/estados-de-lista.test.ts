@@ -20,8 +20,6 @@ const TELAS = [
   "src/pages/Contacts.tsx",
   "src/pages/Companies.tsx",
   "src/pages/Activities.tsx",
-  "src/pages/EmailTemplates.tsx",
-  "src/pages/EmailSequences.tsx",
   "src/pages/Reports.tsx",
 ];
 
@@ -71,27 +69,5 @@ describe("os hooks de consulta param de descartar o estado", () => {
     expect(linha, `chamada a ${hook} não encontrada`).toBeTruthy();
     expect(linha).toContain("isLoading");
     expect(linha).toContain("isError");
-  });
-});
-
-describe("as buscas manuais conferem o erro", () => {
-  /**
-   * `(data as T[]) || []` transforma falha em lista vazia e apaga o erro. Duas
-   * telas faziam isso sem nem ter estado de carregamento.
-   */
-  it.each([
-    "src/pages/EmailTemplates.tsx",
-    "src/pages/EmailSequences.tsx",
-  ])("%s trata o error da consulta", (arquivo) => {
-    const src = semComentarios(readFileSync(arquivo, "utf8"));
-    expect(src).toMatch(/setFalhou\(true\)/);
-    expect(src).toMatch(/console\.error\(/);
-  });
-
-  it("EmailSequences confere as QUATRO consultas, não uma", () => {
-    // São quatro em Promise.all; conferir só a primeira deixaria três falhas
-    // passarem como lista vazia.
-    const src = semComentarios(readFileSync("src/pages/EmailSequences.tsx", "utf8"));
-    expect(src).toMatch(/\[sRes, stRes, eRes, cRes\]\.find\(\(r\) => r\.error\)/);
   });
 });

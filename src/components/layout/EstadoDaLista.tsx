@@ -30,10 +30,10 @@ export function LoadingState({
   return (
     // Skeleton em vez de spinner: preserva a forma da tela e não desloca o
     // conteúdo quando os dados chegam. Spinner centralizado faz a página pular.
-    <div className={cn("space-y-2", className)} aria-busy="true" aria-live="polite">
+    <div className={cn("divide-y divide-border", className)} aria-busy="true" aria-live="polite">
       <span className="sr-only">Carregando…</span>
       {Array.from({ length: linhas }).map((_, i) => (
-        <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        <Skeleton key={i} className="h-12 w-full rounded-none" />
       ))}
     </div>
   );
@@ -41,7 +41,7 @@ export function LoadingState({
 
 export function ErrorState({
   titulo = "Não foi possível carregar",
-  descricao = "A consulta ao banco falhou. Nenhum dado foi alterado.",
+  descricao = "Não foi possível carregar os dados. Tente novamente.",
   onTentarNovamente,
   className,
 }: {
@@ -54,7 +54,7 @@ export function ErrorState({
     <div
       role="alert"
       className={cn(
-        "flex flex-col items-center justify-center rounded-lg border border-dashed border-destructive/40 px-6 py-12 text-center",
+        "flex flex-col items-center justify-center border-y border-border px-4 py-8 text-center",
         className,
       )}
     >
@@ -88,14 +88,12 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center px-6 py-16 text-center",
+        "flex flex-col items-center justify-center px-4 py-8 text-center",
         className,
       )}
     >
-      {/* O anel vem de .vx-empty-icon-ring, que existia no CSS e nunca foi
-          usado — 64px com halo de 8px na cor de destaque. */}
-      <div className="vx-empty-icon-ring">
-        <Icone className="h-6 w-6 text-primary" />
+      <div className="mb-4">
+        <Icone className="h-6 w-6 text-muted-foreground" />
       </div>
       <p className="text-sm font-medium">{titulo}</p>
       {descricao && (

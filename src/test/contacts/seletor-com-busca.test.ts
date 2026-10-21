@@ -80,7 +80,6 @@ describe("nenhuma tela monta o próprio seletor de contato", () => {
   it.each([
     "src/pages/Activities.tsx",
     "src/pages/Deals.tsx",
-    "src/pages/LeadScoring.tsx",
     "src/components/crm/EmailComposeModal.tsx",
   ])("%s usa SeletorDeContato", (arquivo) => {
     expect(semComentarios(readFileSync(arquivo, "utf8"))).toContain("<SeletorDeContato");

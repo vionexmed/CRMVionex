@@ -98,7 +98,7 @@ export function ApiKeysTab({ orgId, userId }: { orgId: string | null; userId?: s
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>API Keys</CardTitle>
+              <CardTitle className="vx-titulo-secao">API Keys</CardTitle>
               <CardDescription>
                 Gere chaves para acessar a API REST do CRM. Rate limit: 1000 req/hora.
               </CardDescription>
@@ -184,7 +184,7 @@ export function ApiKeysTab({ orgId, userId }: { orgId: string | null; userId?: s
       {/* API Docs link */}
       <Card>
         <CardHeader>
-          <CardTitle>Documentação da API</CardTitle>
+          <CardTitle className="vx-titulo-secao">Documentação da API</CardTitle>
           <CardDescription>
             Endpoints REST disponíveis: contacts, companies, deals, activities
           </CardDescription>

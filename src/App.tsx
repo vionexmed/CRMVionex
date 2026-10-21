@@ -95,15 +95,10 @@ const Activities       = lazyChunk(() => import("./pages/Activities"));
 const Inbox            = lazyChunk(() => import("./pages/Inbox"));
 const MyEmail          = lazyChunk(() => import("./pages/MyEmail"));
 const Atendimento      = lazyChunk(() => import("./pages/Atendimento"));
-const EmailTemplates   = lazyChunk(() => import("./pages/EmailTemplates"));
-const EmailSequences   = lazyChunk(() => import("./pages/EmailSequences"));
-const LeadScoring      = lazyChunk(() => import("./pages/LeadScoring"));
 const Reports          = lazyChunk(() => import("./pages/Reports"));
-const Automations      = lazyChunk(() => import("./pages/Automations"));
 const Settings         = lazyChunk(() => import("./pages/Settings"));
 const Integrations     = lazyChunk(() => import("./pages/Integrations"));
 const SecuritySettings = lazyChunk(() => import("./pages/SecuritySettings"));
-const SalesGoals       = lazyChunk(() => import("./pages/SalesGoals"));
 const Team             = lazyChunk(() => import("./pages/Team"));
 const Marketing        = lazyChunk(() => import("./pages/Marketing"));
 const MarketingOverview = lazyChunk(() => import("./pages/marketing/Overview"));
@@ -123,7 +118,7 @@ const queryClient = new QueryClient({
       if (mutation.options.onError) return; // já tratado localmente
       toast({
         title: "Erro ao salvar",
-        description: error instanceof Error ? error.message : String(error),
+        description: mensagemErro(error),
         variant: "destructive",
       });
     },
@@ -198,29 +193,25 @@ const App = () => (
                     lugar. `replace` para o botão Voltar não cair de novo aqui. */}
                 <Route path="/tasks" element={<Navigate to="/activities?tipo=task" replace />} />
                 <Route path="/reports" element={<SuspenseRoute><Reports /></SuspenseRoute>} />
-                <Route path="/sales-goals" element={<SuspenseRoute><SalesGoals /></SuspenseRoute>} />
 
                 {/* Cada pessoa CONECTA a própria conta -- a credencial e a
                     conexão seguem privadas. As mensagens, não: desde
                     20260909140000 o histórico de e-mail e de conversa é da
                     organização, como o resto do CRM. */}
                 <Route path="/settings/email" element={<SuspenseRoute><MyEmail /></SuspenseRoute>} />
-
                 {/* UMA tela para os três canais. Eram três destinos, e quem
                     atende tinha de adivinhar em qual deles a conversa estava. */}
                 <Route path="/atendimento" element={<SuspenseRoute><Atendimento /></SuspenseRoute>} />
+                <Route path="/comunicacao" element={<Navigate to="/atendimento?canal=whatsapp" replace />} />
+                <Route path="/comunicacao/whatsapp" element={<Navigate to="/atendimento?canal=whatsapp" replace />} />
+                <Route path="/comunicacao/instagram" element={<Navigate to="/atendimento?canal=instagram" replace />} />
+                <Route path="/comunicacao/email" element={<Navigate to="/inbox" replace />} />
                 {/* As rotas de canal viram redirecionamento COM O FILTRO já
                     aplicado: link salvo e favorito continuam chegando à mesma
                     conversa, agora ao lado das dos outros canais. `replace` para
                     o botão Voltar não cair de novo aqui. */}
                 <Route path="/conversations" element={<Navigate to="/atendimento?canal=whatsapp" replace />} />
                 <Route path="/instagram" element={<Navigate to="/atendimento?canal=instagram" replace />} />
-
-                {/* A CAIXA COMPLETA FICA, e não é teimosia: `/inbox` tem pastas
-                    do Gmail, rótulos, spam, lixeira, adiar e anexos -- gestão de
-                    caixa, que não cabe numa lista de conversas e que virar
-                    redirecionamento APAGARIA. Saiu da barra lateral; o cabeçalho
-                    de Atendimento leva até ela, e o link salvo continua valendo. */}
                 <Route path="/inbox" element={<SuspenseRoute><Inbox /></SuspenseRoute>} />
 
                 {/* Todo mundo vê quem é da equipe. As ações (trocar papel, remover,
@@ -232,10 +223,6 @@ const App = () => (
 
                 {/* Rotas restritas a owner/admin — Comercial é redirecionado */}
                 <Route element={<RequireAdmin />}>
-                  <Route path="/email-templates" element={<SuspenseRoute><EmailTemplates /></SuspenseRoute>} />
-                  <Route path="/email-sequences" element={<SuspenseRoute><EmailSequences /></SuspenseRoute>} />
-                  <Route path="/lead-scoring" element={<SuspenseRoute><LeadScoring /></SuspenseRoute>} />
-                  <Route path="/automations" element={<SuspenseRoute><Automations /></SuspenseRoute>} />
                   {/* Marketing continua ACESSÍVEL, só saiu da navegação: seis
                       cartões dela não têm fonte de dado e o painel do Google
                       está zerado no código. Uma tela que mostra zeros sem

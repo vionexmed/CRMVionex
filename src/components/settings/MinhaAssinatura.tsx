@@ -102,7 +102,7 @@ export function MinhaAssinatura({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Minha assinatura</CardTitle>
+        <CardTitle className="vx-titulo-secao">Minha assinatura</CardTitle>
         <CardDescription>
           Vai no rodapé dos e-mails que você enviar pelo CRM. Deixe em branco para usar a
           assinatura padrão da empresa.

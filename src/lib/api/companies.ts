@@ -7,6 +7,15 @@ type CompanyInsert = Database["public"]["Tables"]["companies"]["Insert"];
 type CompanyUpdate = Database["public"]["Tables"]["companies"]["Update"];
 
 export const companiesApi = {
+  getById: async (orgId: string, id: string, signal?: AbortSignal): Promise<Company | null> => {
+    if (!orgId || !id) return null;
+    const query = supabase.from(TABLES.COMPANIES).select("*").eq("org_id", orgId).eq("id", id);
+    if (signal) query.abortSignal(signal);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
   list: async (orgId: string): Promise<Company[]> => {
     const { data, error } = await supabase.from(TABLES.COMPANIES).select("*").eq("org_id", orgId);
     if (error) throw error;

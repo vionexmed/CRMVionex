@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { formatarMoeda, formatarDataCurta } from "@/lib/formato";
 import { nomeDoContato } from "@/lib/contato-formato";
 import { totaisDoOrcamento, type OrcamentoComRelacoes } from "@/lib/api/orcamentos";
+import { codigoDoOrcamento } from "@/lib/orcamento-resumo";
 import { SeloDeOrcamento } from "@/components/orcamentos/SeloDeOrcamento";
 
 /**
@@ -38,8 +39,8 @@ export function LinhaDeOrcamento({
         onClick={() => aoAbrir(orcamento)}
         className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
       >
-        <span className="w-12 shrink-0 text-label font-semibold tabular-nums text-muted-foreground">
-          #{orcamento.numero}
+        <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground">
+          {codigoDoOrcamento(orcamento.numero)}
         </span>
 
         <span className="min-w-0 flex-1">
@@ -54,7 +55,7 @@ export function LinhaDeOrcamento({
 
         <SeloDeOrcamento orcamento={orcamento} />
 
-        <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums">
+        <span className="w-24 shrink-0 text-right text-sm font-bold tabular-nums">
           {formatarMoeda(total, orcamento.moeda)}
         </span>
 

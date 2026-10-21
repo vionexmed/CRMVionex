@@ -1,7 +1,6 @@
-import { Badge } from "@/components/ui/badge";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -12,6 +11,9 @@ import { SortHeader, useOrdenacao } from "@/components/layout/SortHeader";
 import { formatarData, formatarMoeda } from "@/lib/formato";
 import { SeloDeNegocio } from "@/components/crm/SeloDeNegocio";
 import { BarraDeSelecao } from "@/components/layout/BarraDeAcoes";
+import { Iniciais } from "@/components/layout/ListaV1";
+import { corDaEtapa, etapasEmOrdem } from "@/components/negocios/sinais";
+import { cn } from "@/lib/utils";
 
 type Stage = Database["public"]["Tables"]["pipeline_stages"]["Row"];
 
@@ -61,10 +63,21 @@ export function DealsList({
     onSelectionChange(next);
   };
 
-  const getStageName = (stageId: string | null) => {
-    if (!stageId) return "—";
-    return stages.find((s) => s.id === stageId)?.name || "—";
-  };
+  /**
+   * Nome e cor de cada etapa, indexados uma vez. A cor é a da POSIÇÃO no funil
+   * dela (a mesma do ponto do quadro), e por isso a ordem é contada dentro do
+   * funil de cada etapa, não na lista misturada de todos os funis.
+   */
+  const etapaPorId = useMemo(() => {
+    const porFunil = new Map<string, Stage[]>();
+    for (const e of stages) porFunil.set(e.pipeline_id, [...(porFunil.get(e.pipeline_id) ?? []), e]);
+    const mapa = new Map<string, { nome: string; classe: string }>();
+    for (const lista of porFunil.values()) {
+      const ordenadas = etapasEmOrdem(lista);
+      ordenadas.forEach((e, i) => mapa.set(e.id, { nome: e.name, classe: corDaEtapa(i, ordenadas.length) }));
+    }
+    return mapa;
+  }, [stages]);
 
   return (
     <div className="space-y-3">
@@ -118,23 +131,39 @@ export function DealsList({
                     <Checkbox checked={selectedDeals.has(deal.id)} onCheckedChange={() => toggleOne(deal.id)} />
                   </TableCell>
                   <TableCell>
-                    <div>
-                      <span className="font-medium">{deal.title}</span>
-                      {deal.company && <p className="text-xs text-muted-foreground">{deal.company.name}</p>}
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <Iniciais
+                        nome={deal.company?.name || deal.title}
+                        forma={deal.company ? "empresa" : "pessoa"}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-foreground">{deal.title}</p>
+                        {deal.company && <p className="truncate text-xs text-muted-foreground">{deal.company.name}</p>}
+                      </div>
                     </div>
                   </TableCell>
-                  <TableCell className="font-semibold text-primary">
+                  {/* Valor em cor de texto, não de marca: numa coluna inteira
+                      de valores, a cor de destaque competia com o título. */}
+                  <TableCell className="whitespace-nowrap font-semibold tabular-nums text-foreground">
                     {formatarMoeda(Number(deal.value) || 0, deal.currency || "BRL")}
                   </TableCell>
-                  <TableCell className="text-muted-foreground hidden md:table-cell">{getStageName(deal.stage_id)}</TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    {(deal.probability ?? 0) > 0 && (
-                      <Badge variant="secondary" className="text-xs">{deal.probability}%</Badge>
-                    )}
+                  <TableCell className="hidden md:table-cell">
+                    {(() => {
+                      const etapa = deal.stage_id ? etapaPorId.get(deal.stage_id) : undefined;
+                      return etapa ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
+                          <span aria-hidden="true" className={cn("h-2 w-2 shrink-0 rounded-full", etapa.classe)} />
+                          {etapa.nome}
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>;
+                    })()}
+                  </TableCell>
+                  <TableCell className="hidden tabular-nums text-muted-foreground lg:table-cell">
+                    {(deal.probability ?? 0) > 0 ? `${deal.probability}%` : "—"}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     {deal.close_date ? (
-                      <div className={`flex items-center gap-1 text-sm ${isUrgent ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                      <div className={`flex items-center gap-1 text-xs ${isUrgent ? "font-medium text-destructive" : "text-muted-foreground"}`}>
                         {isUrgent && <AlertTriangle className="h-3 w-3" />}
                         {formatarData(deal.close_date)}
                       </div>
@@ -148,17 +177,14 @@ export function DealsList({
                     <SeloDeNegocio status={deal.status} />
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
+                    {/* O dono vem resolvido por useMembers() em Deals.tsx: não
+                        existe FK de deals para profiles. */}
                     {deal.owner ? (
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={deal.owner.avatar_url || ""} />
-                          <AvatarFallback className="bg-primary/10 text-primary text-label">
-                            {deal.owner.name?.charAt(0)?.toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm text-muted-foreground">{deal.owner.name}</span>
+                        <Iniciais nome={deal.owner.name} tamanho="sm" destaque />
+                        <span className="truncate text-xs text-foreground">{deal.owner.name}</span>
                       </div>
-                    ) : "—"}
+                    ) : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                 </TableRow>
               );

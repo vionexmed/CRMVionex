@@ -54,12 +54,17 @@ describe("os níveis existem em um lugar só", () => {
     expect(bloco).toContain("font-heading");
   });
 
-  it("cada nível é um degrau distinto", () => {
+  /**
+   * Visual 01: tela 20px, painel 16px, seção 14px -- o mesmo tamanho do título
+   * de cartão. Seção e painel iguais (16px) faziam o nome de um bloco competir
+   * com o nome do registro aberto na gaveta.
+   */
+  it("a tela tem destaque, painel usa 16 px e seção usa 14 px", () => {
     const tamanho = (classe: string) => {
       const i = CSS.indexOf(`.${classe} {`);
       return CSS.slice(i, CSS.indexOf("}", i)).match(/text-(xl|base|sm|meta|corpo|2xl)/)?.[1];
     };
-    expect(tamanho("vx-titulo-tela")).toBe("xl");
+    expect(tamanho("vx-titulo-tela")).toBe("2xl");
     expect(tamanho("vx-titulo-painel")).toBe("base");
     expect(tamanho("vx-titulo-secao")).toBe("sm");
   });
@@ -96,7 +101,7 @@ describe("o primitivo de cartão tem o default certo", () => {
   });
 
   it("CardDescription nasce no tamanho de subtítulo", () => {
-    expect(CARD).toMatch(/CardDescription[\s\S]*?text-label text-muted-foreground/);
+    expect(CARD).toMatch(/CardDescription[\s\S]*?text-xs text-muted-foreground/);
   });
 
   /**

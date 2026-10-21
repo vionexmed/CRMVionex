@@ -44,14 +44,10 @@ describe("uma resposta só para quem não tem organização", () => {
    */
   const EXIGEM_SEM_ORGANIZACAO = [
     "src/pages/Activities.tsx",
-    "src/pages/Automations.tsx",
     "src/pages/Companies.tsx",
     "src/pages/Contacts.tsx",
     "src/pages/Deals.tsx",
-    "src/pages/EmailSequences.tsx",
-    "src/pages/EmailTemplates.tsx",
     "src/pages/Inbox.tsx",
-    "src/pages/LeadScoring.tsx",
     "src/pages/Produtos.tsx",
     "src/pages/Reports.tsx",
   ];

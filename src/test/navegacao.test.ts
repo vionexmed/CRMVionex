@@ -138,7 +138,7 @@ describe("os rótulos não se repetem", () => {
     const src = readFileSync("src/components/layout/AppSidebar.tsx", "utf8");
     // O bloco cravado tinha o texto "Principal" solto no JSX.
     expect(src).not.toMatch(/>\s*Principal\s*</);
-    expect(src).toContain("NAV_GRUPOS");
+    expect(src).toContain("getVisibleNavigation");
   });
 
   it("a barra do celular lê a mesma fonte", () => {
@@ -202,7 +202,7 @@ describe("configuração sai da navegação sem sumir", () => {
 
   it("o rodapé da lateral as monta", () => {
     const src = readFileSync("src/components/layout/AppSidebar.tsx", "utf8");
-    expect(src).toContain("MENU_DA_CONTA");
+    expect(src).toContain("ACCOUNT_ITEMS");
     expect(src).toContain("DropdownMenu");
   });
 
@@ -262,16 +262,16 @@ describe("a estrutura de grupos", () => {
    *
    * E "Analytics" continha Automações e Lead Scoring, que não são analytics.
    */
-  it("quatro grupos, nenhum com menos de dois itens", () => {
-    expect(NAV_GRUPOS).toHaveLength(4);
+  it("seis áreas, nenhuma sem destino", () => {
+    expect(NAV_GRUPOS).toHaveLength(6);
     for (const g of NAV_GRUPOS) {
-      expect(g.items.length, `grupo "${g.label}" com ${g.items.length} item`).toBeGreaterThan(1);
+      expect(g.items.length, `grupo "${g.label}" com ${g.items.length} item`).toBeGreaterThan(0);
     }
   });
 
   it("os nomes dizem o que o grupo tem", () => {
     expect(NAV_GRUPOS.map((g) => g.label)).toEqual([
-      "Trabalho", "Registros", "Atendimento", "Análise",
+      "Painel", "Atividades", "Clientes", "Negócios", "Comunicação", "Análise",
     ]);
   });
 });
@@ -285,14 +285,18 @@ describe("o cabeçalho não mantém lista própria", () => {
    * `/tasks`, que virou redirecionamento, e "Templates de Email", renomeado
    * dois commits antes.
    */
-  it("deriva de NAV_GRUPOS", () => {
-    expect(HEADER).toContain("NAV_GRUPOS");
+  it("deriva do catálogo de áreas", () => {
+    expect(HEADER).toContain("NAV_SECTIONS");
     expect(HEADER).not.toMatch(/const routeLabels/);
   });
 
-  /** `/` é o Login — o mesmo defeito que NotFound e Setup tinham. */
-  it("o primeiro elo do caminho não leva ao login", () => {
-    expect(HEADER).not.toMatch(/label: "VIONEX", href: "\/"/);
-    expect(HEADER).toMatch(/label: "VIONEX", href: "\/dashboard"/);
+  /**
+   * `/` é o Login — o mesmo defeito que NotFound e Setup tinham. No Visual 01 o
+   * caminho começa pela ÁREA (a marca está no topo da lateral), e nenhum elo
+   * pode apontar para a raiz.
+   */
+  it("nenhum elo do caminho leva ao login", () => {
+    expect(HEADER).not.toMatch(/href: "\/"/);
+    expect(HEADER).toContain("href: section.entryPath");
   });
 });

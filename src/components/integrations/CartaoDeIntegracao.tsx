@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { SectionLabel } from "@/components/layout/SectionLabel";
+import { SeloComPonto, type Tom } from "@/components/layout/ListaV1";
 
 /**
  * Um cartão de integração, com o estado visível ANTES do clique.
@@ -23,26 +24,17 @@ import { SectionLabel } from "@/components/layout/SectionLabel";
  */
 export type EstadoIntegracao = "ativo" | "disponivel" | "nao-integrado";
 
-const SELO: Record<EstadoIntegracao, { texto: string; classe: string }> = {
-  ativo: { texto: "Ativo", classe: "bg-success/10 text-success" },
-  disponivel: { texto: "Disponível", classe: "bg-muted text-muted-foreground" },
-  // Âmbar e não vermelho: não é erro, é uma etapa que não existe ainda.
-  "nao-integrado": { texto: "Não integrado", classe: "bg-warning/10 text-warning" },
+// Conectado/Desconectado/Não integrado no mesmo selo suave do resto do app.
+// Âmbar e não vermelho no terceiro: não é erro, é uma etapa que não existe ainda.
+const SELO: Record<EstadoIntegracao, { texto: string; tom: Tom }> = {
+  ativo: { texto: "Conectado", tom: "sucesso" },
+  disponivel: { texto: "Desconectado", tom: "neutro" },
+  "nao-integrado": { texto: "Não integrado", tom: "atencao" },
 };
 
 export function SeloDeIntegracao({ estado }: { estado: EstadoIntegracao }) {
   const s = SELO[estado];
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-label font-semibold uppercase tracking-wide",
-        s.classe,
-      )}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
-      {s.texto}
-    </span>
-  );
+  return <SeloComPonto tom={s.tom} variante="suave" className="shrink-0">{s.texto}</SeloComPonto>;
 }
 
 export function CartaoDeIntegracao({
@@ -184,7 +176,7 @@ export function CartaoDeIntegracao({
             {acoes}
             {/* O selo sobra só para o terceiro estado: o interruptor tem dois, e
                 "não integrado" não é nenhum dos dois -- é ausência de código. */}
-            {inativo && <SeloDeIntegracao estado={estado} />}
+            <SeloDeIntegracao estado={estado} />
           </div>
 
           {linkExterno && (

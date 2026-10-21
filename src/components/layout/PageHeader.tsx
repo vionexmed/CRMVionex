@@ -1,6 +1,4 @@
 import { ReactNode } from "react";
-import { useLocation } from "react-router-dom";
-import { grupoDaRota } from "@/components/layout/navegacao";
 import { formatarNumero, pluralizar } from "@/lib/formato";
 
 /**
@@ -40,71 +38,46 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({
-  kicker,
   title,
   description,
   contagem,
   actions,
   meta,
 }: PageHeaderProps) {
-  const { pathname } = useLocation();
-  const rotulo = kicker ?? grupoDaRota(pathname);
-
   const unidade = contagem
     ? pluralizar(contagem.valor, contagem.unidade, contagem.plural)
     : null;
 
   return (
-    // Sem cartão, sem gradiente, sem ladrilho de ícone: a separação do conteúdo
-    // vem da régua abaixo. Eram 126px antes de qualquer conteúdo, em 19 telas.
-    <div className="border-b border-border pb-3.5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    /*
+     * VISUAL 01: título grande com a contagem AO LADO, em cinza -- "Contatos
+     * 1.284". O rótulo da área saiu daqui porque a trilha da barra superior já
+     * diz onde a pessoa está; repetir em cima do título era a mesma informação
+     * duas vezes no mesmo palmo de tela. Sem régua embaixo: quem vem logo abaixo
+     * (abas de visão, filtros) já desenha a própria linha.
+     */
+    <header className="shrink-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          {rotulo && (
-            // 0.08em e não 0.14em, e este é o MESMO valor do cabeçalho de
-            // tabela e do rótulo de grupo da lateral -- os três são a mesma
-            // etiqueta em papéis diferentes, e cada um tinha o seu tracking.
-            // Catorze centésimos separam tanto as letras que a palavra deixa
-            // de se ler como palavra.
-            <p className="mb-0.5 text-label font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              {rotulo}
-            </p>
-          )}
-          {/* A classe, não as utilidades soltas: assim o nível existe em UM
-              lugar, e as telas sem casca (entrada, wizard, erro) usam o mesmo. */}
-          <h1 className="vx-titulo-tela truncate">{title}</h1>
+          <h1 className="vx-titulo-tela break-words">
+            {title}
+            {contagem && (
+              // `tabular-nums` porque o número muda sob os olhos -- sem largura
+              // fixa de dígito, o total "pula" a cada filtro aplicado.
+              <span className="ml-2.5 align-baseline text-base font-medium tabular-nums text-muted-foreground">
+                {formatarNumero(contagem.valor)}
+                <span className="sr-only"> {unidade}</span>
+              </span>
+            )}
+          </h1>
           {description && <p className="vx-subtitulo-tela">{description}</p>}
           {meta && <div className="mt-2">{meta}</div>}
         </div>
 
-        <div className="flex items-end gap-3 shrink-0">
-          {contagem && (
-            // `tabular-nums` porque o número muda sob os olhos — sem largura fixa
-            // de dígito, o total "pula" de lugar a cada filtro aplicado.
-            // O NÚMERO DEIXOU DE SER COLORIDO.
-            //
-            // Era `text-primary`: a contagem de registros pintada com a cor da
-            // marca, na mesma tela em que o botão de ação principal é a única
-            // outra coisa colorida. Duas coisas na cor do acento competem, e a
-            // que não é clicável ganha por ser maior.
-            //
-            // Neste sistema a cor é reservada para AÇÃO e para ESTADO. Um
-            // total é dado: ele se destaca por tamanho e por peso, que é o que
-            // hierarquia tipográfica faz.
-            <div className="border-r border-border pr-3.5 text-right leading-none">
-              <p className="font-heading text-2xl font-bold tabular-nums tracking-tight text-foreground">
-                {formatarNumero(contagem.valor)}
-              </p>
-              <p className="mt-1.5 text-label uppercase tracking-[0.08em] text-muted-foreground">
-                {unidade}
-              </p>
-            </div>
-          )}
-          {actions && (
-            <div className="flex flex-wrap items-center gap-2">{actions}</div>
-          )}
-        </div>
+        {actions && (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>
+        )}
       </div>
-    </div>
+    </header>
   );
 }

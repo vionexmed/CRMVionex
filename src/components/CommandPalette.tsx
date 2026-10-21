@@ -1,170 +1,108 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  LayoutDashboard, Users, Building2, Handshake, Activity, BarChart3, Settings,
-  Inbox, FileText, Zap, Target, Search as SearchIcon, MessageSquare,
-} from "lucide-react";
-import {
-  CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator,
-} from "@/components/ui/command";
-import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { useOrg } from "@/hooks/useOrg";
-import { useDebounce } from "@/hooks/useDebounce";
-import { formatarNumero } from "@/lib/formato";
+import { Users, Building2, Handshake, Search, type LucideIcon } from "lucide-react";
+import { CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Button } from "@/components/ui/button";
+import { Iniciais } from "@/components/layout/ListaV1";
+import { getVisibleNavigation, ACCOUNT_ITEMS } from "@/components/layout/navegacao";
+import { useAuth } from "@/contexts/AuthContext";
+import { useGlobalSearch } from "@/hooks/queries/useGlobalSearch";
+import { mensagemErro } from "@/lib/erro-supabase";
+import type { SearchCategory } from "@/lib/api/global-search";
 
-const pages = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-  { label: "Contatos", icon: Users, path: "/contacts" },
-  { label: "Empresas", icon: Building2, path: "/companies" },
-  { label: "Negócios", icon: Handshake, path: "/deals" },
-  { label: "Atividades", icon: Activity, path: "/activities" },
-  { label: "Atividades", icon: Activity, path: "/activities" },
-  // Um destino para os três canais. A caixa de e-mail completa (pastas, spam,
-  // anexos) continua alcançável, e por isso segue na paleta como entrada
-  // própria -- ela não é mais o destino de "e-mail", é o de "gerenciar caixa".
-  { label: "Atendimento", icon: MessageSquare, path: "/atendimento" },
-  { label: "Caixa de e-mail", icon: Inbox, path: "/inbox" },
-  { label: "Templates de Email", icon: FileText, path: "/email-templates" },
-  { label: "Sequências", icon: Zap, path: "/email-sequences" },
-  { label: "Lead Scoring", icon: Target, path: "/lead-scoring" },
-  { label: "Relatórios", icon: BarChart3, path: "/reports" },
-  { label: "Automações", icon: Zap, path: "/automations" },
-  { label: "Configurações", icon: Settings, path: "/settings" },
+const categories: { key: SearchCategory; label: string; icon: LucideIcon }[] = [
+  { key: "contacts", label: "Contatos", icon: Users },
+  { key: "companies", label: "Empresas", icon: Building2 },
+  { key: "deals", label: "Negócios", icon: Handshake },
 ];
-
-const shortcuts = [
-  { label: "Novo Contato", keys: "N", desc: "Criar contato" },
-  { label: "Novo Negócio", keys: "D", desc: "Criar negócio" },
-  { label: "Nova Tarefa", keys: "T", desc: "Criar tarefa" },
-  { label: "Buscar", keys: "⌘K", desc: "Abrir busca" },
-  { label: "Focar busca", keys: "/", desc: "Focar campo de busca" },
-  { label: "Fechar", keys: "Esc", desc: "Fechar modal" },
-];
-
-interface CommandPaletteProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+/** Título de grupo no V1: caixa-alta pequena, como os rótulos de seção da casca. */
+const GRUPO = "[&_[cmdk-group-heading]]:text-label [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide";
+const normalize = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+function readHistory(key: string | null): string[] {
+  if (!key) return [];
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
+    return Array.isArray(value)
+      ? [...new Set(value.filter((item): item is string => typeof item === "string").map((item) => item.trim().slice(0, 200)).filter(Boolean))].slice(0, 5)
+      : [];
+  } catch { return []; }
 }
+
+interface CommandPaletteProps { open: boolean; onOpenChange: (open: boolean) => void }
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate();
-  const { orgId } = useOrg();
+  const { user, profile, isAdmin } = useAuth();
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 300);
-  const [contacts, setContacts] = useState<any[]>([]);
-  const [deals, setDeals] = useState<any[]>([]);
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem("fc-recent-searches") || "[]"); }
-    catch { return []; }
-  });
+  const inputRef = useRef<HTMLInputElement>(null);
+  const opener = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  const key = user?.id && profile?.org_id ? `vionex-search:${user.id}:${profile.org_id}` : null;
+  const [history, setHistory] = useState(() => ({ key, terms: readHistory(key) }));
+  useEffect(() => { setHistory({ key, terms: readHistory(key) }); }, [key]);
+  const recent = history.key === key ? history.terms : [];
+  const query = useGlobalSearch(search, open);
+  const term = search.trim();
 
-  const searchEntities = useCallback(async (q: string) => {
-    if (!orgId || !q || q.length < 2) {
-      setContacts([]); setDeals([]); setCompanies([]);
-      return;
+  const pages = useMemo(() => {
+    const items = getVisibleNavigation(isAdmin).flatMap((section) => section.items.map((item) => ({
+      ...item, label: item.path === "/dashboard" ? section.label : item.label,
+      keywords: `${section.label} ${item.label} ${(item.aliases ?? []).join(" ")}`,
+    })));
+    const account = ACCOUNT_ITEMS.filter((item) => isAdmin || !item.adminOnly).map((item) => ({ ...item, keywords: `Conta ${item.label}` }));
+    return [...new Map([...items, ...account].map((item) => [item.path, item])).values()];
+  }, [isAdmin]);
+  const matchingPages = pages.filter((page) => normalize(`${page.label} ${page.keywords}`).includes(normalize(term)));
+
+  const select = (href: string) => {
+    if (key && term.length >= 2) {
+      const terms = [term, ...recent.filter((item) => normalize(item) !== normalize(term))].slice(0, 5);
+      setHistory({ key, terms });
+      try { localStorage.setItem(key, JSON.stringify(terms)); } catch { /* Histórico é opcional. */ }
     }
-    const [cRes, dRes, coRes] = await Promise.all([
-      supabase.from("contacts").select("id, first_name, last_name, email, status").eq("org_id", orgId).or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,email.ilike.%${q}%`).limit(5),
-      supabase.from("deals").select("id, title, value, status").eq("org_id", orgId).ilike("title", `%${q}%`).limit(5),
-      supabase.from("companies").select("id, name, domain").eq("org_id", orgId).ilike("name", `%${q}%`).limit(5),
-    ]);
-    setContacts(cRes.data || []);
-    setDeals(dRes.data || []);
-    setCompanies(coRes.data || []);
-  }, [orgId]);
-
-  useEffect(() => { searchEntities(debouncedSearch); }, [debouncedSearch, searchEntities]);
-
-  const handleSelect = (path: string) => {
-    if (search && !recentSearches.includes(search)) {
-      const updated = [search, ...recentSearches].slice(0, 5);
-      setRecentSearches(updated);
-      localStorage.setItem("fc-recent-searches", JSON.stringify(updated));
-    }
-    navigate(path);
+    navigate(href);
     onOpenChange(false);
     setSearch("");
   };
+  const clearHistory = () => {
+    setHistory({ key, terms: [] });
+    try { if (key) localStorage.removeItem(key); } catch { /* A lista local já foi limpa. */ }
+  };
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Buscar páginas, contatos, negócios..." value={search} onValueChange={setSearch} />
-      <CommandList>
-        <CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>
-
-        {/* Real-time entity results */}
-        {contacts.length > 0 && (
-          <CommandGroup heading="Contatos">
-            {contacts.map((c) => (
-              <CommandItem key={c.id} onSelect={() => handleSelect(`/contacts`)} className="gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span>{c.first_name} {c.last_name}</span>
-                {c.email && <span className="text-xs text-muted-foreground ml-auto">{c.email}</span>}
-              </CommandItem>
-            ))}
+    <CommandDialog open={open} onOpenChange={onOpenChange}
+      commandProps={{ shouldFilter: false, label: "Busca global" }}
+      contentProps={{
+        onOpenAutoFocus: (event) => { event.preventDefault(); inputRef.current?.focus(); },
+        onCloseAutoFocus: (event) => { event.preventDefault(); if (opener.current?.isConnected) opener.current.focus(); },
+      }}>
+      <CommandInput ref={inputRef} placeholder="Buscar páginas, contatos, empresas e negócios…" aria-label="Buscar no CRM" maxLength={200} value={search} onValueChange={setSearch} />
+      <CommandList aria-label="Resultados da busca">
+        {term.length < 2 && <p role="status" className="px-4 py-3 text-xs text-muted-foreground">Digite pelo menos 2 caracteres para buscar registros.</p>}
+        {query.isSearching && <p role="status" className="px-4 py-3 text-xs text-muted-foreground">Buscando registros…</p>}
+        {query.error && <div role="alert" className="px-4 py-3 text-sm">{mensagemErro(query.error)}<Button variant="ghost" size="sm" onClick={() => void query.refetch()}>Tentar novamente</Button></div>}
+        {query.data && categories.map(({ key: category, label }) => (
+          <CommandGroup key={category} heading={label} className={GRUPO}>
+            {query.data?.errors?.[category]
+              ? <div role="alert" className="px-2 py-2 text-xs text-muted-foreground">Não foi possível buscar {label.toLocaleLowerCase("pt-BR")}: {query.data.errors[category]}<Button variant="ghost" size="sm" onClick={() => void query.refetch()}>Tentar novamente</Button></div>
+              : query.data![category].length === 0
+                ? <p className="px-2 py-2 text-xs text-muted-foreground">Nenhum resultado em {label.toLocaleLowerCase("pt-BR")}.</p>
+                : query.data![category].map((result) => (
+                  <CommandItem key={`${result.kind}:${result.id}`} value={`${result.kind}:${result.id}`} onSelect={() => select(result.href)} className="gap-3">
+                    <Iniciais nome={result.title} forma={category === "contacts" ? "pessoa" : "empresa"} tamanho="sm" />
+                    <span className="min-w-0"><span className="block truncate font-medium" title={result.title}>{result.title}</span>{result.subtitle && <span className="block truncate text-xs text-muted-foreground" title={result.subtitle}>{result.subtitle}</span>}</span>
+                  </CommandItem>
+                ))}
           </CommandGroup>
-        )}
-
-        {deals.length > 0 && (
-          <CommandGroup heading="Negócios">
-            {deals.map((d) => (
-              <CommandItem key={d.id} onSelect={() => handleSelect(`/deals/${d.id}`)} className="gap-2">
-                <Handshake className="h-4 w-4 text-muted-foreground" />
-                <span>{d.title}</span>
-                {d.value && <Badge variant="secondary" className="ml-auto text-label">R$ {formatarNumero(d.value)}</Badge>}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-
-        {companies.length > 0 && (
-          <CommandGroup heading="Empresas">
-            {companies.map((c) => (
-              <CommandItem key={c.id} onSelect={() => handleSelect(`/companies`)} className="gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                <span>{c.name}</span>
-                {c.domain && <span className="text-xs text-muted-foreground ml-auto">{c.domain}</span>}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-
-        {/* Recent searches */}
-        {!search && recentSearches.length > 0 && (
-          <CommandGroup heading="Buscas Recentes">
-            {recentSearches.map((s, i) => (
-              <CommandItem key={i} onSelect={() => setSearch(s)} className="gap-2">
-                <SearchIcon className="h-4 w-4 text-muted-foreground" />
-                {s}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-
-        <CommandSeparator />
-
-        <CommandGroup heading="Páginas">
-          {pages.map((page) => (
-            <CommandItem key={page.path} onSelect={() => handleSelect(page.path)} className="gap-2">
-              <page.icon className="h-4 w-4 text-muted-foreground" />
-              {page.label}
-            </CommandItem>
-          ))}
-        </CommandGroup>
-
-        <CommandSeparator />
-
-        <CommandGroup heading="Atalhos de Teclado">
-          {shortcuts.map((s) => (
-            <CommandItem key={s.label} className="gap-2 justify-between" disabled>
-              <span className="text-xs text-muted-foreground">{s.desc}</span>
-              <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-label">{s.keys}</kbd>
-            </CommandItem>
-          ))}
-        </CommandGroup>
+        ))}
+        {!term && recent.length > 0 && <CommandGroup heading="Buscas recentes" className={GRUPO}>
+          {recent.map((item) => <CommandItem key={item} value={`recent:${item}`} onSelect={() => setSearch(item)} className="gap-3"><Search aria-hidden="true" className="h-4 w-4" /><span className="truncate">{item}</span></CommandItem>)}
+          <Button variant="ghost" size="sm" onClick={clearHistory}>Limpar histórico</Button>
+        </CommandGroup>}
+        {matchingPages.length > 0 && <CommandGroup heading="Páginas" className={GRUPO}>
+          {matchingPages.map((page) => <CommandItem key={page.path} value={`page:${page.path}`} onSelect={() => select(page.path)} className="gap-3"><page.icon aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />{page.label}</CommandItem>)}
+        </CommandGroup>}
       </CommandList>
+      <p className="border-t border-border bg-surface-2 px-4 py-3 text-xs text-muted-foreground">Até 5 resultados por categoria. ↑↓ navegar · Enter abrir · Esc fechar</p>
     </CommandDialog>
   );
 }

@@ -23,37 +23,40 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export const useTheme = () => useContext(ThemeContext);
 
-/**
- * AS SEIS CORES DE DESTAQUE, CADA UMA COM UM PAR CLARO/ESCURO.
- *
- * O par não é decoração: uma cor que se lê sobre branco é escura e saturada, e
- * essa mesma cor sobre um fundo de 9% de claridade vira um borrão. No escuro
- * ela precisa SUBIR de claridade e DESCER de saturação -- subir para se
- * destacar do fundo, descer para não acender como néon.
- *
- * Quatro das seis (`emerald`, `orange`, `rose`, e o `teal` antigo) usavam o
- * MESMO valor nos dois temas, ou um valor mais saturado ainda no escuro. Era o
- * que deixava o tema escuro com cara de fluorescente. Agora as seis seguem a
- * regra.
- *
- * Estes valores são escritos na RAIZ em tempo de execução, por cima de
- * `--primary` / `--ring` / `--sidebar-primary`. Por isso nenhum lugar do CSS
- * pode cravar o teal: quem escolher roxo tem de ver roxo em tudo.
- */
 const ACCENT_COLORS: Record<string, { light: string; dark: string }> = {
-  // O teal do logo Vionex — o padrão, e a identidade da marca.
-  teal: { light: "188 88% 26%", dark: "187 62% 48%" },
-  blue: { light: "221 76% 46%", dark: "215 80% 62%" },
-  violet: { light: "262 83% 58%", dark: "258 72% 68%" },
-  emerald: { light: "160 78% 28%", dark: "158 56% 48%" },
-  orange: { light: "24 82% 40%", dark: "28 82% 58%" },
-  rose: { light: "347 72% 43%", dark: "348 70% 62%" },
+  // Cada variante mantém 4,5:1 para texto sobre superfícies e dentro do botão.
+  // Azul Vionex, Violeta e Esmeralda são as três direções do Visual 01.
+  blue: { light: "226 82% 55%", dark: "225 100% 74%" },
+  // Violeta e Esmeralda um pouco mais escuros que o hex de referência: no tom
+  // original, texto da cor sobre a coluna cinza ficava abaixo de 4,5:1.
+  violet: { light: "252 100% 62%", dark: "250 100% 78%" },
+  emerald: { light: "165 85% 25%", dark: "164 63% 51%" },
+  teal: { light: "187 100% 25%", dark: "187 100% 35%" },
+  orange: { light: "25 95% 34%", dark: "25 95% 53%" },
+  rose: { light: "347 77% 45%", dark: "347 77% 63%" },
 };
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => (localStorage.getItem("fc-theme") as Theme) || "light");
   const [density, setDensityState] = useState<Density>(() => (localStorage.getItem("fc-density") as Density) || "normal");
-  const [accentColor, setAccentState] = useState(() => localStorage.getItem("fc-accent") || "teal");
+  /*
+   * O Visual 01 tem o Azul Vionex como marca. Quem tinha o teal antigo salvo
+   * (era o padrão, então quase todo mundo) é levado UMA vez para o azul; depois
+   * disso a escolha volta a ser respeitada. A marca `fc-visual` registra que a
+   * migração já aconteceu.
+   */
+  const [accentColor, setAccentState] = useState(() => {
+    try {
+      if (localStorage.getItem("fc-visual") !== "v1") {
+        localStorage.setItem("fc-visual", "v1");
+        localStorage.setItem("fc-accent", "blue");
+        return "blue";
+      }
+      return localStorage.getItem("fc-accent") || "blue";
+    } catch {
+      return "blue";
+    }
+  });
 
   const applyTheme = (t: Theme) => {
     const root = document.documentElement;
@@ -85,9 +88,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const applyAccent = (color: string) => {
     const root = document.documentElement;
     const isDark = root.classList.contains("dark");
-    const palette = ACCENT_COLORS[color] || ACCENT_COLORS.teal;
+    const palette = ACCENT_COLORS[color] || ACCENT_COLORS.blue;
     const val = isDark ? palette.dark : palette.light;
     root.style.setProperty("--primary", val);
+<<<<<<< HEAD
+    root.style.setProperty("--primary-foreground", isDark ? "211 68% 7%" : "0 0% 100%");
+    root.style.setProperty("--ring", val);
+    root.style.setProperty("--sidebar-primary", val);
+    root.style.setProperty("--sidebar-primary-foreground", isDark ? "211 68% 7%" : "0 0% 100%");
+=======
     /*
      * O ANEL DE FOCO SEGUE O TEMA, não só a cor escolhida.
      *
@@ -100,6 +109,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
      */
     root.style.setProperty("--ring", val);
     root.style.setProperty("--sidebar-primary", val);
+>>>>>>> origin/main
     root.style.setProperty("--sidebar-ring", val);
   };
 

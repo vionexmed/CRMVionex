@@ -84,8 +84,8 @@ export default {
          * mesma família troca tudo de uma vez sem reescrever chamada nenhuma --
          * e deixa o caminho aberto para voltar a ter uma display própria.
          */
-        sans: ['Roboto', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        heading: ['Roboto', '-apple-system', 'sans-serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"', '"Segoe UI"', 'Inter', 'system-ui', 'sans-serif'],
+        heading: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Segoe UI"', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
       },
       colors: {
@@ -96,13 +96,23 @@ export default {
         foreground: "hsl(var(--foreground))",
         primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
         secondary: { DEFAULT: "hsl(var(--secondary))", foreground: "hsl(var(--secondary-foreground))" },
-        destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
+        destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))", soft: "hsl(var(--destructive-soft))" },
         muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
         accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
         popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
         card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
-        success: { DEFAULT: "hsl(var(--success))", foreground: "hsl(var(--success-foreground))" },
-        warning: { DEFAULT: "hsl(var(--warning))", foreground: "hsl(var(--warning-foreground))" },
+        success: { DEFAULT: "hsl(var(--success))", foreground: "hsl(var(--success-foreground))", soft: "hsl(var(--success-soft))" },
+        warning: { DEFAULT: "hsl(var(--warning))", foreground: "hsl(var(--warning-foreground))", soft: "hsl(var(--warning-soft))" },
+        info: { DEFAULT: "hsl(var(--info))", foreground: "hsl(var(--info-foreground))", soft: "hsl(var(--info-soft))" },
+        neutral: { DEFAULT: "hsl(var(--neutral))", soft: "hsl(var(--neutral-soft))" },
+        "surface-2": "hsl(var(--surface-2))",
+        chart: {
+          1: "hsl(var(--chart-1))", 2: "hsl(var(--chart-2))", 3: "hsl(var(--chart-3))", 4: "hsl(var(--chart-4))",
+        },
+        stage: {
+          1: "var(--stage-1)", 2: "var(--stage-2)", 3: "var(--stage-3)",
+          4: "var(--stage-4)", 5: "var(--stage-5)", 6: "var(--stage-6)",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -112,33 +122,21 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+          muted: "hsl(var(--sidebar-muted))",
         },
       },
-      /*
-       * PROPORCIONAL, e não subtração fixa.
-       *
-       * Era `--radius - 2px` e `- 4px`. Com o token em 10px isso dava 10/8/6 e
-       * passava despercebido; quando ele subiu para 16px virou 16/14/12 -- a
-       * escala COLAPSOU, e os três ficaram praticamente iguais.
-       *
-       * O estrago é nos elementos pequenos, que são a maioria: 106 usos de
-       * `rounded-md` e 14 de `rounded-sm`. Um raio de 14px num botão de 32px é
-       * quase uma pílula, e no quadrado de 24px do ícone do StatCard vira
-       * bolha -- justamente o que `visual-do-painel.test.ts` proíbe. O teste
-       * continuava passando porque confere o NOME da classe, não o valor.
-       *
-       * Com fator, os três acompanham o cartão sem se achatar.
-       *
-       * O token desceu de 16px para 12px -- dezesseis é raio de aplicativo de
-       * consumo, e num cartão de lista o canto come o conteúdo. Como os
-       * degraus são proporcionais, a escala inteira acompanhou sozinha:
-       * 12 / 8 / 5.
-       */
+      // Superfícies 8 px, controles 6 px; `rounded` (4 px) fica para o selo.
       borderRadius: {
-        lg: "var(--radius)",                  /* 12px — cartão, painel, diálogo */
-        md: "calc(var(--radius) * 0.6667)",   /*  8px — botão, campo, menu */
-        sm: "calc(var(--radius) * 0.4167)",   /*  5px — selo, caixa de seleção */
+        xl: "var(--radius)",
+        "2xl": "var(--radius)",
+        "3xl": "var(--radius)",
+        lg: "var(--radius)",                 /* 8px — superfícies */
+        md: "var(--radius-control)",   /* 6px — controles */
+        sm: "var(--radius-control)",   /* 6px — pequenos elementos */
       },
+      height: { control: "var(--control-h)", row: "var(--row-h)" },
+      transitionDuration: { 180: "180ms", 240: "240ms" },
+      transitionTimingFunction: { DEFAULT: "cubic-bezier(.2,.8,.2,1)" },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
         "accordion-up": { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } },

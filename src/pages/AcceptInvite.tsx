@@ -4,8 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lock, User, Handshake } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { AuthShell, AuthTitulo, CampoSenha } from "@/components/auth/AuthShell";
 import { useToast } from "@/hooks/use-toast";
 import { mensagemErro } from "@/lib/erro-supabase";
 
@@ -165,86 +165,54 @@ export default function AcceptInvite() {
 
   if (erro) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="font-heading text-xl">Não foi possível abrir o convite</CardTitle>
-            <CardDescription className="pt-1 leading-relaxed">{erro}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" className="w-full" onClick={() => navigate("/")}>
-              Ir para a tela de entrada
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthShell>
+        <AuthTitulo titulo="Não foi possível abrir o convite" apoio={erro} />
+        <Button variant="outline" className="h-10 w-full" onClick={() => navigate("/")}>
+          Ir para a tela de entrada
+        </Button>
+      </AuthShell>
     );
   }
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
+      <AuthShell>
+        <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />Abrindo seu convite…
+        </p>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-            <Handshake className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <h1 className="vx-titulo-tela">Você foi convidado(a)!</h1>
+    <AuthShell>
+      <AuthTitulo
+        titulo="Bem-vindo(a) ao Vionex"
+        apoio={<>Defina seu nome e uma senha para concluir o acesso{email && <> como <strong className="font-semibold text-foreground">{email}</strong></>}.</>}
+      />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="invite-name">Nome completo</Label>
+          <Input
+            id="invite-name"
+            autoComplete="name"
+            placeholder="Como sua equipe vai ver você"
+            className="h-10"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            autoFocus
+          />
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-heading text-xl">Concluir cadastro</CardTitle>
-            <CardDescription className="text-sm">
-              Defina seu nome e uma senha para acessar o CRM
-              {email && <> — entrando como <span className="font-medium">{email}</span></>}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="invite-name">Nome completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="invite-name"
-                    placeholder="Seu nome"
-                    className="pl-9"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="invite-password">Senha</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="invite-password"
-                    type="password"
-                    placeholder="Mínimo 6 caracteres"
-                    className="pl-9"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                </div>
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Salvando..." : "Entrar no CRM"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="invite-password">Senha</Label>
+          <CampoSenha id="invite-password" autoComplete="new-password" placeholder="Mínimo de 6 caracteres" minLength={6}
+            value={password} onChange={setPassword} />
+        </div>
+        <Button type="submit" className="h-10 w-full" disabled={loading}>
+          {loading ? <><Loader2 aria-hidden="true" className="animate-spin" />Salvando…</> : "Entrar no CRM"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

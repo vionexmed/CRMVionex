@@ -17,10 +17,7 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      // Mesma altura, mesmo fundo e mesma linha do `<Input>`: campo de texto e
-      // seletor lado a lado com tratamentos diferentes é o que fazia uma barra
-      // de filtros parecer montada por duas pessoas.
-      "flex h-9 w-full items-center justify-between rounded-md border border-input bg-card px-3 py-1.5 text-sm ring-offset-background transition-colors placeholder:text-muted-foreground hover:border-input/70 focus:outline-none focus:border-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      "vx-campo flex h-control w-full items-center justify-between rounded-md border border-input bg-card px-3 py-1.5 text-sm ring-offset-background placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60 [&>span]:line-clamp-1",
       className,
     )}
     {...props}

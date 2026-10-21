@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+    <div className="relative min-w-0 w-full overflow-auto">
+      <table ref={ref} className={cn("w-full caption-bottom text-sm tabular-nums", className)} {...props} />
     </div>
   ),
 );
@@ -56,10 +56,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
         // a base é 13px e o cabeçalho fica desproporcional -- quase o dobro da
         // altura da linha de dado. `.vx-table` já define padding próprio para
         // as 18 tabelas do projeto; esta altura é o piso para quem não usa.
-        // Caixa alta em 11px com tracking aberto: é o rótulo de instrumento
-        // que `.vx-table thead th` já aplica, trazido para o primitivo para
-        // que as tabelas fora da classe não fiquem com outro cabeçalho.
-        "h-9 px-3 text-left align-middle text-label font-semibold uppercase tracking-[0.08em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
+        "h-10 px-3 text-xs text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}
@@ -70,12 +67,7 @@ TableHead.displayName = "TableHead";
 
 const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    // `p-4` (16px em todos os lados) era o default do shadcn, calibrado para
-    // corpo de 16px. Aqui a base é 13px: dezesseis pixels acima e abaixo de uma
-    // linha de 18px de altura davam 50px por linha, e uma lista de contatos
-    // cabia em nove registros na tela. `.vx-table` já ajusta as 18 tabelas do
-    // projeto; este é o piso para quem não usa a classe.
-    <td ref={ref} className={cn("px-3 py-2.5 align-middle [&:has([role=checkbox])]:pr-0", className)} {...props} />
+    <td ref={ref} className={cn("px-3 py-3 align-middle [&:has([role=checkbox])]:pr-0", className)} {...props} />
   ),
 );
 TableCell.displayName = "TableCell";

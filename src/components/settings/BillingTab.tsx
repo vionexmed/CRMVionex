@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SeloComPonto } from "@/components/layout/ListaV1";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -70,7 +71,7 @@ export function BillingTab({ orgId }: { orgId: string | null }) {
             <CardHeader>
               <div className="flex items-center gap-2">
                 {plan.name === "Enterprise" && <Crown className="h-4 w-4 text-warning" />}
-                <CardTitle>{plan.name}</CardTitle>
+                <CardTitle className="vx-titulo-secao">{plan.name}</CardTitle>
                 {plan.current && <Badge className="text-label">Atual</Badge>}
               </div>
               <p className="text-lg font-bold">{plan.price}</p>
@@ -96,7 +97,7 @@ export function BillingTab({ orgId }: { orgId: string | null }) {
       {/* Invoices */}
       <Card>
         <CardHeader>
-          <CardTitle>Histórico de Faturas</CardTitle>
+          <CardTitle className="vx-titulo-secao">Histórico de Faturas</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="vx-table">
@@ -115,7 +116,7 @@ export function BillingTab({ orgId }: { orgId: string | null }) {
                     <TableCell className="text-xs">{inv.date}</TableCell>
                     <TableCell className="text-xs">{inv.plan}</TableCell>
                     <TableCell className="text-xs">{inv.amount}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-label text-success">{inv.status}</Badge></TableCell>
+                    <TableCell><SeloComPonto tom="sucesso">{inv.status}</SeloComPonto></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrg } from "@/hooks/useOrg";
+import { useAbaNaUrl } from "@/hooks/useAbaNaUrl";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { IntegrationsTab } from "@/components/integrations/IntegrationsTab";
 import { WebhooksTab } from "@/components/integrations/WebhooksTab";
@@ -11,9 +12,12 @@ import { PageTabs } from "@/components/layout/PageTabs";
 import { ArrowLeftRight, KeyRound, Magnet as MagnetIcon, Plug, Radar, Webhook } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 
+const ABAS = ["integrations", "webhooks", "api", "lead-capture", "tracking", "import-export"] as const;
+
 export default function Integrations() {
   const { user } = useAuth();
   const { orgId } = useOrg();
+  const [aba, setAba] = useAbaNaUrl("aba", "integrations", ABAS);
 
   return (
     <PageShell
@@ -21,7 +25,7 @@ export default function Integrations() {
       description="Conecte ferramentas externas e gerencie suas chaves"
     >
 
-      <Tabs defaultValue="integrations">
+      <Tabs value={aba} onValueChange={setAba}>
         <PageTabs
           abas={[
             { valor: "integrations", rotulo: "Integrações", icone: Plug, rotuloCurto: "Integr." },

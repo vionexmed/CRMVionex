@@ -30,11 +30,6 @@ const COM_CASCA = [
   "src/pages/Orcamentos.tsx",
   "src/pages/Activities.tsx",
   "src/pages/Reports.tsx",
-  "src/pages/SalesGoals.tsx",
-  "src/pages/LeadScoring.tsx",
-  "src/pages/Automations.tsx",
-  "src/pages/EmailSequences.tsx",
-  "src/pages/EmailTemplates.tsx",
   "src/pages/MyEmail.tsx",
   "src/pages/Team.tsx",
   "src/pages/Settings.tsx",
@@ -138,7 +133,7 @@ describe("as telas internas usam a mesma casca", () => {
      * o invariante tivesse mudado -- o ritmo continua saindo daqui. Teste que
      * quebra por quebra de linha é teste que alguém desliga.
      */
-    expect(src).toMatch(/cn\(\s*"space-y-4"/);
+    expect(src).toMatch(/cn\(\s*"min-w-0 space-y-6"/);
   });
 
   /**

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/hooks/useOrg";
 import {
@@ -49,6 +49,8 @@ export interface MarketingPayload {
   funnel: FunnelStage[];
   loading: boolean;
   updatedAt: Date;
+  error: string | null;
+  refetch: () => void;
 }
 
 const emptyFunnel: FunnelStage[] = [
@@ -75,7 +77,11 @@ export function useMarketingData(period: PeriodKey, customDays = 30): MarketingP
     funnel: emptyFunnel,
     loading: false,
     updatedAt: new Date(),
+    error: null,
+    refetch: () => undefined,
   });
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refetch = useCallback(() => setRefreshKey((value) => value + 1), []);
 
   useEffect(() => {
     const days = periodDays(period, customDays);
@@ -108,7 +114,7 @@ export function useMarketingData(period: PeriodKey, customDays = 30): MarketingP
       };
     };
 
-    setState((s) => ({ ...s, loading: true }));
+    setState((s) => ({ ...s, loading: true, error: null, refetch }));
     (async () => {
       try {
         const [
@@ -164,6 +170,16 @@ export function useMarketingData(period: PeriodKey, customDays = 30): MarketingP
         ]);
 
         if (cancelled) return;
+        const firstError = [campRes, insightsRes, contactsRes, dealsCreatedRes, dealsWonRes, visitorsRes]
+          .map((result) => (result as { error?: { message?: string } | null }).error)
+          .find(Boolean);
+        const googlePermissionError = [gCampRes, gInsightsRes]
+          .map((result) => (result as { error?: { code?: string; message?: string } | null }).error)
+          .find((error) => error && error.code !== "42P01");
+        if (firstError || googlePermissionError) {
+          setState((s) => ({ ...s, loading: false, error: firstError?.message ?? googlePermissionError?.message ?? "Não foi possível carregar os dados de marketing.", refetch }));
+          return;
+        }
 
         const campRows = campRes.data ?? [];
         const insights = insightsRes.data ?? [];
@@ -367,16 +383,18 @@ export function useMarketingData(period: PeriodKey, customDays = 30): MarketingP
           funnel,
           loading: false,
           updatedAt: new Date(),
+          error: null,
+          refetch,
         });
       } catch {
-        if (!cancelled) setState((s) => ({ ...s, loading: false }));
+        if (!cancelled) setState((s) => ({ ...s, loading: false, error: "Não foi possível carregar os dados de marketing.", refetch }));
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [orgId, period, customDays]);
+  }, [orgId, period, customDays, refreshKey, refetch]);
 
   return state;
 }

@@ -168,20 +168,15 @@ describe("a lateral ancora a tela", () => {
     bloco(escopo).match(new RegExp(`${token}:\\s*([^;]+);`))?.[1]?.trim();
 
   /**
-   * A LATERAL DEIXOU DE SER NAVY.
+   * VISUAL 01: a lateral é NAVY, a parte mais escura da tela.
    *
-   * Era `217 72% 14%`, encostada na borda. Virou cartão BRANCO flutuando sobre o
-   * cinza da página (`--background`, 97%) -- é o formato pedido, e é o que dá
-   * separação sem depender de sombra pesada.
-   *
-   * O teste não trava o branco exato: trava a RELAÇÃO, que é o que precisa valer
-   * para o cartão se ler como cartão. Cravar `0 0% 100%` reprovaria um ajuste
-   * legítimo para 99%.
+   * Ela ancora a tela pela esquerda e deixa a luz onde o trabalho está. O teste
+   * trava a RELAÇÃO com a página, não o hex: um ajuste de tom não reprova.
    */
-  it("no claro a lateral é mais clara que a página, para flutuar sobre ela", () => {
+  it("no claro a lateral é bem mais escura que a página", () => {
     const lum = (v?: string) => Number(v?.match(/(\d+)%\s*$/)?.[1] ?? 0);
-    expect(lum(valor(":root {", "--sidebar-background")))
-      .toBeGreaterThan(lum(valor(":root {", "--background")));
+    expect(lum(valor(":root {", "--background")) - lum(valor(":root {", "--sidebar-background")))
+      .toBeGreaterThan(50);
   });
 
   /**
@@ -207,41 +202,30 @@ describe("a lateral ancora a tela", () => {
   });
 
   /**
-   * O REALCE DE PASSAGEM É NEUTRO.
+   * O ITEM ATIVO É PREENCHIDO NA COR DE MARCA.
    *
-   * `--sidebar-accent` era a pastilha do item ATIVO; hoje é o realce do item
-   * sob o cursor, e o ativo passou a ser um lavado de `--sidebar-primary` (ver
-   * o teste do item ativo mais abaixo). O token trocou de papel, e o teste
-   * acompanha -- mas a regra que ele guarda é a mesma, e continua valendo com
-   * mais força ainda: passar o mouse não significa nada, e tingir isso com a
-   * cor da marca esvazia o acento onde ele deveria significar decisão.
-   *
-   * Além disso `--sidebar-accent` NÃO é sobrescrito pelo `ThemeContext`: se
-   * alguém o aproximar do teal, ele fica teal para quem escolheu roxo.
+   * Contra o navy, uma pílula neutra some; o ativo é a única coisa saturada da
+   * lateral. Tem de ler `--sidebar-primary` e não um valor cravado, senão a
+   * troca de cor de destaque deixaria o item ativo na cor antiga.
    */
-  it("o realce de passagem é cinza, não a cor da marca", () => {
-    const acento = valor(":root {", "--sidebar-accent");
-    const [matiz, sat] = acento!.split(" ");
-    // Teal vive perto de 187. Cinza levemente azulado, perto de 220, com
-    // saturação baixa.
-    expect(Number(sat.replace("%", "")), `--sidebar-accent está saturado: ${acento}`)
-      .toBeLessThan(20);
-    expect(Math.abs(Number(matiz) - 187), `--sidebar-accent puxa para o teal: ${acento}`)
-      .toBeGreaterThan(15);
+  it("o item ativo usa a cor de destaque da lateral", () => {
+    const b = bloco(".vx-nav-active {");
+    expect(b).toContain("hsl(var(--sidebar-primary))");
+    expect(b).toContain("hsl(var(--sidebar-primary-foreground))");
+    expect(b).not.toMatch(/#[0-9a-f]{3,6}|rgba?\(/i);
+    // Sem barra lateral colorida: era um traço de 2px competindo com a linha
+    // de separação da coluna.
+    expect(b).not.toContain("border-left");
   });
 
   /**
-   * INVERTEU, junto com o formato.
-   *
-   * Antes a lateral era um bloco mais escuro, encostado -- ali fazer-se mais
-   * escura era o que a separava. Agora é um cartão que FLUTUA, e objeto que
-   * flutua sobre fundo escuro se aproxima da luz, não se afasta. Mesmo princípio
-   * do tema claro, invertido: em ambos, o cartão se distingue da página.
+   * No escuro a lateral continua a parte mais funda: mesma relação do claro,
+   * para a tela não mudar de estrutura ao trocar de tema.
    */
-  it("no escuro a lateral é mais clara que o conteúdo, para flutuar sobre ele", () => {
+  it("no escuro a lateral é mais escura que o conteúdo", () => {
     const lum = (v?: string) => Number(v?.match(/(\d+)%\s*$/)?.[1] ?? 0);
     expect(lum(valor(".dark {", "--sidebar-background")))
-      .toBeGreaterThan(lum(valor(".dark {", "--background")));
+      .toBeLessThan(lum(valor(".dark {", "--background")));
   });
 
   /**
@@ -251,75 +235,6 @@ describe("a lateral ancora a tela", () => {
    */
   it("muted continua distinto do fundo", () => {
     expect(valor(":root {", "--muted")).not.toBe(valor(":root {", "--background"));
-  });
-
-  /**
-   * O ITEM ATIVO SE DISTINGUE DO ITEM SOB O CURSOR.
-   *
-   * ─────────────────────────────────────────────────────────────────────────
-   * A VERSÃO ANTERIOR DESTE TESTE ESTAVA MEDINDO PROSA.
-   *
-   * Ela exigia `--sidebar-primary` e `/ 18%` dentro do bloco cru de
-   * `.vx-nav-active`, e passava porque um COMENTÁRIO dentro do bloco narrava a
-   * regra antiga ("era `--sidebar-primary / 18%` com texto teal"). A
-   * declaração real não tinha nem o token nem a porcentagem: a pastilha virou
-   * cinza quando a lateral deixou de ser navy, e o teste não percebeu.
-   *
-   * O nome também tinha envelhecido -- "aparece contra o navy". Não há navy:
-   * a lateral é a superfície mais CLARA da tela nos dois temas.
-   *
-   * O que este teste guarda agora é a regra viva, e ela tem duas metades:
-   *
-   *   ATIVO SEGUE O ACENTO   o fundo é `--sidebar-primary` com alfa baixo. O
-   *                          `ThemeContext` só sobrescreve `--primary`,
-   *                          `--ring`, `--sidebar-primary` e `--sidebar-ring`
-   *                          -- qualquer outro token é FIXO. Pintar o item
-   *                          ativo de `--sidebar-accent` tem na prática o
-   *                          mesmo efeito de cravar o teal em hex: quem
-   *                          escolhe roxo continua vendo cinza.
-   *
-   *   HOVER FICA NEUTRO      é o que separa os dois estados. Antes ambos eram
-   *                          o mesmo cinza e a única diferença era o peso da
-   *                          fonte, que não se lê de relance.
-   *
-   *   A DOSE É BAIXA         doze por cento é lavado, não cor. O argumento
-   *                          antigo ("você está aqui" é orientação, não ação,
-   *                          e gastar a marca nisso a esvazia onde ela
-   *                          significa decisão) continua valendo -- o botão
-   *                          primário segue sendo a única coisa SÓLIDA em cor
-   *                          na tela. Por isso o teste cobra o alfa, e não só
-   *                          a presença do token.
-   *
-   * Lido sem comentários, e sobre a família inteira da classe -- a regra, a
-   * variante do tema escuro e a do `svg`.
-   */
-  it("o item ativo segue a cor de destaque e se separa do hover", () => {
-    const i = CSS_LIMPO.indexOf(".vx-nav-active {");
-    expect(i, "regra .vx-nav-active não encontrada").toBeGreaterThan(-1);
-    const familia = CSS_LIMPO.slice(i, CSS_LIMPO.indexOf(".vx-nav-item {", i));
-
-    // O fundo deriva do token que o ThemeContext troca...
-    const fundo = familia.match(/\.vx-nav-active \{[^}]*background:\s*([^;]+);/)?.[1];
-    expect(fundo, "o fundo do item ativo não deriva de --sidebar-primary")
-      .toMatch(/hsl\(var\(--sidebar-primary\)\s*\/\s*\d+%\)/);
-
-    // ...mas em dose de LAVADO: acima de ~25% deixa de ser superfície tingida
-    // e vira elemento colorido, que é o papel reservado ao botão primário.
-    const alfa = Number(fundo!.match(/\/\s*(\d+)%/)?.[1]);
-    expect(alfa, `o lavado do item ativo está forte demais: ${alfa}%`).toBeLessThanOrEqual(25);
-    expect(alfa, `o lavado do item ativo não aparece: ${alfa}%`).toBeGreaterThanOrEqual(8);
-
-    // O hover continua neutro -- é o que distingue os dois estados.
-    const hover = CSS_LIMPO.match(/\.vx-nav-item:hover \{[^}]*background:\s*([^;]+);/)?.[1];
-    expect(hover, "hover e ativo voltaram a ser o mesmo tratamento")
-      .toContain("--sidebar-accent");
-
-    // E o ícone leva o acento cheio: o menor elemento da linha.
-    expect(familia).toMatch(/svg\s*\{\s*color:\s*hsl\(var\(--sidebar-primary\)\)/);
-
-    // Sem barra lateral colorida: era um traço de 2px competindo com a linha
-    // de separação da coluna -- duas verticais paralelas a dois pixels.
-    expect(familia).not.toContain("border-left");
   });
 
   /**

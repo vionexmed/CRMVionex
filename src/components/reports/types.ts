@@ -40,10 +40,20 @@ export const fmt = (v: number) => formatarMoedaInteira(v);
 
 export const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 
+/**
+ * A paleta de série, SÓ em token.
+ *
+ * Eram oito HSL cravados: ignoravam a cor de destaque escolhida em
+ * Configurações (a primeira série ficava azul com o tema roxo), não tinham
+ * variante escura, e a quarta era o vermelho de erro -- "Nota" e "Tarefa"
+ * apareciam como se fossem falha. Agora as quatro primeiras são as séries do
+ * sistema (`--chart-1` é a própria `--primary`) e as seguintes vêm dos tons de
+ * estado que não significam erro. Vermelho não entra.
+ */
 export const CHART_COLORS = [
-  "hsl(217, 91%, 60%)", "hsl(142, 76%, 36%)", "hsl(38, 92%, 50%)",
-  "hsl(0, 84%, 60%)", "hsl(262, 83%, 58%)", "hsl(190, 95%, 39%)",
-  "hsl(326, 78%, 55%)", "hsl(25, 95%, 53%)",
+  "hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))", "hsl(var(--success))", "hsl(var(--info))",
+  "hsl(var(--warning))", "hsl(var(--neutral))",
 ];
 
 export const tooltipStyle = {

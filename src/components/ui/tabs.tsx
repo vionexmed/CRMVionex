@@ -12,11 +12,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      // A trilha é o REBAIXO com um fio em volta, e mede 34px em vez de 40.
-      // Sem o fio, um `bg-muted` claro sobre `bg-card` branco flutua sem
-      // limite definido -- e sobre a própria página, que agora é do mesmo
-      // lado da escala, ele sumia por completo.
-      "inline-flex h-[34px] items-center justify-center rounded-md border border-border bg-muted p-[3px] text-muted-foreground",
+      "inline-flex min-h-11 max-w-full items-stretch justify-start gap-4 border-b border-border bg-transparent p-0 text-muted-foreground sm:min-h-10",
       className,
     )}
     {...props}
@@ -31,11 +27,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      // A aba ativa é a superfície do CARTÃO (`bg-card`), não a da página:
-      // dentro de uma trilha rebaixada, o que sobe tem de ser o plano do
-      // objeto. Com `bg-background` a aba ativa ficava da mesma cor da
-      // página e a pastilha só existia pela sombra.
-      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[var(--shadow-xs)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+      "vx-control inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium ring-offset-background transition-colors duration-150 data-[state=active]:border-primary data-[state=active]:text-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 sm:min-h-10",
       className,
     )}
     {...props}
@@ -50,7 +42,7 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      "min-w-0 mt-6 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
       className,
     )}
     {...props}

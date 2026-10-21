@@ -1,112 +1,105 @@
-import { useLocation } from "react-router-dom";
-import { Search } from "lucide-react";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Fragment } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Building2, CalendarCheck, Handshake, Plus, Search, UserPlus } from "lucide-react";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/crm/NotificationBell";
-import { NAV_GRUPOS, MENU_DA_CONTA } from "@/components/layout/navegacao";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { NAV_SECTIONS, getActiveNavItem, getActiveSection } from "./navegacao";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
+type BreadcrumbPart = { label: string; href?: string };
+interface AppHeaderProps { onOpenSearch: () => void; actions?: React.ReactNode }
+
 /**
- * O rótulo de cada rota, derivado da navegação.
+ * "+ Novo" cria qualquer registro de qualquer tela.
  *
- * Havia um `ROTULO_DA_ROTA` escrito à mão aqui -- uma TERCEIRA lista de destinos,
- * depois da lateral e da barra do celular. E já tinha divergido: continha
- * `/tasks`, que virou redirecionamento, e "Templates de Email" e "Sequências de
- * Email", renomeados para "de e-mail" há dois commits.
- *
- * É a mesma divergência que existia entre lateral e celular, e que `NAV_GRUPOS`
- * resolveu. O cabeçalho estava de fora.
+ * Cada destino já abre o próprio formulário com `?action=new`; o menu só
+ * centraliza a porta de entrada, para cadastrar um contato no meio do funil sem
+ * trocar de área antes.
  */
-const ROTULO_DA_ROTA: Record<string, string> = Object.fromEntries(
-  [...NAV_GRUPOS.flatMap((g) => g.items), ...MENU_DA_CONTA].map((i) => [
-    // A query string não faz parte do caminho.
-    i.url.split("?")[0],
-    i.title,
-  ]),
-);
+const CRIAR = [
+  { rotulo: "Contato", destino: "/contacts?action=new", icone: UserPlus },
+  { rotulo: "Negócio", destino: "/deals?action=new", icone: Handshake },
+  { rotulo: "Atividade", destino: "/activities?action=new", icone: CalendarCheck },
+  { rotulo: "Empresa", destino: "/companies?action=new", icone: Building2 },
+] as const;
 
-interface AppHeaderProps {
-  onOpenSearch: () => void;
-  actions?: React.ReactNode;
-}
-
+/**
+ * Barra superior do Visual 01: trilha à esquerda, busca no centro, criar e
+ * avisos à direita. A busca saiu da lateral e veio para cá porque é a ação mais
+ * usada depois de navegar, e no centro ela fica no caminho do olho.
+ */
 export function AppHeader({ onOpenSearch, actions }: AppHeaderProps) {
-  const location = useLocation();
-
-    // `/` é o LOGIN. O primeiro elo do caminho mandava quem já estava autenticado
-  // para a tela de entrada -- o mesmo defeito que NotFound e Setup tinham.
-  const parts: { label: string; href?: string }[] = [{ label: "VIONEX", href: "/dashboard" }];
-
-  if (location.pathname.startsWith("/deals/") && location.pathname !== "/deals") {
-    parts.push({ label: "Negócios", href: "/deals" });
-    parts.push({ label: "Detalhe" });
-  } else if (location.pathname.startsWith("/settings/")) {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { open, openMobile, isMobile } = useSidebar();
+  const section = NAV_SECTIONS.find((section) => section.id === getActiveSection(pathname));
+  const item = getActiveNavItem(pathname);
+  // Sem "VIONEX" no começo: a marca já está no topo da lateral.
+  const parts: BreadcrumbPart[] = [];
+  if (section) {
+    parts.push({ label: section.label, href: section.entryPath });
+    if (item && item.label !== section.label && section.items.length > 1) parts.push({ label: item.label, href: item.path });
+    else if (section.items.length === 1 && item) parts.push({ label: item.label === section.label ? "Visão geral" : item.label });
+    if (pathname.startsWith("/deals/")) parts.push({ label: "Detalhe" });
+  } else if (pathname.startsWith("/settings")) {
     parts.push({ label: "Configurações", href: "/settings" });
-    parts.push({ label: ROTULO_DA_ROTA[location.pathname] || "Página" });
-  } else {
-    const label = ROTULO_DA_ROTA[location.pathname] || "Página";
-    parts.push({ label });
-  }
+    if (item && item.label !== "Configurações") parts.push({ label: item.label });
+  } else parts.push({ label: item?.label || "Página" });
 
   return (
-    // 48px e não 56: a barra não tem conteúdo próprio -- caminho, busca e
-    // avisos --, e oito pixels de altura ali são oito pixels a menos de lista.
-    //
-    // `bg-card` em vez de `bg-background/80`: a barra é a continuação da
-    // parede da lateral, o plano em que a interface se apoia, e não um véu
-    // por cima da página. O `backdrop-blur` fica porque o conteúdo rola por
-    // baixo dela.
-    <header
-      className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-border bg-card/85 px-3 backdrop-blur-md sm:gap-4 sm:px-4"
-      role="banner"
-    >
-      <SidebarTrigger className="-ml-1" aria-label="Alternar sidebar" />
-
-      <Breadcrumb className="flex-1 hidden sm:flex">
-        <BreadcrumbList>
-          {parts.map((part, i) => (
-            <span key={i} className="contents">
-              {i > 0 && <BreadcrumbSeparator />}
-              <BreadcrumbItem>
-                {i < parts.length - 1 && part.href ? (
-                  <BreadcrumbLink href={part.href}>{part.label}</BreadcrumbLink>
-                ) : (
-                  <BreadcrumbPage>{part.label}</BreadcrumbPage>
-                )}
-              </BreadcrumbItem>
-            </span>
-          ))}
+    <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-4 md:gap-4 md:px-6" role="banner">
+      <SidebarTrigger className="-ml-1 min-h-11 min-w-11 md:min-h-9 md:min-w-9" aria-label="Alternar navegação lateral" aria-expanded={isMobile ? openMobile : open} />
+      <Breadcrumb className="hidden min-w-0 shrink-0 md:flex lg:w-56 xl:w-64">
+        <BreadcrumbList className="flex-nowrap">
+          {parts.map((part, index) => <Fragment key={`${part.label}-${index}`}>
+            {index > 0 && <BreadcrumbSeparator className="text-muted-foreground/70">/</BreadcrumbSeparator>}
+            <BreadcrumbItem className="min-w-0">
+              {index < parts.length - 1 && part.href
+                ? <BreadcrumbLink asChild><Link to={part.href} className="truncate rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{part.label}</Link></BreadcrumbLink>
+                : <BreadcrumbPage className="truncate font-semibold">{part.label}</BreadcrumbPage>}
+            </BreadcrumbItem>
+          </Fragment>)}
         </BreadcrumbList>
       </Breadcrumb>
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold md:hidden">{parts[parts.length - 1].label}</span>
 
-      {/* Mobile: just show current page title */}
-      <span className="flex-1 text-sm font-medium sm:hidden truncate">
-        {parts[parts.length - 1].label}
-      </span>
+      {/* Parece campo, é botão: abre a busca compartilhada (⌘K), que é onde os
+          resultados por tipo e o teclado já funcionam. */}
+      <div className="hidden min-w-0 flex-1 justify-center md:flex">
+        <button type="button" onClick={onOpenSearch} aria-label="Buscar no CRM (Ctrl ou ⌘ K)"
+          className="flex h-9 w-full max-w-xl items-center gap-2.5 rounded-md border border-border bg-surface-2 px-3 text-sm text-muted-foreground transition-colors hover:border-input hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Search aria-hidden="true" className="h-4 w-4 shrink-0" />
+          <span className="flex-1 truncate text-left">Buscar contatos, negócios, empresas…</span>
+          <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-label text-muted-foreground">⌘K</kbd>
+        </button>
+      </div>
 
-      <div className="flex items-center gap-1.5 sm:gap-2">
+      <div className="flex shrink-0 items-center gap-1 md:gap-2">
         {actions}
-        {/* O "+" DE AÇÕES RÁPIDAS E A LÂMPADA DE INSIGHTS SAÍRAM.
-
-            As quatro ações do "+" levavam para `?action=new` das mesmas quatro
-            telas que a barra lateral já abre -- um atalho para onde já se
-            chegava, ocupando o canto mais valioso do cabeçalho. E cada tela tem
-            o próprio botão de criar, no contexto certo.
-
-            Sobram o sino, que avisa de coisa que a pessoa não foi buscar, e a
-            busca. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" className="h-9 gap-1.5 px-3" aria-label="Criar novo registro">
+              <Plus aria-hidden="true" /><span className="hidden sm:inline">Novo</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {CRIAR.map(({ rotulo, destino, icone: Icone }) => (
+              <DropdownMenuItem key={destino} onSelect={() => navigate(destino)} className="min-h-9 gap-2.5 max-md:min-h-11">
+                <Icone aria-hidden="true" className="h-4 w-4 text-muted-foreground" />{rotulo}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <NotificationBell />
-        <button
-          onClick={onOpenSearch}
-          aria-label="Buscar (⌘K)"
-          className="flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm text-muted-foreground transition-colors hover:bg-accent sm:w-64"
-        >
-          <Search className="h-4 w-4" />
-          <span className="hidden sm:inline flex-1 text-left">Buscar...</span>
-          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-label font-medium text-muted-foreground sm:flex">
-            ⌘K
-          </kbd>
+        <button type="button" onClick={onOpenSearch} aria-label="Buscar no CRM (Ctrl ou ⌘ K)"
+          className="flex h-11 w-11 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden">
+          <Search aria-hidden="true" className="h-[18px] w-[18px]" />
         </button>
       </div>
     </header>

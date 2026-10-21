@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Trophy, XCircle, ChevronDown, ChevronRight, Pencil, Eye, Mail, Calendar } from "lucide-react";
+import { Plus, Trophy, XCircle, ChevronDown, ChevronRight, MoreHorizontal, Pencil, Eye, Mail, Calendar } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatarDataCurta } from "@/lib/formato";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent,
   PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors,
@@ -10,67 +12,82 @@ import {
 } from "@dnd-kit/core";
 import type { DealWithRelations } from "@/lib/api/deals";
 import type { Database } from "@/integrations/supabase/types";
-import { formatarMoeda, pluralizar } from "@/lib/formato";
+import { formatarDataCurta, formatarMoeda, formatarMoedaInteira, formatarNumero, pluralizar } from "@/lib/formato";
+import { cn } from "@/lib/utils";
+import { Iniciais } from "@/components/layout/ListaV1";
+import { getContactOrigin } from "@/lib/contact-options";
+import {
+  corDaEtapa, diasParado, etapasEmOrdem, proximaAtividade, rotuloDaProxima,
+} from "@/components/negocios/sinais";
 
 
 type Stage = Database["public"]["Tables"]["pipeline_stages"]["Row"];
 type Contact = Database["public"]["Tables"]["contacts"]["Row"];
 
+/** A partir de quantos dias sem movimento o card pinta o "parado" de vermelho. */
+const DIAS_PARADO_ALERTA = 7;
 
 /* ── Deal Card ───────────────────────────────────────────── */
 
 /**
- * O card do quadro, no desenho da referência: título com caixa de seleção,
- * uma linha de subtítulo, `valor · data`, divisória e quatro botões redondos.
+ * O card do quadro, no desenho do Visual 01: iniciais da empresa, título,
+ * pessoa · origem, valor grande, divisória e a linha da PRÓXIMA ATIVIDADE com
+ * o responsável à direita.
  *
- * AS TRÊS LINHAS DE CONTEXTO SAÍRAM -- notas, última interação e próxima ação.
- * Elas não existem na referência, e a decisão de segui-la foi tomada
- * explicitamente. O efeito colateral que vale registrar: `dealsApi.list` ainda
- * EMBUTE `atividades` na consulta, e agora ninguém lê. É peso morto na listagem
- * até alguém tirar de lá -- não tirei junto porque mexer no embed arrasta a
- * invalidação de cache entre negócios e atividades, que é outra história.
+ * A linha de baixo voltou a ler `atividades` (que `dealsApi.list` já embute):
+ * "Ligação seg, 09:00", "Reunião atrasada 2 dias" em vermelho, ou "Sem
+ * atividade" com os dias parado. É a pergunta que o vendedor faz a cada card --
+ * "o que eu tenho que fazer aqui?" -- e o valor sozinho não responde.
+ *
+ * Os quatro botões redondos (abrir, editar, e-mail, agenda) viraram um menu
+ * `…`: a referência não tem fileira de ações no card, e tirar as ações de vez
+ * levaria embora a única porta para EDITAR o negócio a partir do quadro.
+ *
+ * Sem marcador de temperatura ("Quente/Morno/Frio"): não existe coluna para
+ * isso, e inventar a partir de outra coisa seria um número sem fonte.
  *
  * `memo` porque o quadro renderiza CONTINUAMENTE durante o arraste -- o dnd-kit
  * atualiza a posição a cada movimento do ponteiro. Sem isso, mover um card
- * renderiza os duzentos.
- *
- * Só funciona com as props estáveis, e é por isso que o clique recebe
- * `onDealClick` + `deal` em vez de `onClick={() => onDealClick(deal)}`: a arrow
- * inline tem identidade nova a cada render, e `memo` compararia, veria
- * diferente e renderizaria igual -- pagando a comparação sem pular nada.
+ * renderiza os duzentos. Só funciona com props estáveis, e é por isso que o
+ * clique recebe `onDealClick` + `deal` em vez de uma arrow inline.
  */
 const DealCard = memo(function DealCard({
   deal,
   selecionado,
+  aberto,
+  agora,
   onDealClick,
   onContactClick,
   onEditDeal,
   onComposeEmail,
+  onAbrirPagina,
   onAlternarSelecao,
 }: {
   deal: DealWithRelations;
   /** Marcado na seleção em lote. A mesma que a lista usa. */
   selecionado: boolean;
+  /** É o negócio aberto no painel lateral. */
+  aberto: boolean;
+  /** Relógio do quadro, para todos os cards medirem atraso pelo mesmo instante. */
+  agora: number;
   onDealClick: (d: DealWithRelations) => void;
   /** Abre o painel da PESSOA, sem sair do quadro. */
   onContactClick?: (contact: Contact) => void;
-  /** Abre o formulário de edição. Ausente: o card não mostra o lápis. */
+  /** Abre o formulário de edição. Ausente: o item some do menu. */
   onEditDeal?: (d: DealWithRelations) => void;
-  /** Abre o compositor do CRM já endereçado. Ausente: o envelope fica apagado. */
+  /** Abre o compositor do CRM já endereçado. Ausente: o item fica apagado. */
   onComposeEmail?: (d: DealWithRelations) => void;
+  /** Vai direto à página do negócio (agenda, linha do tempo). */
+  onAbrirPagina?: (d: DealWithRelations) => void;
   /** Ausente: a caixa de seleção não aparece -- não há barra que a receba. */
   onAlternarSelecao?: (id: string) => void;
 }) {
   // O clone visual do drag é o DragOverlay — o card original só fica translúcido
   // (aplicar transform aqui fazia DOIS cards se moverem ao mesmo tempo)
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: deal.id });
-  // A cor da etapa saiu do card: ela agora vive na faixa do cabeçalho da coluna.
-  // Ver o comentário de `.vx-deal-card` no index.css.
   const style = isDragging ? { opacity: 0.4 } : undefined;
 
-  // Empresa e pessoa deixaram de ser uma string só: o nome da pessoa agora é
-  // clicável e abre o painel dela. Antes o subtítulo inteiro era texto morto --
-  // o nome estava ali e não levava a nada.
+  // Empresa e pessoa: o nome da pessoa é clicável e abre o painel dela.
   const nome = deal.contact
     ? `${deal.contact.first_name} ${deal.contact.last_name || ""}`.trim()
     : null;
@@ -79,9 +96,14 @@ const DealCard = memo(function DealCard({
   //
   // Os negócios criados pelo gatilho de entrada se chamam pelo nome da pessoa
   // (antes era "Lead: <nome>", prefixo removido em 20260827120000). Sem esta
-  // linha, o card mostra o mesmo nome duas vezes seguidas -- o prefixo estava
-  // mascarando a repetição, não evitando.
+  // linha, o card mostra o mesmo nome duas vezes seguidas.
   const nomeContato = nome && nome !== deal.title ? nome : null;
+  const origem = deal.contact
+    ? getContactOrigin(deal.contact.metadata as Record<string, unknown> | null).label
+    : null;
+
+  const proxima = proximaAtividade(deal.atividades, agora);
+  const parado = diasParado(deal, agora);
 
   // Um arraste abortado não pode engolir o clique seguinte, e soltar um card não
   // pode abrir painel. Mesmo padrão de ContactsKanbanByOwner.
@@ -92,62 +114,15 @@ const DealCard = memo(function DealCard({
 
   const email = deal.contact?.email?.trim() || null;
 
-  /**
-   * OS QUATRO BOTÕES da referência: abrir, editar, e-mail e agenda.
-   *
-   * Uma lista e não quatro blocos de JSX: os quatro diferem só no ícone, no
-   * rótulo e no que fazem, e escrever o botão quatro vezes convidaria os quatro
-   * a divergirem no próximo ajuste de estilo.
-   *
-   * `desabilitado` existe por causa do e-mail: sem endereço no contato não há
-   * para onde mandar, e um botão que não leva a lugar nenhum é pior que um
-   * botão apagado. O `title` diz o motivo em vez de só apagar.
-   *
-   * Abrir e agenda caem os dois no negócio: é lá que se agenda uma atividade, e
-   * a referência não tem uma tela de agenda para onde apontar.
-   */
-  const acoes: {
-    chave: string;
-    titulo: string;
-    Icone: React.ComponentType<{ className?: string }>;
-    aoClicar: () => void;
-    desabilitado?: boolean;
-  }[] = [
-    { chave: "abrir", titulo: "Abrir negócio", Icone: Eye, aoClicar: () => onDealClick(deal) },
-    ...(onEditDeal
-      ? [{ chave: "editar", titulo: "Editar", Icone: Pencil, aoClicar: () => onEditDeal(deal) }]
-      : []),
-    {
-      /*
-        ABRE O COMPOSITOR DO CRM, e não o `mailto:`.
-
-        O `mailto:` jogava a pessoa para fora: abria o cliente de e-mail do
-        sistema, e a mensagem saía por lá -- sem passar pela conta conectada,
-        sem assinatura, e sem virar histórico do negócio. Quem olhasse o
-        registro depois não veria e-mail nenhum, porque de fato nenhum e-mail
-        do CRM foi enviado.
-
-        Aqui ele abre o mesmo compositor da Caixa de entrada, já endereçado e
-        já amarrado ao contato e ao negócio -- então o envio conta como
-        interação, que é o que o card mostra na linha de cima.
-      */
-      chave: "email",
-      titulo: !email
-        ? "Sem e-mail no contato"
-        : !onComposeEmail
-          ? "Compositor indisponível nesta tela"
-          : `Escrever para ${email}`,
-      Icone: Mail,
-      desabilitado: !email || !onComposeEmail,
-      aoClicar: () => onComposeEmail?.(deal),
-    },
-    {
-      chave: "agenda",
-      titulo: "Agendar atividade — abre o negócio",
-      Icone: Calendar,
-      aoClicar: () => onDealClick(deal),
-    },
-  ];
+  // Nos DOIS eventos de ponteiro, e no teclado: sem o `onPointerDown`, o
+  // dnd-kit começa a arrastar o card a partir do controle e o clique nunca
+  // acontece; sem o `onKeyDown`, Enter no controle iniciaria o arraste por
+  // teclado do card inteiro.
+  const isolar = {
+    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation(),
+  };
 
   return (
     <div
@@ -155,7 +130,8 @@ const DealCard = memo(function DealCard({
       style={style}
       {...attributes}
       {...listeners}
-      className={`vx-deal-card ${selecionado ? "vx-deal-card--marcado" : ""}`}
+      className={cn("vx-deal-card", selecionado && "vx-deal-card--marcado", aberto && "border-primary ring-1 ring-primary")}
+      aria-current={aberto ? "true" : undefined}
       onPointerDown={(e) => {
         arrastou.current = false;
         listeners?.onPointerDown?.(e);
@@ -168,238 +144,233 @@ const DealCard = memo(function DealCard({
         onDealClick(deal);
       }}
     >
-      {/*
-        TÍTULO e CAIXA DE SELEÇÃO na mesma linha, como na referência.
+      <div className="flex items-start gap-2.5">
+        <Iniciais nome={deal.company?.name || nome || deal.title} forma={deal.company ? "empresa" : "pessoa"} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold leading-snug text-foreground">{deal.title}</p>
+          {(deal.company || nomeContato || origem) && (
+            <p className="mt-0.5 truncate text-xs leading-tight text-muted-foreground">
+              {nomeContato ? (
+                onContactClick && deal.contact ? (
+                  <button
+                    type="button"
+                    {...isolar}
+                    // stopPropagation senão o clique sobe para o card e abre o
+                    // negócio -- os dois painéis abririam no mesmo clique.
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (arrastou.current) return;
+                      onContactClick(deal.contact!);
+                    }}
+                    className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                  >
+                    {nomeContato}
+                  </button>
+                ) : nomeContato
+              ) : deal.company?.name}
+              {(nomeContato || deal.company) && origem && " · "}
+              {origem}
+            </p>
+          )}
+        </div>
+        {/*
+          CAIXA DE SELEÇÃO e MENU no canto, juntos.
 
-        A caixa alimenta a MESMA seleção da visão de lista, então marcar aqui e
-        trocar para lista mantém a marcação -- e a barra de ações em lote que já
-        existe aparece igual. Sem isso ela seria enfeite: caixa que marca e não
-        leva a ação nenhuma é o controle morto que o resto deste arquivo evita.
+          A caixa alimenta a MESMA seleção da visão de lista -- marcar aqui e
+          trocar para lista mantém a marcação, e a barra de ações em lote
+          aparece igual.
+        */}
+        <div className="-mr-1 -mt-1 flex shrink-0 items-center">
+          {onAlternarSelecao && (
+            <span {...isolar} className="flex h-8 w-6 items-center justify-center">
+              <Checkbox
+                checked={selecionado}
+                onCheckedChange={() => onAlternarSelecao(deal.id)}
+                aria-label={`Selecionar ${deal.title}`}
+              />
+            </span>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" {...isolar} aria-label={`Ações de ${deal.title}`}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            {/* O menu é portal, mas evento sintético do React sobe pela árvore
+                de COMPONENTES: sem isolar aqui, escolher um item também
+                "clicaria" o card e abriria o negócio. */}
+            <DropdownMenuContent align="end" {...isolar}>
+              <DropdownMenuItem onSelect={() => (onAbrirPagina ?? onDealClick)(deal)}>
+                <Eye className="mr-2 h-3.5 w-3.5" />Abrir negócio
+              </DropdownMenuItem>
+              {onEditDeal && (
+                <DropdownMenuItem onSelect={() => onEditDeal(deal)}>
+                  <Pencil className="mr-2 h-3.5 w-3.5" />Editar
+                </DropdownMenuItem>
+              )}
+              {/* Abre o compositor do CRM, e não o `mailto:`: o envio passa pela
+                  conta conectada e vira histórico do negócio. */}
+              <DropdownMenuItem disabled={!email || !onComposeEmail} onSelect={() => onComposeEmail?.(deal)}>
+                <Mail className="mr-2 h-3.5 w-3.5" />
+                {!email ? "Sem e-mail no contato" : "Escrever e-mail"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => (onAbrirPagina ?? onDealClick)(deal)}>
+                <Calendar className="mr-2 h-3.5 w-3.5" />Agendar atividade
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
 
-        `items-start` e não `center`: o título quebra em duas linhas em negócio
-        de nome longo, e centralizar faria a caixa descer junto.
-      */}
-      <div className="flex items-start justify-between gap-2">
-        <p className="min-w-0 flex-1 truncate text-sm font-medium leading-snug text-foreground">
-          {deal.title}
-        </p>
-        {onAlternarSelecao && (
-          <span
-            // Nos DOIS eventos: sem o `onPointerDown`, o dnd-kit começa a
-            // arrastar o card a partir da caixa e o clique nunca acontece.
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            className="mt-0.5 shrink-0"
-          >
-            <Checkbox
-              checked={selecionado}
-              onCheckedChange={() => onAlternarSelecao(deal.id)}
-              aria-label={`Selecionar ${deal.title}`}
-            />
+      <div className="mt-2.5 flex min-w-0 items-baseline justify-between gap-2">
+        <span className="truncate text-lg font-bold tabular-nums tracking-tight text-foreground">
+          {formatarMoeda(Number(deal.value) || 0, deal.currency || "BRL")}
+        </span>
+        {deal.close_date && (
+          <span className="shrink-0 text-xs text-muted-foreground" title="Previsão de fechamento">
+            {formatarDataCurta(deal.close_date)}
           </span>
         )}
       </div>
 
-      {/* Empresa (texto) · Pessoa (clicável) */}
-      {(deal.company || nomeContato) && (
-        <p className="mt-1 truncate text-xs text-muted-foreground leading-tight">
-          {deal.company?.name}
-          {deal.company && nomeContato && " · "}
-          {nomeContato && (
-            onContactClick && deal.contact ? (
-              <button
-                type="button"
-                // stopPropagation senão o clique sobe para o card e navega para o
-                // negócio -- o painel abriria e a rota mudaria no mesmo clique.
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (arrastou.current) return;
-                  onContactClick(deal.contact!);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="underline decoration-dotted underline-offset-2 hover:text-foreground"
-              >
-                {nomeContato}
-              </button>
-            ) : (
-              nomeContato
-            )
-          )}
-        </p>
-      )}
-
       {/*
-        VALOR · DATA, a terceira linha da referência.
+        PRÓXIMA ATIVIDADE e RESPONSÁVEL, abaixo da divisória.
 
-        Sem a classe `num` (JetBrains Mono): a referência escreve o valor na
-        MESMA fonte do resto, e a mono destoava logo abaixo de duas linhas de
-        Roboto. `tabular-nums` fica -- é ele que alinha os dígitos, e a Roboto
-        também tem o conjunto tabular.
+        A divisória sangra até a borda com margem negativa: `-mx-3.5` cancela os
+        14px de padding de `.vx-deal-card` -- os dois precisam ser o mesmo número.
       */}
-      <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
-        <span className="shrink-0 text-sm font-bold tabular-nums text-foreground">
-          {formatarMoeda(Number(deal.value) || 0, deal.currency || "BRL")}
+      <div className="-mx-3.5 -mb-3.5 mt-3 flex items-center gap-2 border-t border-border px-3.5 py-2.5">
+        <span aria-hidden="true" className={cn(
+          "h-2 w-2 shrink-0 rounded-full",
+          proxima?.atrasada ? "bg-destructive" : proxima ? "bg-primary" : "bg-muted-foreground/50",
+        )} />
+        <span className={cn(
+          "min-w-0 flex-1 truncate text-xs",
+          proxima?.atrasada ? "font-medium text-destructive" : proxima ? "text-foreground" : "text-muted-foreground",
+        )}>
+          {proxima ? rotuloDaProxima(proxima, agora) : "Sem atividade"}
         </span>
-        {deal.close_date && (
-          <>
-            {/* O ponto separador é um <span>, não o caractere "·": em 11px a
-                bolinha de 3px lê como separador, e o "·" da fonte some. */}
-            <span className="h-[3px] w-[3px] shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
-            <span className="truncate text-xs text-muted-foreground">
-              {formatarDataCurta(deal.close_date)}
-            </span>
-          </>
+        {!proxima && parado > 0 && (
+          <span title="Dias sem nenhum movimento registrado" className={cn(
+            "shrink-0 text-xs font-semibold tabular-nums",
+            parado >= DIAS_PARADO_ALERTA ? "text-destructive" : "text-muted-foreground",
+          )}>
+            {parado} {pluralizar(parado, "dia")}
+          </span>
         )}
-      </div>
-
-      {/*
-        AÇÕES RÁPIDAS, separadas por uma linha -- é o que a referência faz.
-
-        Os botões são círculos CONTORNADOS. Sem borda eram ícones cinza soltos
-        sobre o branco, e nada dizia que eram clicáveis antes de o mouse passar
-        por cima -- num card que inteiro já é clicável, é a diferença entre
-        "ícone" e "botão".
-
-        `stopPropagation` nos DOIS eventos, e não só no clique: sem o
-        `onPointerDown`, o dnd-kit começa a arrastar o card a partir do botão e o
-        clique nunca chega a acontecer.
-      */}
-      <div className="-mx-3.5 -mb-3.5 mt-2.5 flex items-center gap-2 border-t border-border px-3.5 py-2.5">
-        {acoes.map(({ chave, titulo, Icone, aoClicar, desabilitado }) => (
-          <button
-            key={chave}
-            type="button"
-            title={titulo}
-            aria-label={titulo}
-            disabled={desabilitado}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (arrastou.current) return;
-              aoClicar();
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-          >
-            <Icone className="h-3.5 w-3.5" />
-          </button>
-        ))}
+        {deal.owner?.name && (
+          <span title={`Responsável: ${deal.owner.name}`} className="shrink-0">
+            <Iniciais nome={deal.owner.name} tamanho="sm" destaque />
+          </span>
+        )}
       </div>
     </div>
   );
 });
 
-/* ── Stage Column (Pipedrive-style) ──────────────────────── */
+/* ── Stage Column ────────────────────────────────────────── */
 
 function StageColumn({
   stage,
+  indice,
+  totalEtapas,
   deals,
   selecionados,
+  abertoId,
+  agora,
   onDealClick,
   onContactClick,
   onAddDeal,
   onEditDeal,
   onComposeEmail,
+  onAbrirPagina,
   onAlternarSelecao,
 }: {
   stage: Stage;
+  indice: number;
+  totalEtapas: number;
   deals: DealWithRelations[];
   selecionados: Set<string>;
+  abertoId: string | null;
+  agora: number;
   onDealClick: (d: DealWithRelations) => void;
   onContactClick?: (contact: Contact) => void;
   onAddDeal: (stageId: string) => void;
   onEditDeal?: (d: DealWithRelations) => void;
   onComposeEmail?: (d: DealWithRelations) => void;
+  onAbrirPagina?: (d: DealWithRelations) => void;
   onAlternarSelecao?: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
   const total = deals.reduce((s, d) => s + (Number(d.value) || 0), 0);
+  const prob = Number(stage.win_probability) || 0;
 
   return (
     <div
       ref={setNodeRef}
-      className={`flex h-full w-[264px] min-h-0 shrink-0 flex-col rounded-xl transition-colors sm:w-[288px] ${
-        isOver ? "bg-primary/5" : ""
-      }`}
+      // Realce de soltura por COR, nunca por escala/filtro: transform num
+      // ancestral do card faz o DragOverlay fugir do cursor (CLAUDE.md).
+      className={cn(
+        "flex h-full w-[272px] min-h-0 shrink-0 flex-col overflow-hidden rounded-lg transition-colors sm:w-[292px]",
+        isOver ? "bg-accent ring-1 ring-primary/40" : "bg-muted/60",
+      )}
     >
       {/*
-        O CABEÇALHO VIROU CARTÃO, com a faixa colorida NO TOPO.
+        A FAIXA DO CABEÇALHO: ponto na cor da etapa, nome, contagem e o total
+        com a chance da etapa.
 
-        Era texto solto sobre o fundo, com a barra de cor por baixo -- a etapa não
-        se lia como um objeto, e a barra parecia sublinhar o título em vez de
-        identificar a coluna. Agora cabeçalho e cards são a mesma matéria (cartão
-        branco sobre o cinza da página), e a cor identifica a coluna de longe.
-
-        `overflow-hidden` é o que faz a faixa herdar o arredondamento do cartão;
-        sem ele ela vaza nos cantos de cima.
+        A cor vem da POSIÇÃO (escala bg-stage-1…6, da marca ao verde), não de
+        `pipeline_stages.color`: a escala acompanha a cor de destaque e o tema
+        escuro, e a cor gravada no banco é um hex fixo.
       */}
-      <div className="mb-2 overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-xs)]">
-        <div
-          className="h-1.5 w-full"
-          style={{ backgroundColor: stage.color || "hsl(var(--primary))" }}
-        />
-        <div className="flex items-start justify-between gap-2 px-3 py-2.5">
-          <div className="min-w-0 flex-1">
-            <h3 className="vx-titulo-secao truncate text-foreground">{stage.name}</h3>
-            <p className="mt-0.5 truncate text-label text-muted-foreground">
-              <span className="font-semibold tabular-nums text-foreground">
-                {formatarMoeda(total)}
-              </span>
-              {" · "}
-              {deals.length} {pluralizar(deals.length, "negócio", "negócios")}
-            </p>
-          </div>
-          {/*
-            O `+` fica VISÍVEL, e não escondido num menu.
-            A referência põe "Add New Deal" no topo da coluna; um `...` no lugar
-            teria o mesmo desenho e nenhuma descoberta -- ninguém abre menu para
-            procurar a ação mais usada da tela.
-          */}
-          <button
-            type="button"
-            onClick={() => onAddDeal(stage.id)}
-            title={`Novo negócio em ${stage.name}`}
-            className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
+      <div className="border-b border-border/60 bg-muted px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className={cn("h-2 w-2 shrink-0 rounded-full", corDaEtapa(indice, totalEtapas))} />
+          <h3 className="vx-titulo-secao min-w-0 truncate text-foreground">{stage.name}</h3>
+          <span className="rounded-full bg-card px-1.5 text-xs font-semibold tabular-nums text-muted-foreground">
+            {formatarNumero(deals.length)}
+          </span>
         </div>
+        <p className="mt-1 truncate text-xs text-muted-foreground">
+          <span className="font-semibold tabular-nums text-foreground">{formatarMoedaInteira(total)}</span>
+          {prob > 0 && <> · prob. {prob}%</>}
+        </p>
       </div>
 
       {/*
-        A ROLAGEM DA COLUNA, e por que ela estava espremida.
-
-        Era `pr-0.5` -- DOIS pixels para a barra de rolagem, que então passava por
-        cima da borda direita dos cards. E `max-h-[calc(100vh-240px)]` era um
-        número mágico: 240 não corresponde a nada que exista no layout, então em
-        telas de altura diferente a coluna terminava antes ou depois do que devia.
-
-        Agora `pr-2 -mr-2`: a barra ganha 8px de canaleta, e a margem negativa
-        devolve esse espaço para os cards não encolherem. E a altura vem do PAI --
-        `min-h-0` é o que permite um filho de flex encolher abaixo do conteúdo,
-        sem o qual `flex-1` cresce em vez de rolar.
-
-        `pb-2` no fim para o último card não encostar na borda: sem ele parece que
-        a lista foi cortada, não que acabou.
+        A ROLAGEM DA COLUNA. A altura vem do PAI -- `min-h-0` é o que permite um
+        filho de flex encolher abaixo do conteúdo, sem o qual `flex-1` cresce em
+        vez de rolar.
       */}
-      <div className="-mr-2 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-2 pr-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
         {deals.map((deal) => (
           <DealCard
             key={deal.id}
             deal={deal}
             selecionado={selecionados.has(deal.id)}
+            aberto={deal.id === abertoId}
+            agora={agora}
             onDealClick={onDealClick}
             onContactClick={onContactClick}
             onEditDeal={onEditDeal}
             onComposeEmail={onComposeEmail}
+            onAbrirPagina={onAbrirPagina}
             onAlternarSelecao={onAlternarSelecao}
           />
         ))}
 
-        {/* O "Adicionar" do rodapé saiu: a ação subiu para o `+` do cabeçalho,
-            onde a referência a coloca e onde ela não se afasta conforme a coluna
-            enche -- numa coluna de dez cards, o botão de baixo ficava fora da
-            tela. A zona vazia que sobra é o alvo de soltar do arraste. */}
-        <div className="min-h-[60px] flex-1" />
+        {/* "+ Adicionar negócio" no FIM da coluna, como na referência. Fica
+            dentro da área que rola, logo depois do último card, e a zona vazia
+            abaixo dele continua sendo alvo de soltar do arraste. */}
+        <button
+          type="button"
+          onClick={() => onAddDeal(stage.id)}
+          className="flex h-9 shrink-0 items-center justify-center gap-1 rounded-lg border border-dashed border-border text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:bg-card hover:text-primary"
+        >
+          <Plus className="h-3.5 w-3.5" />Adicionar negócio
+        </button>
+        <div className="min-h-[40px] flex-1" />
       </div>
     </div>
   );
@@ -426,10 +397,11 @@ function CollapsibleStatusColumn({
   if (deals.length === 0) return null;
 
   return (
-    <div className="rounded-md border border-border bg-muted/20">
+    <div className="rounded-lg border border-border bg-card">
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="flex w-full items-center justify-between px-3 py-2 hover:bg-accent/30 transition-colors"
+        aria-expanded={!collapsed}
+        className="flex min-h-10 w-full items-center justify-between px-3 py-2 transition-colors hover:bg-surface-2"
       >
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${color}`} />
@@ -439,26 +411,27 @@ function CollapsibleStatusColumn({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{formatarMoeda(total)}</span>
+          <span className="text-xs font-semibold tabular-nums text-foreground">{formatarMoedaInteira(total)}</span>
           {collapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
         </div>
       </button>
       {!collapsed && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5 p-2 border-t border-border">
+        <div className="grid grid-cols-2 gap-2 border-t border-border p-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {deals.map((deal) => (
-            <div
+            <button
+              type="button"
               key={deal.id}
-              className="cursor-pointer rounded-md border border-border bg-card p-2 transition-colors hover:border-primary/40"
+              className="rounded-md border border-border bg-card p-2 text-left transition-colors hover:border-primary/40"
               onClick={() => onDealClick(deal)}
             >
               <p className="truncate text-sm font-medium">{deal.title}</p>
               {deal.company && (
                 <p className="truncate text-label text-muted-foreground">{deal.company.name}</p>
               )}
-              <p className={`text-xs font-semibold mt-0.5 ${color}`}>
+              <p className={`mt-0.5 text-xs font-semibold tabular-nums ${color}`}>
                 {formatarMoeda(Number(deal.value) || 0, deal.currency || "BRL")}
               </p>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -488,9 +461,10 @@ function WonLostDropZone({
       // kanban como o gatilho exato que faz o DragOverlay (portal para
       // document.body) fugir do cursor pela largura da sidebar. O destaque é
       // só cor/anel, nunca escala.
-      className={`flex w-16 shrink-0 flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
-        isOver ? "border-primary bg-primary/10 ring-2 ring-primary/30" : "border-border bg-muted/10"
-      }`}
+      className={cn(
+        "flex w-16 shrink-0 flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors",
+        isOver ? "border-primary bg-primary/10 ring-2 ring-primary/30" : "border-border bg-card/50",
+      )}
     >
       <Icon className={`h-5 w-5 ${color}`} />
       <span className={`mt-1 text-label font-medium ${color}`}>{label}</span>
@@ -510,16 +484,17 @@ interface DealsKanbanProps {
   /** Clique no nome da pessoa: abre o painel dela sem sair do quadro. */
   onContactClick?: (contact: Contact) => void;
   onAddDeal: (stageId?: string) => void;
-  /** Abre o formulário de edição a partir do card. Ausente: o lápis não aparece. */
+  /** Abre o formulário de edição a partir do card. Ausente: o item some do menu. */
   onEditDeal?: (deal: DealWithRelations) => void;
   /** Abre o compositor de e-mail do CRM a partir do card. */
   onComposeEmail?: (deal: DealWithRelations) => void;
+  /** "Abrir negócio" do menu do card: sempre a página, mesmo com painel. */
+  onOpenPage?: (deal: DealWithRelations) => void;
+  /** O negócio aberto no painel lateral, para o card ganhar o realce. */
+  openDealId?: string | null;
   /**
    * A MESMA seleção da visão de lista, e é o que faz a caixa do card valer algo.
-   *
-   * Marcar no quadro e trocar para lista mantém a marcação, e a barra de ações
-   * em lote que já existe (`BarraDeSelecao`, em DealsList) recebe as duas. Sem
-   * estas duas props a caixa não aparece -- não há barra para receber o clique.
+   * Sem estas duas props a caixa não aparece -- não há barra para receber o clique.
    */
   selectedDeals?: Set<string>;
   onSelectionChange?: (s: Set<string>) => void;
@@ -529,9 +504,20 @@ interface DealsKanbanProps {
 
 export function DealsKanban({
   deals, wonDeals, lostDeals, stages, onDragEnd, onDealClick, onContactClick, onAddDeal, onEditDeal, onMarkWon, onMarkLost,
-  onComposeEmail, selectedDeals, onSelectionChange,
+  onComposeEmail, onOpenPage, openDealId = null, selectedDeals, onSelectionChange,
 }: DealsKanbanProps) {
   const [activeDeal, setActiveDeal] = useState<DealWithRelations | null>(null);
+
+  // Um relógio só para o quadro, e não `Date.now()` em cada card: dois cards
+  // renderizados com milissegundos de diferença não podem discordar sobre
+  // "atrasada hoje". Anda de minuto em minuto -- e não a cada render, o que
+  // daria prop nova a todo card em cada movimento do arraste e quebraria o
+  // `memo`. O minuto também faz a reunião das 15h virar "atrasada" sozinha.
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setAgora(Date.now()), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
 
   // Estável para o `memo` do card: uma arrow inline aqui teria identidade nova a
   // cada render do quadro e faria os duzentos cards renderizarem de novo.
@@ -544,6 +530,7 @@ export function DealsKanban({
   }, [selectedDeals, onSelectionChange]);
 
   const semSelecao = useMemo(() => new Set<string>(), []);
+  const ordenadas = useMemo(() => etapasEmOrdem(stages), [stages]);
 
   const pointerSensor = useSensor(PointerSensor, {
     activationConstraint: { distance: 8 },
@@ -575,10 +562,8 @@ export function DealsKanban({
     }
   };
 
-  // Chegar aqui agora significa uma coisa só: o funil existe e está SEM ETAPAS.
-  // Os casos de "carregando", "falhou" e "nenhum funil na organização" são
-  // resolvidos em Deals.tsx, antes de montar este componente. Antes tudo isso
-  // caía nesta mensagem, que mandava configurar um funil já configurado.
+  // Chegar aqui significa uma coisa só: o funil existe e está SEM ETAPAS. Os
+  // casos de "carregando", "falhou" e "nenhum funil" são resolvidos em Deals.tsx.
   if (stages.length === 0) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-dashed border-border py-20">
@@ -600,21 +585,23 @@ export function DealsKanban({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        {/* `flex-1 min-h-0` e não `h-full`: a faixa ocupa o que sobrou da casca
-            sem depender de o pai já ter altura resolvida, e é isso que faz a
-            rolagem acontecer DENTRO de cada coluna em vez de na página. */}
-        <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto pb-2">
-          {stages.map((stage) => (
+        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2">
+          {ordenadas.map((stage, i) => (
             <StageColumn
               key={stage.id}
               stage={stage}
+              indice={i}
+              totalEtapas={ordenadas.length}
               deals={deals.filter((d) => d.stage_id === stage.id)}
               selecionados={selectedDeals ?? semSelecao}
+              abertoId={openDealId}
+              agora={agora}
               onDealClick={onDealClick}
               onContactClick={onContactClick}
               onAddDeal={onAddDeal}
               onEditDeal={onEditDeal}
               onComposeEmail={onComposeEmail}
+              onAbrirPagina={onOpenPage}
               onAlternarSelecao={onSelectionChange ? alternarSelecao : undefined}
             />
           ))}
@@ -624,17 +611,22 @@ export function DealsKanban({
           <WonLostDropZone id="lost-drop" label="Perdido" icon={XCircle} color="text-destructive" />
         </div>
 
-        {/* No body, como no kanban de contatos: `.vx-page` anima `transform`,
-            e um ancestral com transform vira bloco de contenção para
-            `position: fixed` -- o overlay passa a se posicionar pelo `<main>`
-            e foge do cursor pela largura da sidebar. */}
+        {/*
+          PORTAL PARA O <body>, e é a proteção que importa.
+
+          `.vx-page` anima `transform`, e um ancestral com transform vira bloco
+          de contenção para `position: fixed` -- o overlay passava a se
+          posicionar em relação ao <main> e fugia do cursor pela largura da
+          lateral. No <body> não há ancestral nenhum para conter. Mesmo padrão de
+          ContactsKanbanByOwner.
+        */}
         {createPortal(
           <DragOverlay>
             {activeDeal && (
-              <div className="w-[264px] sm:w-[288px] opacity-90">
-                <div className="rounded-md border border-primary bg-card p-2.5 shadow-lg">
-                  <p className="text-sm font-medium">{activeDeal.title}</p>
-                  <p className="text-xs font-semibold text-foreground mt-0.5">
+              <div className="w-[272px] opacity-90 sm:w-[292px]">
+                <div className="rounded-lg border border-primary bg-card p-3 shadow-lg">
+                  <p className="truncate text-sm font-semibold">{activeDeal.title}</p>
+                  <p className="mt-1 text-base font-bold tabular-nums text-foreground">
                     {formatarMoeda(Number(activeDeal.value) || 0, activeDeal.currency || "BRL")}
                   </p>
                 </div>
@@ -645,7 +637,6 @@ export function DealsKanban({
         )}
       </DndContext>
 
-      {/* Collapsible won/lost sections below kanban */}
       {(wonDeals.length > 0 || lostDeals.length > 0) && (
         <div className="space-y-2">
           <CollapsibleStatusColumn title="Ganhos" icon={Trophy} deals={wonDeals} color="text-success" onDealClick={onDealClick} />

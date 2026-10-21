@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -24,7 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Plus, CheckSquare, List,
-  CalendarDays, Trash2, Edit2, MoreHorizontal,
+  CalendarDays, Trash2, Edit2, MoreHorizontal, Check, CalendarClock,
   ChevronLeft, ChevronRight, Search,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -37,14 +36,18 @@ import { useCompanies } from "@/hooks/queries/useCompanies";
 import { useDealsPicker } from "@/hooks/queries/useDeals";
 import type { Database } from "@/integrations/supabase/types";
 import {
-  ATIVIDADE_ICONE, ATIVIDADE_JA_ACONTECEU, ATIVIDADE_ROTULO, ATIVIDADE_COR,
+  ATIVIDADE_ICONE, ATIVIDADE_JA_ACONTECEU, ATIVIDADE_ROTULO,
   ATIVIDADE_TIPOS, ATIVIDADE_TIPOS_MANUAIS,
 } from "@/lib/atividade-tipos";
 import { LoadingState, ErrorState, EmptyState } from "@/components/layout/EstadoDaLista";
 import { formatarDataCurta, formatarDataHora, pluralizar } from "@/lib/formato";
 import { SemOrganizacao } from "@/components/layout/SemOrganizacao";
 import { SegmentedControl } from "@/components/layout/SegmentedControl";
-import { BarraDeFiltros } from "@/components/layout/BarraDeAcoes";
+import { BarraDeSelecao } from "@/components/layout/BarraDeAcoes";
+import { VisoesDaLista, LinhaDeFiltros, ChipDeFiltro, Iniciais } from "@/components/layout/ListaV1";
+import { TipoDeAtividade } from "@/components/atividades/TipoDeAtividade";
+import { textoDeAtraso } from "@/components/atividades/prazo";
+import { mensagemErro } from "@/lib/erro-supabase";
 import { cn } from "@/lib/utils";
 import { SeletorDeContato } from "@/components/crm/SeletorDeContato";
 import { formatarEmail, formatarTelefone, nomeDoContato } from "@/lib/contato-formato";
@@ -81,7 +84,7 @@ function aconteceuEm(a: Activity): number {
 
 const dateFilterLabels: Record<DateFilter, string> = {
   todo: "Para fazer",
-  overdue: "Vencido",
+  overdue: "Atrasadas",
   today: "Hoje",
   tomorrow: "Amanhã",
   this_week: "Esta semana",
@@ -170,14 +173,76 @@ export default function Activities() {
 
   const toggleComplete = (activity: Activity) => {
     const completed_at = activity.completed_at ? null : new Date().toISOString();
-    updateActivity.mutate({ id: activity.id, activity: { completed_at } });
+    updateActivity.mutate(
+      { id: activity.id, activity: { completed_at } },
+      // Sem onError o checkbox voltava ao estado anterior sem explicação.
+      { onError: (e) => toast({ title: "Erro ao atualizar atividade", description: mensagemErro(e), variant: "destructive" }) },
+    );
   };
 
   const deleteActivity = (id: string) => {
     deleteActivities.mutate([id], {
       onSuccess: () => toast({ title: "Atividade excluída" }),
+      onError: (e) => toast({ title: "Erro ao excluir atividade", description: mensagemErro(e), variant: "destructive" }),
     });
   };
+
+  /**
+   * Seleção para ações em lote. É um modelo À PARTE do checkbox de conclusão da
+   * primeira coluna: aquele marca "feita", este marca "quero agir em várias".
+   * Misturar os dois faria clicar para selecionar concluir a atividade.
+   */
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [emLote, setEmLote] = useState(false);
+
+  /**
+   * Aplica `mudanca` a cada atividade selecionada e reporta o saldo.
+   *
+   * O PostgREST não tem transação e cada linha tem um valor próprio (o adiamento
+   * parte do vencimento DE CADA UMA), então são N updates. `allSettled` em vez
+   * de `all`: uma falha no meio não pode esconder que as outras já foram
+   * gravadas -- a pessoa precisa saber quantas ficaram para trás.
+   */
+  const agirEmLote = async (
+    rotulo: string,
+    mudanca: (a: Activity) => Parameters<typeof updateActivity.mutateAsync>[0]["activity"],
+  ) => {
+    const alvo = filtered.filter((a) => selecionadas.has(a.id));
+    if (alvo.length === 0) return;
+    setEmLote(true);
+    try {
+      const res = await Promise.allSettled(
+        alvo.map((a) => updateActivity.mutateAsync({ id: a.id, activity: mudanca(a) })),
+      );
+      const falhas = res.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+      if (falhas.length === 0) {
+        toast({ title: `${alvo.length} ${pluralizar(alvo.length, "atividade")} ${rotulo}` });
+        setSelecionadas(new Set());
+      } else {
+        // Só as que falharam continuam marcadas, para tentar de novo.
+        const falharam = new Set(alvo.filter((_, i) => res[i].status === "rejected").map((a) => a.id));
+        setSelecionadas(falharam);
+        toast({
+          title: `${falhas.length} de ${alvo.length} não foram atualizadas`,
+          description: mensagemErro(falhas[0].reason),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setEmLote(false);
+    }
+  };
+
+  const concluirSelecionadas = () =>
+    agirEmLote("concluídas", (a) => ({ completed_at: a.completed_at ?? new Date().toISOString() }));
+
+  /** Sem vencimento, o adiamento parte de agora: não há data de onde somar. */
+  const adiarSelecionadas = (dias: number) =>
+    agirEmLote(dias === 1 ? "adiadas em 1 dia" : `adiadas em ${dias} dias`, (a) => {
+      const base = a.due_date ? new Date(a.due_date) : new Date();
+      base.setDate(base.getDate() + dias);
+      return { due_date: base.toISOString() };
+    });
 
   const getContact = (id: string | null) => id ? contacts.find((c) => c.id === id) : null;
   const getCompany = (id: string | null) => id ? companies.find((c) => c.id === id) : null;
@@ -373,6 +438,11 @@ export default function Activities() {
 
   const monthNames = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
+  // Seleção não sobrevive a mudança de filtro: a barra agiria em linhas que a
+  // pessoa não está mais vendo. ANTES do retorno antecipado: hook depois de
+  // `return` quebra o React quando a organização chega na segunda renderização.
+  useEffect(() => { setSelecionadas(new Set()); }, [typeFilter, dateFilter, ownerFilter, search]);
+
   if (!orgId) return <SemOrganizacao />;
 
   return (
@@ -413,134 +483,120 @@ export default function Activities() {
     >
 
       {/*
-        UMA BARRA DE FILTRO, e não uma fileira de pílulas nua.
+        O PERÍODO é a visão principal da lista, então vira as abas do V1, com a
+        contagem de cada uma (inclusive zero: "Hoje" vazio se vê sem clicar).
+        "Atrasadas" ganha o tom de alerta quando há algo nela.
 
-        Eram SEIS pílulas montadas à mão, com `bg-primary` sólido no
-        selecionado -- enquanto a fileira de período logo abaixo usava
-        `bg-primary/10` tingido. Dois desenhos de "selecionado" na mesma tela,
-        para dois controles que o olho lê como o mesmo tipo de coisa.
-
-        O comentário do `actions` acima registra que este grupo de pílulas já
-        foi consolidado cinco vezes e que esta cópia passou batido duas. Era a
-        sexta.
-
-        Tipo, busca e responsável são as três FACETAS do filtro -- juntá-las
-        numa barra só é o que separa "o que eu quero ver" (aqui) de "de que
-        período" (a fileira de baixo, que é a visão principal da lista).
+        Os nove filtros de antes continuam todos aqui -- só a apresentação
+        mudou. `HISTORICO` segue mandando na ORDENAÇÃO (histórico por quando
+        aconteceu, o resto por vencimento): é o que separa "o que vence quando"
+        de "o que já aconteceu", e a ordem das abas põe as duas últimas no fim.
       */}
-      <BarraDeFiltros className="mt-1">
-        <SegmentedControl<string>
-          rotuloGrupo="Tipo de atividade"
-          valor={typeFilter}
-          onChange={setTypeFilter}
-          opcoes={[
-            { valor: "all", rotulo: "Tudo" },
-            /* A lista compartilhada, e não uma cópia. Esta era a oitava --
-               e faltava `orcamento` nela, então filtrar por orçamento seria
-               impossível justamente na tela feita para procurar atividade. */
-            ...ATIVIDADE_TIPOS.map((t) => ({
-              valor: t as string,
-              rotulo: ATIVIDADE_ROTULO[t],
-              icone: ATIVIDADE_ICONE[t],
-            })),
-          ]}
-        />
+      <VisoesDaLista<DateFilter>
+        className="mt-1"
+        rotulo="Período"
+        valor={dateFilter}
+        onChange={setDateFilter}
+        visoes={(Object.keys(dateFilterLabels) as DateFilter[]).map((key) => ({
+          valor: key,
+          rotulo: dateFilterLabels[key],
+          contagem: counts[key],
+          tom: key === "overdue" && counts[key] > 0 ? "alerta" : "normal",
+        }))}
+      />
 
-        <div className="ml-auto flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-44 pl-7 text-xs"
-            />
-          </div>
-          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-            <SelectTrigger className="h-8 w-36 text-xs">
-              <SelectValue placeholder="Responsável" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {(members as Profile[]).map((m) => (
-                <SelectItem key={m.id} value={m.id}>{m.name || m.email}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </BarraDeFiltros>
-
-      {/*
-        O PERÍODO, em DOIS grupos -- porque são duas perguntas.
-
-        Os nove filtros vinham enfileirados iguais, e não são o mesmo eixo:
-        sete respondem "o que vence quando" e dois respondem "o que já
-        aconteceu". O código sempre soube -- `HISTORICO` existe desde antes
-        disto e os dois grupos até ORDENAM diferente (histórico por
-        `aconteceuEm`, o resto por vencimento). O que faltava era a tela dizer.
-
-        A separação lê a mesma `HISTORICO`, e não uma segunda lista: duas listas
-        do mesmo conceito divergem no dia em que alguém acrescenta um filtro.
-
-        A CONTAGEM APARECE SEMPRE, inclusive zero -- era `count > 0`, então sete
-        chips apareciam sem número nenhum e não havia como saber que "Hoje"
-        estava vazio antes de clicar. O chip zerado fica esmaecido: continua
-        clicável, só não finge ter conteúdo.
-      */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2">
-        {([
-          ["A fazer", (Object.keys(dateFilterLabels) as DateFilter[]).filter((k) => !HISTORICO.includes(k))],
-          ["Histórico", HISTORICO],
-        ] as const).map(([grupo, chaves]) => (
-          <div key={grupo} className="flex items-center gap-1.5">
-            <span className="text-label font-semibold uppercase tracking-wide text-muted-foreground/70">
-              {grupo}
-            </span>
-            <div className="flex flex-wrap items-center gap-0.5">
-              {chaves.map((key) => {
-                const count = counts[key];
-                const ativo = dateFilter === key;
-                const alerta = key === "overdue" && count > 0;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setDateFilter(key)}
-                    aria-pressed={ativo}
-                    className={cn(
-                      "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                      ativo
-                        ? alerta
-                          ? "bg-destructive/10 text-destructive"
-                          : "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                      // Vazio e não selecionado: esmaecido. Selecionado nunca
-                      // esmaece -- senão o filtro atual some da barra.
-                      !ativo && count === 0 && "opacity-45",
-                    )}
-                  >
-                    {dateFilterLabels[key]}
-                    <span
-                      className={cn(
-                        "ml-1 text-label tabular-nums",
-                        alerta ? "text-destructive" : "text-muted-foreground",
-                      )}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
+      {/* Tipo, responsável e busca são as FACETAS do filtro; o que está ativo
+          aparece como chip removível ao lado. */}
+      <LinhaDeFiltros
+        className="py-3"
+        direita={
+          <>
+            <div className="relative">
+              <Search aria-hidden="true" className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                aria-label="Buscar atividades"
+                placeholder="Buscar..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 w-48 pl-8 text-xs"
+              />
             </div>
-          </div>
-        ))}
-      </div>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger aria-label="Tipo de atividade" className="h-8 w-36 text-xs">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                {ATIVIDADE_TIPOS.map((t) => (
+                  <SelectItem key={t} value={t}>{ATIVIDADE_ROTULO[t]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+              <SelectTrigger aria-label="Responsável" className="h-8 w-40 text-xs">
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os responsáveis</SelectItem>
+                {(members as Profile[]).map((m) => (
+                  <SelectItem key={m.id} value={m.id}>{m.name || m.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        }
+      >
+        {typeFilter === "all" && ownerFilter === "all" && !search.trim() && (
+          <span className="text-xs text-muted-foreground">Nenhum filtro de tipo, responsável ou busca</span>
+        )}
+        {typeFilter !== "all" && (
+          <ChipDeFiltro ativo rotuloRemover="Remover filtro de tipo" onRemover={() => setTypeFilter("all")}>
+            Tipo: {ATIVIDADE_ROTULO[typeFilter as ActivityType] ?? typeFilter}
+          </ChipDeFiltro>
+        )}
+        {ownerFilter !== "all" && (
+          <ChipDeFiltro ativo rotuloRemover="Remover filtro de responsável" onRemover={() => setOwnerFilter("all")}>
+            Responsável: {getMember(ownerFilter)?.name || getMember(ownerFilter)?.email || "—"}
+          </ChipDeFiltro>
+        )}
+        {search.trim() && (
+          <ChipDeFiltro ativo rotuloRemover="Limpar a busca" onRemover={() => setSearch("")}>
+            Busca: “{search.trim()}”
+          </ChipDeFiltro>
+        )}
+      </LinhaDeFiltros>
+
+      {viewMode === "list" && (
+        <BarraDeSelecao
+          quantidade={selecionadas.size}
+          substantivo="atividade"
+          onLimpar={() => setSelecionadas(new Set())}
+        >
+          <Button size="sm" variant="outline" disabled={emLote} onClick={concluirSelecionadas}>
+            <Check className="mr-1 h-3.5 w-3.5 text-success" />Concluir
+          </Button>
+          <Button size="sm" variant="outline" disabled={emLote} onClick={() => adiarSelecionadas(1)}>
+            <CalendarClock className="mr-1 h-3.5 w-3.5" />Adiar 1 dia
+          </Button>
+          <Button size="sm" variant="outline" disabled={emLote} onClick={() => adiarSelecionadas(7)}>
+            <CalendarClock className="mr-1 h-3.5 w-3.5" />Adiar 1 semana
+          </Button>
+        </BarraDeSelecao>
+      )}
 
       {/* Table view */}
       {viewMode === "list" && (
         <div className="vx-table">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/30">
+              <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    aria-label="Selecionar todas as atividades da lista"
+                    checked={filtered.length > 0 && filtered.every((a) => selecionadas.has(a.id))}
+                    onCheckedChange={(v) => setSelecionadas(v ? new Set(filtered.map((a) => a.id)) : new Set())}
+                  />
+                </TableHead>
                 <TableHead className="w-10"></TableHead>
                 {/* SETE colunas, e não dez.
                     E-mail, telefone e organização eram três colunas com dados
@@ -548,17 +604,16 @@ export default function Activities() {
                     quatro juntas espremiam o Assunto, que é o que se lê. Nada
                     saiu da tela: os três desceram para dentro da célula da
                     pessoa. */}
-                <TableHead className="min-w-[240px]">Assunto</TableHead>
+                <TableHead className="min-w-[240px]">Atividade</TableHead>
                 <TableHead>Negócio</TableHead>
                 <TableHead className="min-w-[200px]">Pessoa de contato</TableHead>
                 <TableHead>Data</TableHead>
-                <TableHead>Atribuído a</TableHead>
+                <TableHead>Responsável</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((a) => {
-                const Icon = ATIVIDADE_ICONE[a.type];
                 const contact = getContact(a.contact_id);
                 const deal = getDeal(a.deal_id);
                 const company = getCompany(a.company_id) || (contact?.company_id ? getCompany(contact.company_id) : null);
@@ -568,27 +623,41 @@ export default function Activities() {
                 return (
                   <TableRow
                     key={a.id}
-                    className={`group ${a.completed_at ? "opacity-40" : ""} ${overdue ? "bg-destructive/[0.03]" : ""}`}
+                    className={cn("group", a.completed_at && "opacity-60", selecionadas.has(a.id) && "bg-accent")}
                   >
                     <TableCell className="pr-0">
                       <Checkbox
+                        aria-label="Selecionar atividade"
+                        checked={selecionadas.has(a.id)}
+                        onCheckedChange={(v) =>
+                          setSelecionadas((prev) => {
+                            const next = new Set(prev);
+                            if (v) next.add(a.id); else next.delete(a.id);
+                            return next;
+                          })
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="pr-0">
+                      <Checkbox
+                        aria-label="Marcar como concluída"
                         checked={!!a.completed_at}
                         onCheckedChange={() => toggleComplete(a)}
                       />
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Icon className={`h-3.5 w-3.5 shrink-0 ${ATIVIDADE_COR[a.type]}`} />
-                        <span className={`text-sm font-medium truncate ${a.completed_at ? "line-through" : ""}`}>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <TipoDeAtividade tipo={a.type} />
+                        <span className={cn("truncate text-sm font-semibold", a.completed_at && "line-through")}>
                           {a.title}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell>
                       {deal && (
-                        <Badge variant="secondary" className="text-label font-normal max-w-[160px] truncate">
+                        <span className="block max-w-[180px] truncate text-xs text-muted-foreground" title={deal.title}>
                           {deal.title}
-                        </Badge>
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -599,25 +668,31 @@ export default function Activities() {
                           ALTA aparecia gritando aqui e normalizado na tela de
                           Contatos. Mesma pessoa, dois nomes. */}
                       {contact ? (
-                        <div className="min-w-0 leading-tight">
-                          <p className="truncate text-sm">
-                            {nomeDoContato(contact.first_name, contact.last_name)}
-                          </p>
-                          {(contact.email || contact.phone) && (
-                            <p className="truncate text-label text-muted-foreground">
-                              {contact.email && formatarEmail(contact.email)}
-                              {contact.email && contact.phone && " · "}
-                              {contact.phone && formatarTelefone(contact.phone)}
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Iniciais nome={nomeDoContato(contact.first_name, contact.last_name)} tamanho="sm" />
+                          <div className="min-w-0 leading-tight">
+                            <p className="truncate text-sm">
+                              {nomeDoContato(contact.first_name, contact.last_name)}
                             </p>
-                          )}
-                          {company && (
-                            <p className="truncate text-label text-muted-foreground/70">
-                              {company.name}
-                            </p>
-                          )}
+                            {(contact.email || contact.phone) && (
+                              <p className="truncate text-label text-muted-foreground">
+                                {contact.email && formatarEmail(contact.email)}
+                                {contact.email && contact.phone && " · "}
+                                {contact.phone && formatarTelefone(contact.phone)}
+                              </p>
+                            )}
+                            {company && (
+                              <p className="truncate text-label text-muted-foreground">
+                                {company.name}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       ) : company ? (
-                        <span className="text-label text-muted-foreground">{company.name}</span>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Iniciais nome={company.name} forma="empresa" tamanho="sm" />
+                          <span className="truncate text-xs text-muted-foreground">{company.name}</span>
+                        </div>
                       ) : null}
                     </TableCell>
                     <TableCell>
@@ -629,9 +704,12 @@ export default function Activities() {
                       {a.due_date ? (
                         <span
                           title={`Vence em ${formatarDataHora(a.due_date)}`}
-                          className={`text-xs whitespace-nowrap ${overdue ? "text-destructive font-medium" : "text-muted-foreground"}`}
+                          className={cn("block whitespace-nowrap text-xs", overdue ? "font-medium text-destructive" : "text-muted-foreground")}
                         >
                           {dataCurta(a.due_date)}
+                          {overdue && (
+                            <span className="block text-label">{textoDeAtraso(a.due_date)}</span>
+                          )}
                         </span>
                       ) : a.completed_at ? (
                         <span
@@ -643,7 +721,7 @@ export default function Activities() {
                       ) : a.created_at ? (
                         <span
                           title={`Registrada em ${formatarDataHora(a.created_at)}`}
-                          className="whitespace-nowrap text-xs text-muted-foreground/70"
+                          className="whitespace-nowrap text-xs text-muted-foreground"
                         >
                           {dataCurta(a.created_at)}
                         </span>
@@ -653,10 +731,13 @@ export default function Activities() {
                       {/* Quem fez. O banco não guarda um "concluída por"
                           separado, então user_id é a melhor fonte que existe. */}
                       {member ? (
-                        <span className="text-xs text-muted-foreground">{member.name || member.email}</span>
+                        <span className="flex min-w-0 items-center gap-2" title={member.name || member.email || undefined}>
+                          <Iniciais nome={member.name || member.email} tamanho="sm" />
+                          <span className="truncate text-xs text-muted-foreground">{member.name || member.email}</span>
+                        </span>
                       ) : (
                         <span
-                          className="text-xs text-muted-foreground/50"
+                          className="text-xs text-muted-foreground"
                           title={a.user_id ? "Conta não está mais na equipe" : "Nenhuma conta registrada"}
                         >
                           —
@@ -666,8 +747,8 @@ export default function Activities() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="rounded p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent transition-all">
-                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          <button aria-label="Ações da atividade" className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-accent focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100">
+                            <MoreHorizontal className="h-4 w-4" />
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -689,10 +770,10 @@ export default function Activities() {
                   afirmar um fato que a tela não conhece. */}
               {(carregando || falhou || filtered.length === 0) && (
                 <TableRow>
-                  {/* SETE, como o cabeçalho. Ficou em 10 quando as três
+                  {/* OITO, como o cabeçalho (sete + a coluna de seleção). Ficou em 10 quando as três
                       colunas de contato viraram uma -- o navegador perdoa
                       (estica até o fim), mas o número mente para quem lê. */}
-                  <TableCell colSpan={7} className="p-0">
+                  <TableCell colSpan={8} className="p-0">
                     {carregando ? (
                       <LoadingState linhas={6} className="p-4" />
                     ) : falhou ? (
@@ -726,25 +807,25 @@ export default function Activities() {
               return { year: d.getFullYear(), month: d.getMonth() };
             })}><ChevronRight className="h-4 w-4" /></Button>
           </div>
-          <div className="grid grid-cols-7 gap-px rounded-lg border border-border bg-border overflow-hidden">
+          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border">
             {["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].map((d) => (
-              <div key={d} className="bg-muted px-2 py-1.5 text-center text-label font-medium text-muted-foreground">{d}</div>
+              <div key={d} className="bg-surface-2 px-2 py-1.5 text-center text-label font-semibold uppercase tracking-wide text-muted-foreground">{d}</div>
             ))}
             {calendarDays.map((day, i) => {
               const dateStr = day.date.toISOString().split("T")[0];
               const dayActivities = activitiesByDate.get(dateStr) || [];
               const isToday = dateStr === new Date().toISOString().split("T")[0];
               return (
-                <div key={i} className={`min-h-[80px] bg-background p-1 ${!day.inMonth ? "opacity-40" : ""}`}>
-                  <div className={`text-xs font-medium mb-0.5 ${isToday ? "flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                <div key={i} className={cn("min-h-[88px] p-1.5", isToday ? "bg-accent" : "bg-card", !day.inMonth && "opacity-50")}>
+                  <div className={cn("mb-1 text-xs font-medium", isToday ? "flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground" : "text-muted-foreground")}>
                     {day.date.getDate()}
                   </div>
                   <div className="space-y-0.5">
                     {dayActivities.slice(0, 3).map((a) => {
                       const ActIcon = ATIVIDADE_ICONE[a.type];
                       return (
-                        <div key={a.id} className={`flex items-center gap-1 rounded px-1 py-0.5 text-label truncate bg-muted/50 ${isOverdue(a) ? "ring-1 ring-destructive" : ""}`}>
-                          <ActIcon className={`h-2.5 w-2.5 shrink-0 ${ATIVIDADE_COR[a.type]}`} />
+                        <div key={a.id} className={cn("flex items-center gap-1.5 truncate rounded px-1 py-0.5 text-label", isOverdue(a) ? "bg-destructive-soft text-destructive" : "bg-surface-2")}>
+                          <ActIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
                           <span className="truncate">{a.title}</span>
                         </div>
                       );
@@ -876,7 +957,7 @@ function ActivityCreateEditModal({ open, onOpenChange, activity, contacts, compa
             onOpenChange(false);
             toast({ title: "Atividade atualizada" });
           },
-          onError: (err: Error) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
+          onError: (err) => toast({ title: "Erro ao atualizar atividade", description: mensagemErro(err), variant: "destructive" }),
         }
       );
     } else {
@@ -889,8 +970,8 @@ function ActivityCreateEditModal({ open, onOpenChange, activity, contacts, compa
             onOpenChange(false);
             toast({ title: "Atividade criada" });
           },
-          onError: (err: Error) =>
-            toast({ title: "Erro", description: err.message, variant: "destructive" }),
+          onError: (err) =>
+            toast({ title: "Erro ao criar atividade", description: mensagemErro(err), variant: "destructive" }),
         },
       );
     }

@@ -33,6 +33,7 @@ import DOMPurify from "dompurify";
 import type { Email, InboxContact as Contact } from "@/lib/api/emails";
 import { formatarData, formatarDataCurta, textoDeHtml, pluralizar } from "@/lib/formato";
 import { SemOrganizacao } from "@/components/layout/SemOrganizacao";
+import { Iniciais } from "@/components/layout/ListaV1";
 
 type Folder =
   | "inbox"
@@ -467,15 +468,6 @@ export default function Inbox() {
     return formatarDataCurta(d);
   };
 
-  const getInitials = (name: string) =>
-    name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
-
-  const senderColor = (s: string) => {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
-    return `hsl(${h} 60% 45%)`;
-  };
-
   if (!orgId) return <SemOrganizacao />;
 
   // Caixa pessoal sem conta conectada. Antes esta tela não existia: o usuário
@@ -484,7 +476,7 @@ export default function Inbox() {
   if (!account) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent">
           <Mail className="h-6 w-6 text-primary" />
         </div>
         <div>
@@ -508,7 +500,7 @@ export default function Inbox() {
         <div className={cn("flex items-center gap-1", pastasRecolhidas ? "flex-col p-2" : "p-3")}>
           <Button
             onClick={() => setComposeOpen(true)}
-            className={cn("rounded-lg shadow-sm h-11", pastasRecolhidas ? "w-10 px-0 justify-center" : "flex-1 justify-start gap-2")}
+            className={cn("rounded-lg h-11", pastasRecolhidas ? "w-10 px-0 justify-center" : "flex-1 justify-start gap-2")}
             size="lg"
             title="Escrever"
           >
@@ -542,8 +534,8 @@ export default function Inbox() {
                       ? "relative justify-center rounded-lg py-2"
                       : "gap-3 rounded-r-full pl-5 pr-3 py-1.5",
                     active
-                      ? "bg-primary/10 text-primary font-semibold"
-                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                      ? "bg-accent text-accent-foreground font-semibold"
+                      : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                   )}
                 >
                   <Icon className={cn("h-4 w-4 shrink-0", active && "text-primary")} />
@@ -677,7 +669,7 @@ export default function Inbox() {
                 placeholder="Pesquisar emails"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 h-9 text-sm bg-muted/40 border-transparent focus-visible:bg-background"
+                className="pl-8 h-9 text-sm"
               />
             </div>
           </div>
@@ -691,7 +683,7 @@ export default function Inbox() {
               Nenhum email em "{FOLDERS.find((f) => f.id === folder)?.label}"
             </div>
           ) : (
-            <div className="divide-y divide-border/60">
+            <div className="divide-y divide-border">
               {filtered.map((email) => {
                 const contact = getContactForEmail(email);
                 const isOpen = selectedEmail?.id === email.id;
@@ -709,14 +701,17 @@ export default function Inbox() {
                     className={cn(
                       // py-3 e não py-2.5: a linha tem três linhas de texto e
                       // 10px em cima e embaixo as encostava na vizinha.
-                      "group relative flex items-start gap-2.5 border-l-[3px] pl-2.5 pr-3 py-3 cursor-pointer transition-colors hover:bg-accent/40",
-                      isOpen && "bg-accent/60",
-                      !email.is_read && !isOpen && "bg-primary/[0.04]"
+                      "group relative flex items-start gap-2.5 px-3 py-3 cursor-pointer transition-colors hover:bg-surface-2",
+                      isOpen && "bg-accent hover:bg-accent",
+                      !email.is_read && !isOpen && "bg-card"
                     )}
-                    // A cor do remetente, que era o avatar, virou a barra da
-                    // esquerda: mesma pista visual em 3px em vez de 36.
-                    style={{ borderLeftColor: senderColor(senderName) }}
                   >
+                    {/* Não lido: ponto na cor de destaque, no lugar da barra
+                        colorida por remetente (cor derivada de hash não existe
+                        no tema escuro nem acompanha o destaque escolhido). */}
+                    {!email.is_read && (
+                      <span aria-label="Não lido" className="absolute left-1 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary" />
+                    )}
                     <Checkbox
                       checked={selectedIds.has(email.id)}
                       onCheckedChange={(v) => {
@@ -745,17 +740,14 @@ export default function Inbox() {
                     />
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleStar(email); }}
-                      className="mt-1 text-muted-foreground hover:text-amber-500 transition-colors"
+                      className="mt-1 text-muted-foreground hover:text-warning transition-colors"
                       title={email.is_starred ? "Remover estrela" : "Adicionar estrela"}
                     >
-                      <Star className={cn("h-4 w-4", email.is_starred && "fill-amber-400 text-amber-500")} />
+                      <Star className={cn("h-4 w-4", email.is_starred && "fill-warning text-warning")} />
                     </button>
-                    {/* O AVATAR SAIU DA LISTA.
-                        Eram 36px por linha (28 do círculo + 8 do respiro) para
-                        desenhar as INICIAIS de um remetente -- decorativo, e num
-                        painel de 440px eram quatro ou cinco palavras do assunto.
-                        A cor por remetente virou uma barra de 3px na borda: mesma
-                        pista visual, um oitavo da largura. */}
+                    {/* Iniciais pequenas (24px): a forma do V1, sem cobrar a
+                        largura do avatar de antes. */}
+                    <Iniciais nome={senderName.replace(/^Para:\s*/, "")} tamanho="sm" className="mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className={cn("text-sm truncate", !email.is_read ? "font-bold text-foreground" : "font-medium text-foreground/90")}>
@@ -789,7 +781,7 @@ export default function Inbox() {
                         )}
                         <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                           {email.importance === "high" && (
-                            <Badge variant="outline" className="h-4 text-label border-amber-500/40 text-amber-600">Importante</Badge>
+                            <Badge variant="outline" className="h-4 text-label border-warning/40 text-warning">Importante</Badge>
                           )}
                           {email.open_count > 0 && (
                             <span className="text-label text-muted-foreground flex items-center gap-0.5 tabular-nums" title={`Aberto ${email.open_count}x`}>
@@ -802,7 +794,7 @@ export default function Inbox() {
                             </span>
                           )}
                           {email.snoozed_until && new Date(email.snoozed_until) > new Date() && (
-                            <span className="text-label text-amber-600 flex items-center gap-0.5" title="Adiado">
+                            <span className="text-label text-warning flex items-center gap-0.5" title="Adiado">
                               <Clock className="h-3 w-3" />{formatarData(email.snoozed_until)}
                             </span>
                           )}
@@ -822,14 +814,14 @@ export default function Inbox() {
         <>
           {expanded && (
             <div
-              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 z-40 bg-foreground/50"
               onClick={() => setExpanded(false)}
             />
           )}
           <div
             className={cn(
               expanded
-                ? "fixed inset-4 md:inset-10 z-50 bg-background border border-border rounded-lg shadow-2xl flex flex-col overflow-hidden"
+                ? "fixed inset-4 md:inset-10 z-50 bg-background border border-border rounded-lg shadow-lg flex flex-col overflow-hidden"
                 : "flex-1 min-w-0 flex flex-col",
             )}
           >
@@ -939,7 +931,7 @@ export default function Inbox() {
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="ghost" size="sm" onClick={() => updateEmail(selectedEmail.id, { is_read: false })} title="Marcar não lido"><Mail className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="sm" onClick={() => toggleImportance(selectedEmail)} title="Importância"><Tag className={cn("h-4 w-4", selectedEmail.importance === "high" && "text-amber-500")} /></Button>
+            <Button variant="ghost" size="sm" onClick={() => toggleImportance(selectedEmail)} title="Importância"><Tag className={cn("h-4 w-4", selectedEmail.importance === "high" && "text-warning")} /></Button>
             <Button variant="ghost" size="sm" onClick={() => setExpanded((v) => !v)} title={expanded ? "Restaurar" : "Expandir"} className="ml-auto">
               {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </Button>
@@ -961,20 +953,15 @@ export default function Inbox() {
                 <h1 className="vx-titulo-tela">{selectedEmail.subject || "(sem assunto)"}</h1>
                 <button
                   onClick={() => toggleStar(selectedEmail)}
-                  className="text-muted-foreground hover:text-amber-500 mt-1"
+                  className="text-muted-foreground hover:text-warning mt-1"
                 >
-                  <Star className={cn("h-5 w-5", selectedEmail.is_starred && "fill-amber-400 text-amber-500")} />
+                  <Star className={cn("h-5 w-5", selectedEmail.is_starred && "fill-warning text-warning")} />
                 </button>
               </div>
 
               {/* Sender header */}
               <div className="flex items-start gap-3 pt-2">
-                <div
-                  className="h-10 w-10 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
-                  style={{ background: senderColor(selectedEmail.from_email || "?") }}
-                >
-                  {getInitials(selectedEmail.from_email || "?")}
-                </div>
+                <Iniciais nome={selectedEmail.from_email || "?"} tamanho="lg" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="text-sm font-semibold">{selectedEmail.from_email}</p>

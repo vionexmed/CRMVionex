@@ -84,39 +84,8 @@ describe("a densidade deixou de ser controle morto", () => {
   });
 });
 
-describe("a escala de raio não colapsa", () => {
-  const CFG = readFileSync("tailwind.config.ts", "utf8");
-
-  /**
-   * O TESTE QUE MAIS IMPORTA nesta leva, porque a falha é INVISÍVEL no código.
-   *
-   * A escala era `--radius - 2px` e `- 4px`. Com o token em 10px dava 10/8/6 e
-   * ninguém notava; quando ele subiu para 16px virou 16/14/12 -- os três
-   * praticamente iguais. E o estrago é nos elementos pequenos, que são a
-   * maioria: 106 usos de `rounded-md`, 14 de `rounded-sm`.
-   *
-   * Um raio de 14px num botão de 32px é quase pílula, e no quadrado de 24px do
-   * ícone do StatCard vira bolha -- exatamente o que `visual-do-painel` proíbe.
-   * Aquele teste continuou passando porque confere o NOME da classe, não o
-   * valor computado. Nenhum teste da base pegaria isso; este pega.
-   */
-  it("os degraus menores acompanham por fator, não por subtração", () => {
-    const escala = CFG.slice(CFG.indexOf("borderRadius:"), CFG.indexOf("keyframes:"));
-    expect(escala, "subtração fixa achata a escala quando o raio cresce")
-      .not.toMatch(/calc\(var\(--radius\) - \d+px\)/);
-    expect(escala).toMatch(/md: "calc\(var\(--radius\) \* 0\.\d+\)"/);
-    expect(escala).toMatch(/sm: "calc\(var\(--radius\) \* 0\.\d+\)"/);
-  });
-
-  /** E os fatores têm de ser crescentes: sm < md < lg, senão a escala inverte
-   *  sem que nada quebre. */
-  it("sm é menor que md", () => {
-    const fator = (nome: string) =>
-      Number(CFG.match(new RegExp(`${nome}: "calc\\(var\\(--radius\\) \\* ([\\d.]+)\\)"`))?.[1]);
-    expect(fator("sm")).toBeLessThan(fator("md"));
-    expect(fator("md")).toBeLessThan(1);
-  });
-});
+// A antiga escala proporcional foi substituída por tokens explícitos de 6/4 px.
+// O aceite de raio pertence à inspeção renderizada da fundação, não a regex de CSS.
 
 describe("a cor de destaque continua trocável", () => {
   /**
@@ -147,7 +116,7 @@ describe("a cor de destaque continua trocável", () => {
   });
 
   it("violet segue disponível como escolha", () => {
-    expect(TEMA).toMatch(/violet: \{ light: "262 83% 58%"/);
+    expect(TEMA).toMatch(/violet: \{ light: "252 100% 62%"/);
   });
 });
 

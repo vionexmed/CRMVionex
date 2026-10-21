@@ -1,7 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+
+import { mensagemErro } from "@/lib/erro-supabase";
+
+export type ProfileStatus = "idle" | "loading" | "ready" | "missing" | "error";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -23,6 +27,8 @@ interface AuthContextType {
   /** true para owner/admin — acesso total */
   isAdmin: boolean;
   loading: boolean;
+  profileStatus: ProfileStatus;
+  profileError: string | null;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -34,6 +40,8 @@ const AuthContext = createContext<AuthContextType>({
   role: null,
   isAdmin: false,
   loading: true,
+  profileStatus: "idle",
+  profileError: null,
   signOut: async () => {},
   refreshProfile: async () => {},
 });
@@ -47,127 +55,147 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = useCallback(async (userId: string) => {
-    // Auto-cura de convite: se este e-mail tem convite pendente e o usuário
-    // caiu numa org própria vazia (fluxo de convite falhou), move para a org
-    // do convite com o papel correto antes de carregar o profile.
+  const [profileStatus, setProfileStatus] = useState<ProfileStatus>("idle");
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const currentUser = useRef<string | null>(null);
+  const loadedProfileUser = useRef<string | null>(null);
+  const invalidateProfile = useCallback(() => { ++generation.current; }, []);
+
+  const startProfile = useCallback(() => {
+    const next = ++generation.current;
+    // Revalidar a mesma identidade mantém o aplicativo e seus rascunhos montados.
+    const keepMounted = loadedProfileUser.current !== null && loadedProfileUser.current === currentUser.current;
+    setLoading(!keepMounted);
+    setProfileStatus("loading");
+    setProfileError(null);
+    if (!keepMounted) {
+      loadedProfileUser.current = null;
+      setProfile(null);
+      setRole(null);
+    }
+    return next;
+  }, []);
+
+  const loadProfile = useCallback(async (userId: string, request: number) => {
+    const isCurrent = () => generation.current === request && currentUser.current === userId;
+    if (!isCurrent()) return;
     try {
-      const { data: claim } = await supabase.rpc("claim_pending_invitation");
-      if ((claim as { claimed?: boolean } | null)?.claimed) {
-        console.info("[AuthContext] convite pendente aplicado", claim);
+      // Convites continuam sendo aplicados antes de consultar perfil e papel.
+      // A RPC é opcional em instalações ainda sem essa migration.
+      try { await supabase.rpc("claim_pending_invitation"); } catch { /* segue a consulta */ }
+      if (!isCurrent()) return;
+
+      // O trigger pode ainda não ter criado o perfil após o cadastro.
+      const delays = [0, 200, 500, 1000, 1500];
+      let result: Profile | null = null;
+      for (const delay of delays) {
+        if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+        if (!isCurrent()) return;
+        const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+        if (!isCurrent()) return;
+        if (error) throw error;
+        if (data) { result = data as Profile; break; }
       }
-    } catch {
-      // RPC pode não existir ainda (migration não aplicada) — segue normal
+
+      if (!result) {
+        setProfileStatus("missing");
+        return;
+      }
+      let userRole: AppRole | null = null;
+      if (result.org_id) {
+        const { data, error } = await supabase.from("user_roles").select("role")
+          .eq("user_id", userId).eq("org_id", result.org_id).maybeSingle();
+        if (!isCurrent()) return;
+        if (error) throw error;
+        userRole = (data?.role as AppRole) ?? null;
+      }
+      if (!isCurrent()) return;
+      loadedProfileUser.current = userId;
+      setProfile(result);
+      setRole(userRole);
+      setProfileStatus("ready");
+    } catch (error) {
+      if (!isCurrent()) return;
+      setProfileError(mensagemErro(error));
+      setProfileStatus("error");
+    } finally {
+      if (isCurrent()) setLoading(false);
     }
-
-    // Retry loop: profile is created by a DB trigger on signup, so it may not
-    // exist yet on the very first auth event. Retry with backoff to cover the gap.
-    // Extended to 5 attempts to cover slow triggers post-remix.
-    const delays = [0, 200, 500, 1000, 1500];
-    let result: Profile | null = null;
-    for (let i = 0; i < delays.length; i++) {
-      if (delays[i] > 0) {
-        await new Promise((r) => setTimeout(r, delays[i]));
-      }
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (error) {
-        console.warn("[AuthContext] profile fetch error", error);
-      }
-      if (data) {
-        result = data as Profile;
-        break;
-      }
-    }
-
-    // Antes havia um "auto-reparo" aqui que inseria um profile com
-    // onboarding_completed: false e SEM org_id quando o trigger do banco
-    // demorava. Isso era pior que o problema: o usuário caía no wizard de
-    // empresa e o CompanyStep criava uma ORGANIZAÇÃO NOVA, tirando a pessoa da
-    // empresa dela. Falha de trigger é rara e precisa ser visível, não
-    // remendada com um perfil órfão.
-    if (!result) {
-      console.error(
-        "[AuthContext] profile não encontrado após todas as tentativas para",
-        userId,
-        "— o trigger handle_new_user provavelmente falhou.",
-      );
-    }
-
-    // Carregar o papel do usuário na org (member = Comercial, acesso restrito)
-    let userRole: AppRole | null = null;
-    if (result?.org_id) {
-      const { data: roleRow, error: roleError } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .eq("org_id", result.org_id)
-        .maybeSingle();
-      if (roleError) {
-        console.warn("[AuthContext] role fetch error", roleError);
-      }
-      userRole = (roleRow?.role as AppRole) ?? null;
-    }
-
-    setRole(userRole);
-    setProfile(result);
-    setLoading(false);
   }, []);
 
   useEffect(() => {
-    // IMPORTANT: No async/await inside onAuthStateChange to prevent deadlocks
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          // Fetch profile in a separate non-blocking call
-          setTimeout(() => {
-            void loadProfile(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
-          setRole(null);
-          setLoading(false);
-        }
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        void loadProfile(session.user.id);
+    let active = true;
+    let receivedEvent = false;
+    const initialGeneration = generation.current;
+    const applySession = (nextSession: Session | null, defer: boolean) => {
+      if (!active) return;
+      currentUser.current = nextSession?.user.id ?? null;
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      if (nextSession?.user) {
+        // Invalidar a geração anterior ANTES de adiar a consulta; bloquear somente sem perfil desta identidade.
+        const request = startProfile();
+        if (defer) setTimeout(() => { void loadProfile(nextSession.user.id, request); }, 0);
+        else void loadProfile(nextSession.user.id, request);
       } else {
+        ++generation.current;
+        loadedProfileUser.current = null;
+        setProfile(null);
+        setRole(null);
+        setProfileStatus("idle");
+        setProfileError(null);
         setLoading(false);
       }
+    };
+    // Não executar consultas async dentro do callback de autenticação.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      receivedEvent = true;
+      applySession(nextSession, true);
     });
+    void supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      if (!receivedEvent && generation.current === initialGeneration) applySession(initialSession, false);
+    }).catch(() => {
+      if (active && !receivedEvent && generation.current === initialGeneration) applySession(null, false);
+    });
+    return () => {
+      active = false;
+      invalidateProfile();
+      subscription.unsubscribe();
+    };
+  }, [loadProfile, startProfile, invalidateProfile]);
 
-    return () => subscription.unsubscribe();
-  }, [loadProfile]);
-
-  const refreshProfile = async () => {
-    if (!user) return;
-    await loadProfile(user.id);
-  };
+  const refreshProfile = useCallback(async () => {
+    const userId = currentUser.current;
+    if (!userId) return;
+    await loadProfile(userId, startProfile());
+  }, [loadProfile, startProfile]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Uma consulta em voo nunca deve reinstalar o perfil durante a saída.
+    ++generation.current;
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setLoading(false);
+      setProfileStatus("error");
+      setProfileError(mensagemErro(error));
+      throw error;
+    }
+    currentUser.current = null;
+    loadedProfileUser.current = null;
     setUser(null);
     setSession(null);
     setProfile(null);
     setRole(null);
+    setProfileStatus("idle");
+    setProfileError(null);
+    setLoading(false);
   };
 
   const isAdmin = role === "owner" || role === "admin";
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, role, isAdmin, loading, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, profile, role, isAdmin, loading, profileStatus, profileError, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

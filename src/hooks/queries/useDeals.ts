@@ -5,6 +5,9 @@ import type { DealInsert, DealUpdate, DealListParams, DealWithRelations } from "
 import type { Database } from "@/integrations/supabase/types";
 import { invalidarPainel } from "@/lib/invalidar-painel";
 
+import { toast } from "@/hooks/use-toast";
+import { mensagemErro } from "@/lib/erro-supabase";
+
 type DealStatus = Database["public"]["Enums"]["deal_status"];
 
 // Re-export so pages don't need to import from the api layer directly
@@ -39,12 +42,13 @@ export function useDeal(id: string | undefined) {
   });
 }
 
-export function useDeals(params: DealListParams = {}) {
+export function useDeals(params: DealListParams = {}, opcoes: { enabled?: boolean } = {}) {
   const { orgId } = useOrg();
   return useQuery({
     queryKey: dealsKeys.list(orgId ?? "", params),
     queryFn: () => dealsApi.list(orgId!, params),
-    enabled: !!orgId,
+    // `enabled` deixa a tela desligar a consulta que a visão atual não usa.
+    enabled: !!orgId && (opcoes.enabled ?? true),
     placeholderData: keepPreviousData,
   });
 }
@@ -92,8 +96,13 @@ export function useUpdateDealStage() {
       });
       return { snapshots };
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (error, _vars, ctx) => {
       ctx?.snapshots?.forEach(({ key, data }) => qc.setQueryData(key, data));
+      toast({
+        title: "Não foi possível mudar a etapa",
+        description: `O negócio voltou à etapa anterior. ${mensagemErro(error)}`,
+        variant: "destructive",
+      });
     },
     onSettled: () => qc.invalidateQueries({ queryKey: dealsKeys.all(orgId ?? "") }),
   });
