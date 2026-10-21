@@ -665,6 +665,7 @@ export type Database = {
           contact_id: string | null
           created_at: string | null
           currency: string | null
+          etapa_desde: string
           id: string
           loss_reason: string | null
           loss_reason_id: string | null
@@ -675,6 +676,7 @@ export type Database = {
           qualification_score: number | null
           stage_id: string | null
           status: Database["public"]["Enums"]["deal_status"] | null
+          temperatura: string | null
           title: string
           updated_at: string | null
           value: number | null
@@ -685,6 +687,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string | null
           currency?: string | null
+          etapa_desde?: string
           id?: string
           loss_reason?: string | null
           loss_reason_id?: string | null
@@ -695,6 +698,7 @@ export type Database = {
           qualification_score?: number | null
           stage_id?: string | null
           status?: Database["public"]["Enums"]["deal_status"] | null
+          temperatura?: string | null
           title: string
           updated_at?: string | null
           value?: number | null
@@ -705,6 +709,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string | null
           currency?: string | null
+          etapa_desde?: string
           id?: string
           loss_reason?: string | null
           loss_reason_id?: string | null
@@ -715,6 +720,7 @@ export type Database = {
           qualification_score?: number | null
           stage_id?: string | null
           status?: Database["public"]["Enums"]["deal_status"] | null
+          temperatura?: string | null
           title?: string
           updated_at?: string | null
           value?: number | null
@@ -2497,6 +2503,7 @@ export type Database = {
           updated_at: string
           valido_ate: string | null
           visto_em: string | null
+          visualizacoes: number
         }
         Insert: {
           company_id?: string | null
@@ -2520,6 +2527,7 @@ export type Database = {
           updated_at?: string
           valido_ate?: string | null
           visto_em?: string | null
+          visualizacoes?: number
         }
         Update: {
           company_id?: string | null
@@ -2543,6 +2551,7 @@ export type Database = {
           updated_at?: string
           valido_ate?: string | null
           visto_em?: string | null
+          visualizacoes?: number
         }
         Relationships: [
           {
@@ -2611,6 +2620,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          meta_mensal: number | null
           name: string
           plan: string | null
           settings: Json | null
@@ -2619,6 +2629,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          meta_mensal?: number | null
           name: string
           plan?: string | null
           settings?: Json | null
@@ -2627,6 +2638,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          meta_mensal?: number | null
           name?: string
           plan?: string | null
           settings?: Json | null
@@ -3385,6 +3397,7 @@ export type Database = {
           error_message: string | null
           from_number: string
           id: string
+          lida_em: string | null
           message_type: string
           org_id: string
           raw: Json | null
@@ -3403,6 +3416,7 @@ export type Database = {
           error_message?: string | null
           from_number: string
           id?: string
+          lida_em?: string | null
           message_type?: string
           org_id: string
           raw?: Json | null
@@ -3421,6 +3435,7 @@ export type Database = {
           error_message?: string | null
           from_number?: string
           id?: string
+          lida_em?: string | null
           message_type?: string
           org_id?: string
           raw?: Json | null
@@ -3641,6 +3656,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      marcar_conversa_lida: { Args: { _contact_id: string }; Returns: number }
       next_round_robin_owner: { Args: { _org_id: string }; Returns: string }
       ordem_do_ciclo: {
         Args: { _estagio: Database["public"]["Enums"]["lifecycle_stage"] }
@@ -3661,6 +3677,7 @@ export type Database = {
         Args: { p_contact_id: string; p_pipeline_id: string }
         Returns: string
       }
+      registrar_visualizacao_orcamento: { Args: { _id: string }; Returns: number }
       remove_org_member: {
         Args: {
           _apagar_conta?: boolean

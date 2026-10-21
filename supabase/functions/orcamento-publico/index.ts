@@ -152,9 +152,19 @@ Deno.serve(async (req) => {
         e-mail: "visto" quer dizer que chegou aos olhos, não quantas vezes.
         Regravar a cada F5 apagaria a informação útil, que é QUANDO ele abriu.
       */
+      /*
+        O CONTADOR soma toda abertura (`visualizacoes`), por função atômica:
+        duas abas ao mesmo tempo não perdem contagem. Falhar aqui nunca impede
+        o cliente de ver a proposta -- é medição, não requisito.
+      */
+      const { error: erroContagem } = await admin.rpc("registrar_visualizacao_orcamento", { _id: orc.id });
+      if (erroContagem) console.error("registrar_visualizacao_orcamento", erroContagem);
       if (!orc.visto_em) {
-        await admin.from("orcamentos")
-          .update({ visto_em: new Date().toISOString() }).eq("id", orc.id);
+        if (erroContagem) {
+          // Sem a função (migração ainda não aplicada), mantém o registro antigo.
+          await admin.from("orcamentos")
+            .update({ visto_em: new Date().toISOString() }).eq("id", orc.id);
+        }
         await registrarAtividade(
           admin, orc,
           `Orçamento #${orc.numero} visualizado pelo cliente`,

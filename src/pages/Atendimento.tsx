@@ -419,7 +419,7 @@ export default function Atendimento() {
     // Altura da janela menos o cabeçalho (3,5rem) e o respiro da casca de
     // Comunicação (1,5rem em cima e embaixo): a lista e a conversa rolam por
     // dentro, sem a página inteira rolar junto.
-    <div className="flex h-[calc(100dvh-6.5rem)] min-h-[28rem] flex-col">
+    <div className="flex h-[calc(100dvh-7rem)] min-h-[28rem] flex-col">
       <PageHeader
         title="Atendimento"
         description="E-mail, WhatsApp e Instagram na mesma fila, do mais recente para o mais antigo"

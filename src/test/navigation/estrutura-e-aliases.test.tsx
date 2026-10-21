@@ -7,6 +7,13 @@ import * as navigation from "@/components/layout/navegacao";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// A lateral lê contagens (atrasadas, não lidas) pelo react-query; sem
+// organização no perfil as consultas ficam desligadas, mas o provedor precisa
+// existir, como existe no App.
+const comConsultas = (ui: React.ReactElement) =>
+  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>;
 
 const auth = vi.hoisted(() => ({ isAdmin: false, user: { id: "pessoa" }, loading: false, profileStatus: "ready", profileError: null as string | null, refreshProfile: vi.fn(), profile: { name: "Pessoa", email: "pessoa@example.test" }, signOut: vi.fn() }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => auth, AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
@@ -63,11 +70,11 @@ describe("catálogo da navegação aprovada", () => {
 });
 
 function sidebar(path: string, defaultOpen = true) {
-  render(<MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+  render(comConsultas(<MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
     <TooltipProvider><SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar />
     </SidebarProvider></TooltipProvider>
-  </MemoryRouter>);
+  </MemoryRouter>));
 }
 
 /** Os links de ÁREA, sem os módulos que abrem abaixo da área ativa. */
@@ -180,7 +187,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { useSidebar } from "@/components/ui/sidebar";
 function SidebarPreference() { const { open } = useSidebar(); return <output data-testid="sidebar-preference">{String(open)}</output>; }
 function appShell() {
-  render(<MemoryRouter initialEntries={["/contacts"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><TooltipProvider><Routes><Route element={<AppLayout />}><Route path="/contacts" element={<SidebarPreference />} /></Route></Routes></TooltipProvider></MemoryRouter>);
+  render(comConsultas(<MemoryRouter initialEntries={["/contacts"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><TooltipProvider><Routes><Route element={<AppLayout />}><Route path="/contacts" element={<SidebarPreference />} /></Route></Routes></TooltipProvider></MemoryRouter>));
 }
 
 describe("casca, preferência e busca compartilhada", () => {

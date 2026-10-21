@@ -5,6 +5,11 @@ import { useState, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import type { Session } from "@supabase/supabase-js";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// A casca lê as contagens da lateral pelo react-query, como no App.
+const comConsultas = (ui: React.ReactElement) =>
+  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>;
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -54,9 +59,9 @@ function DraftRoute() {
   </>;
 }
 function mountDraftRoute() {
-  render(<MemoryRouter initialEntries={["/contacts"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+  render(comConsultas(<MemoryRouter initialEntries={["/contacts"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
     <AuthProvider><Routes><Route element={<AppLayout />}><Route path="/contacts" element={<DraftRoute />} /></Route></Routes></AuthProvider>
-  </MemoryRouter>);
+  </MemoryRouter>));
 }
 
 beforeEach(() => {
@@ -127,7 +132,7 @@ describe("perfil e sessão confiáveis", () => {
 
   it("a tela de erro recebe foco e permite repetir a carga sem recarregar a página", async () => {
     transport.profile.mockResolvedValue({ data: null, error: { message: "Consulta indisponível" } });
-    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><AuthProvider><AppLayout /></AuthProvider></MemoryRouter>);
+    render(comConsultas(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><AuthProvider><AppLayout /></AuthProvider></MemoryRouter>));
     await act(async () => { await Promise.resolve(); });
     emit(session("ana"));
     const alert = await screen.findByRole("alert");

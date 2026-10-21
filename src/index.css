@@ -87,6 +87,12 @@
     --warning-foreground: 0 0% 100%;
     --warning-soft: 39 94% 93%;        /* #FEF3DE */
     --destructive-soft: 357 82% 96%;   /* #FDEBEC */
+    /* O vermelho VIVO dos avisos da casca (selo de atrasadas na lateral, ponto
+       do sininho), o #E5484D do Visual 01. Não é `--destructive`: aquele é
+       escurecido para texto vermelho sobre fundo claro passar no AA, e sobre o
+       navy ele vira marrom. Aqui o vermelho é FUNDO, com texto branco em peso
+       semibold, ou um ponto sem texto. */
+    --alerta: 358 75% 59%;             /* #E5484D */
     --info: 221 73% 42%;               /* #1D4FB8 */
     --info-foreground: 0 0% 100%;
     --info-soft: 219 91% 96%;          /* #EAF1FE */
@@ -162,6 +168,7 @@
     --warning-foreground: 39 53% 12%;
     --warning-soft: 39 53% 12%;        /* #2D220E */
     --destructive-soft: 354 42% 14%;   /* #341518 */
+    --alerta: 358 75% 59%;             /* o mesmo: fundo de selo, não texto */
     --info: 217 89% 75%;               /* #84B0F8 */
     --info-foreground: 219 53% 16%;
     --info-soft: 219 53% 16%;          /* #13223D */
@@ -641,7 +648,28 @@
  * nome da página, e aí a hierarquia some junto com a divergência.
  */
 .vx-titulo-tela {
-  @apply font-heading text-2xl font-bold tracking-tight leading-tight;
+  /* 22px, e não o `text-2xl` (24px) da escala: é o que a referência do
+     Visual 01 mede a 1440×900. Valor fora da escala do Tailwind, por isso em
+     CSS e não em classe arbitrária (que o teste de tipografia reprova). */
+  @apply font-heading font-semibold leading-tight;
+  font-size: 1.375rem;
+  letter-spacing: -0.02em;
+}
+
+/* O número dos selos da lateral (Atividades, Comunicação): 10px em negrito,
+   abaixo do menor degrau da escala (`text-label`, 11px). Medido na referência;
+   com 11px o selo parecia maior que o rótulo ao lado. */
+.vx-selo-nav {
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+/* A trilha da barra superior fica no tamanho do CORPO (13px), um degrau abaixo
+   do `text-sm` que o primitivo de breadcrumb traz -- é o que a referência mede.
+   `!important` porque a classe do primitivo vem depois na cascata do Tailwind. */
+.vx-trilha {
+  font-size: 0.8125rem !important;
+  line-height: 1.25rem !important;
 }
 
 .vx-titulo-painel {

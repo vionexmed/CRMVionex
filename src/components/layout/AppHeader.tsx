@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Building2, CalendarCheck, Handshake, Plus, Search, UserPlus } from "lucide-react";
+import { Building2, CalendarCheck, CircleHelp, Handshake, Plus, Search, UserPlus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/crm/NotificationBell";
@@ -55,16 +56,26 @@ export function AppHeader({ onOpenSearch, actions }: AppHeaderProps) {
   } else parts.push({ label: item?.label || "Página" });
 
   return (
-    <header className="z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-4 md:gap-4 md:px-6" role="banner">
-      <SidebarTrigger className="-ml-1 min-h-11 min-w-11 md:min-h-9 md:min-w-9" aria-label="Alternar navegação lateral" aria-expanded={isMobile ? openMobile : open} />
-      <Breadcrumb className="hidden min-w-0 shrink-0 md:flex lg:w-56 xl:w-64">
-        <BreadcrumbList className="flex-nowrap">
+    /*
+     * Medidas da captura de referência a 1440×900: 65px de altura, 28px de
+     * respiro lateral (o mesmo do conteúdo, para a trilha alinhar com o título
+     * da tela), busca de 550px logo depois da trilha e as ações coladas à
+     * direita. Ver `scratchpad/harness2` para comparar lado a lado.
+     */
+    <header className="z-30 flex h-[65px] shrink-0 items-center gap-3 border-b border-border bg-card px-4 md:gap-4 md:pl-7 md:pr-[29px]" role="banner">
+      {/* O Visual 01 não tem este botão no desktop: lá a lateral recolhe pelo
+          menu da conta (e por Ctrl/⌘ B). Ele continua no celular, onde a
+          lateral vive escondida, e volta no desktop quando ela está recolhida
+          -- senão não haveria por onde abri-la de novo com o mouse. */}
+      <SidebarTrigger className={cn("-ml-1 min-h-11 min-w-11 md:min-h-9 md:min-w-9", open && "md:hidden")} aria-label="Alternar navegação lateral" aria-expanded={isMobile ? openMobile : open} />
+      <Breadcrumb className="hidden min-w-[179px] shrink-0 pb-[3px] md:flex">
+        <BreadcrumbList className="vx-trilha flex-nowrap gap-2 sm:gap-2">
           {parts.map((part, index) => <Fragment key={`${part.label}-${index}`}>
             {index > 0 && <BreadcrumbSeparator className="text-muted-foreground/70">/</BreadcrumbSeparator>}
             <BreadcrumbItem className="min-w-0">
               {index < parts.length - 1 && part.href
                 ? <BreadcrumbLink asChild><Link to={part.href} className="truncate rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{part.label}</Link></BreadcrumbLink>
-                : <BreadcrumbPage className="truncate font-semibold">{part.label}</BreadcrumbPage>}
+                : <BreadcrumbPage className="truncate font-semibold text-foreground">{part.label}</BreadcrumbPage>}
             </BreadcrumbItem>
           </Fragment>)}
         </BreadcrumbList>
@@ -73,12 +84,12 @@ export function AppHeader({ onOpenSearch, actions }: AppHeaderProps) {
 
       {/* Parece campo, é botão: abre a busca compartilhada (⌘K), que é onde os
           resultados por tipo e o teclado já funcionam. */}
-      <div className="hidden min-w-0 flex-1 justify-center md:flex">
+      <div className="hidden min-w-0 flex-1 md:flex">
         <button type="button" onClick={onOpenSearch} aria-label="Buscar no CRM (Ctrl ou ⌘ K)"
-          className="flex h-9 w-full max-w-xl items-center gap-2.5 rounded-md border border-border bg-surface-2 px-3 text-sm text-muted-foreground transition-colors hover:border-input hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          className="flex h-[42px] w-full max-w-[550px] items-center gap-[13px] rounded-lg border border-border bg-surface-2 px-3.5 text-sm text-muted-foreground transition-colors hover:border-input hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Search aria-hidden="true" className="h-4 w-4 shrink-0" />
           <span className="flex-1 truncate text-left">Buscar contatos, negócios, empresas…</span>
-          <kbd className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-label text-muted-foreground">⌘K</kbd>
+          <kbd className="flex h-5 items-center rounded border border-border bg-card px-1.5 font-sans text-label leading-none text-muted-foreground">⌘K</kbd>
         </button>
       </div>
 
@@ -86,7 +97,7 @@ export function AppHeader({ onOpenSearch, actions }: AppHeaderProps) {
         {actions}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" className="h-9 gap-1.5 px-3" aria-label="Criar novo registro">
+            <Button size="lg" className="h-[38px] gap-1.5 px-3.5" aria-label="Criar novo registro">
               <Plus aria-hidden="true" /><span className="hidden sm:inline">Novo</span>
             </Button>
           </DropdownMenuTrigger>
@@ -98,6 +109,13 @@ export function AppHeader({ onOpenSearch, actions }: AppHeaderProps) {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        {/* Ajuda leva a um lugar de verdade: o mesmo e-mail de suporte que a
+            tela de erro já usa. Um ícone de ajuda que não abre nada ensinaria a
+            não pedir ajuda. */}
+        <a href="mailto:suporte@vionex.com?subject=Ajuda%20com%20o%20Vionex%20CRM" aria-label="Ajuda: falar com o suporte" title="Falar com o suporte"
+          className="hidden h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex">
+          <CircleHelp aria-hidden="true" className="h-[18px] w-[18px]" />
+        </a>
         <NotificationBell />
         <button type="button" onClick={onOpenSearch} aria-label="Buscar no CRM (Ctrl ou ⌘ K)"
           className="flex h-11 w-11 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden">

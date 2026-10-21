@@ -28,6 +28,7 @@ const negocio = (p: Partial<DealWithRelations>): DealWithRelations => ({
   stage_id: "e1", status: "open", probability: 0, close_date: null, company_id: null,
   contact_id: null, owner_id: null, loss_reason: null, loss_reason_id: null, qualification: null,
   qualification_score: null, created_at: iso(2026, 9, 20), updated_at: null,
+  etapa_desde: iso(2026, 9, 20), temperatura: null,
   atividades: [], ...p,
 });
 
