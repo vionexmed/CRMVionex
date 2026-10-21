@@ -21,7 +21,7 @@ export type Visao<T extends string> = {
   /** Quantos registros a visão traz. Omitir quando a contagem não é barata. */
   contagem?: number;
   /** `alerta` pinta a contagem de vermelho: "sem resposta há 3+ dias". */
-  tom?: "normal" | "alerta";
+  tom?: "normal" | "alerta" | "sucesso" | "perigo";
 };
 
 /**
@@ -31,7 +31,7 @@ export type Visao<T extends string> = {
  * elas o dia todo; o número ao lado responde "tem algo aqui?" sem clicar.
  */
 export function VisoesDaLista<T extends string>({
-  visoes, valor, onChange, rotulo = "Visões da lista", extra, className,
+  visoes, valor, onChange, rotulo = "Visões da lista", extra, className, contagemEmChip = false,
 }: {
   visoes: Visao<T>[];
   valor: T;
@@ -40,6 +40,8 @@ export function VisoesDaLista<T extends string>({
   /** Ação no fim da linha, como "+ Nova visão". */
   extra?: ReactNode;
   className?: string;
+  /** Contagem numa pílula suave (Orçamentos); sem isto, número solto como nas demais listas. */
+  contagemEmChip?: boolean;
 }) {
   return (
     <div className={cn("flex min-w-0 items-end gap-1 overflow-x-auto border-b border-border", className)}>
@@ -62,7 +64,13 @@ export function VisoesDaLista<T extends string>({
               {v.contagem !== undefined && (
                 <span className={cn(
                   "text-xs font-semibold tabular-nums",
-                  v.tom === "alerta" ? "text-destructive" : ativa ? "text-primary" : "text-muted-foreground",
+                  contagemEmChip && "rounded-full px-1.5 py-0.5",
+                  v.tom === "alerta" || v.tom === "perigo" ? "text-destructive" : v.tom === "sucesso" ? "text-success" : ativa ? "text-primary" : "text-muted-foreground",
+                  contagemEmChip && (
+                    v.tom === "perigo" ? "bg-destructive-soft"
+                      : v.tom === "sucesso" ? "bg-success-soft"
+                        : ativa ? "bg-accent" : "bg-secondary"
+                  ),
                 )}>
                   {formatarNumero(v.contagem)}
                 </span>
@@ -85,7 +93,7 @@ export function VisoesDaLista<T extends string>({
  * atalho ainda não ligados ("Quentes", "Atividade atrasada").
  */
 export function ChipDeFiltro({
-  children, ativo = false, onClick, onRemover, rotuloRemover,
+  children, ativo = false, onClick, onRemover, rotuloRemover, className,
 }: {
   children: ReactNode;
   ativo?: boolean;
@@ -93,6 +101,7 @@ export function ChipDeFiltro({
   onRemover?: () => void;
   /** Para leitor de tela: "Remover filtro de estágio". */
   rotuloRemover?: string;
+  className?: string;
 }) {
   const base = "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full border text-xs font-medium transition-colors";
   const cor = ativo
@@ -100,7 +109,7 @@ export function ChipDeFiltro({
     : "border-border bg-card text-foreground hover:bg-surface-2";
   if (onRemover) {
     return (
-      <span className={cn(base, cor, "pl-3 pr-1")}>
+      <span className={cn(base, cor, "pl-3 pr-1", className)}>
         {onClick
           ? <button type="button" onClick={onClick} className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{children}</button>
           : children}
@@ -117,17 +126,17 @@ export function ChipDeFiltro({
   }
   return (
     <button type="button" onClick={onClick} aria-pressed={ativo}
-      className={cn(base, cor, "px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>
+      className={cn(base, cor, "px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", className)}>
       {children}
     </button>
   );
 }
 
 /** "+ Filtro": o chip tracejado que abre o painel de filtros completo. */
-export function ChipAdicionarFiltro({ onClick, children = "Filtro" }: { onClick: () => void; children?: ReactNode }) {
+export function ChipAdicionarFiltro({ onClick, children = "Filtro", className }: { onClick: () => void; children?: ReactNode; className?: string }) {
   return (
     <button type="button" onClick={onClick}
-      className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full border border-dashed border-input px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      className={cn("inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full border border-dashed border-input px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", className)}>
       <Plus aria-hidden="true" className="h-3.5 w-3.5" />{children}
     </button>
   );

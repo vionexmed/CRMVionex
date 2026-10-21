@@ -9,8 +9,8 @@ import type { OrcamentoComRelacoes } from "@/lib/api/orcamentos";
  */
 export const LIMITE_DA_LISTA = 1000;
 
-/** Vencer em até 2 dias já é "em breve" para quem espera resposta. */
-export const DIAS_DE_AVISO = 2;
+/** Vence hoje ou amanhã: é o que a faixa chama de "Expiram amanhã" e pede ação já. */
+export const DIAS_DE_AVISO = 1;
 
 export type ValorPorMoeda = Record<string, number>;
 
@@ -156,3 +156,46 @@ export function clienteDoOrcamento(o: OrcamentoComRelacoes): { nome: string; apo
   return { nome, apoio };
 }
 
+
+const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/** "ontem, 18:40" / "hoje, 09:05" / "7 out, 10:12" -- sempre no relógio LOCAL de quem lê. */
+export function quandoFoiVisto(iso: string, agora: Date = new Date()): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const dois = (n: number) => String(n).padStart(2, "0");
+  const hora = `${dois(d.getHours())}:${dois(d.getMinutes())}`;
+  const dia = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((dia(agora) - dia(d)) / 86_400_000);
+  if (diff === 0) return `hoje, ${hora}`;
+  if (diff === 1) return `ontem, ${hora}`;
+  return `${d.getDate()} ${MESES[d.getMonth()]}, ${hora}`;
+}
+
+/**
+ * "Visualizado 3 vezes · a última ontem, 18:40".
+ *
+ * O contador e a data da última abertura vêm de `visualizacoes` e
+ * `ultima_visualizacao_em` (migrações 20261021120000 e 20261021150000); sem
+ * elas (banco antigo) cai em `visto_em`, que é a PRIMEIRA abertura -- então
+ * diz só "Visualizado", sem inventar número. Devolve null se nunca foi aberto.
+ */
+export function resumoDeVisualizacoes(
+  o: { visualizacoes?: number | null; ultima_visualizacao_em?: string | null; visto_em?: string | null },
+  agora: Date = new Date(),
+): string | null {
+  const n = Number(o.visualizacoes) || 0;
+  const ultima = o.ultima_visualizacao_em ?? (n <= 1 ? o.visto_em : null) ?? null;
+  if (n === 0 && !o.visto_em) return null;
+  const vezes = n >= 1 ? `Visualizado ${n} ${n === 1 ? "vez" : "vezes"}` : "Visualizado";
+  if (!ultima) return vezes;
+  const quando = quandoFoiVisto(ultima, agora);
+  if (!quando) return vezes;
+  return n > 1 ? `${vezes} · a última ${quando}` : `${vezes} · ${quando}`;
+}
+
+/** "30 out": dia e mês abreviado sem ponto, como a tabela de orçamentos mostra. */
+export function dataCurtaSemPonto(yyyyMmDd: string): string {
+  const d = new Date(`${yyyyMmDd.slice(0, 10)}T00:00:00`);
+  return isNaN(d.getTime()) ? "—" : `${d.getDate()} ${MESES[d.getMonth()]}`;
+}

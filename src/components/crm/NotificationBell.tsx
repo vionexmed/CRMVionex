@@ -136,12 +136,14 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button aria-label="Notificações" className="relative flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <Bell className="h-4 w-4" />
+        {/* Visual 01: um PONTO vermelho, não um número. O total vai no nome
+            acessível -- quem usa leitor de tela ouve quantas são, e quem olha
+            vê só que há algo novo, que é o que o sininho precisa dizer. */}
+        <button aria-label={naoLidas > 0 ? `Notificações: ${naoLidas > 99 ? "mais de 99" : naoLidas} não lidas` : "Notificações"}
+          className="relative flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Bell aria-hidden="true" className="h-[18px] w-[18px]" />
           {naoLidas > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-label font-bold text-destructive-foreground">
-              {naoLidas > 99 ? "99+" : naoLidas}
-            </span>
+            <span aria-hidden="true" className="absolute right-[10px] top-[9px] h-[7px] w-[7px] rounded-full bg-alerta ring-2 ring-card" />
           )}
         </button>
       </PopoverTrigger>

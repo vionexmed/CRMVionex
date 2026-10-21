@@ -56,15 +56,21 @@ export function PageHeader({
      * duas vezes no mesmo palmo de tela. Sem régua embaixo: quem vem logo abaixo
      * (abas de visão, filtros) já desenha a própria linha.
      */
-    <header className="shrink-0">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    /*
+     * `md:pt-2.5` soma 10px ao respiro de 28px do <main>: na referência o
+     * título fica 38px abaixo da barra superior, e o resto da página (que não
+     * tem cabeçalho) continua a 28px. `min-h` de um controle (34px) faz o
+     * título cair no mesmo lugar com ou sem botões ao lado.
+     */
+    <header className="shrink-0 md:pt-2.5">
+      <div className="flex flex-col gap-3 sm:min-h-[34px] sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="vx-titulo-tela break-words">
             {title}
             {contagem && (
               // `tabular-nums` porque o número muda sob os olhos -- sem largura
               // fixa de dígito, o total "pula" a cada filtro aplicado.
-              <span className="ml-2.5 align-baseline text-base font-medium tabular-nums text-muted-foreground">
+              <span className="ml-2.5 align-baseline text-sm font-normal tabular-nums text-muted-foreground">
                 {formatarNumero(contagem.valor)}
                 <span className="sr-only"> {unidade}</span>
               </span>

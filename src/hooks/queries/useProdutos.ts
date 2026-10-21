@@ -24,6 +24,16 @@ export function useProdutos(apenasAtivos = false) {
   });
 }
 
+/** Vendas por produto, receita recorrente, mais vendido e ticket médio. */
+export function useMetricasDeProdutos() {
+  const { orgId } = useOrg();
+  return useQuery({
+    queryKey: ["produtos", orgId ?? "", "metricas"] as const,
+    enabled: !!orgId,
+    queryFn: () => produtosApi.metricas(orgId!),
+  });
+}
+
 /** Invalida as duas variantes: um produto novo entra nas duas listas. */
 function useInvalidar() {
   const qc = useQueryClient();

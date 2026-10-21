@@ -5,9 +5,8 @@ import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
-import { ATIVIDADE_ROTULO } from "@/lib/atividade-tipos";
 import { pluralizar } from "@/lib/formato";
-import { quandoCompleto, type ProximaAtividade } from "@/components/negocios/sinais";
+import { abreviarEtapa, nomeDaAtividade, quandoCompleto, type ProximaAtividade } from "@/components/negocios/sinais";
 
 /**
  * As peças do resumo de um negócio, no desenho do painel lateral do V1.
@@ -51,15 +50,17 @@ export function TrilhaDeEtapas({
     : "bg-primary text-primary-foreground";
 
   return (
-    <ol aria-label="Etapas do funil" className="flex w-full gap-0.5">
+    <ol aria-label="Etapas do funil" className="flex w-full gap-1">
       {etapas.map((e, i) => {
         const feita = i < atual;
         const corrente = i === atual;
         const conteudo = feita
           ? <Check aria-hidden="true" className="h-3.5 w-3.5" />
-          : <span className="truncate">{e.name}</span>;
+          // Só a etapa atual leva o nome inteiro; as outras, abreviadas, com o
+          // nome completo no `title` do item.
+          : <span className="truncate">{corrente ? e.name : abreviarEtapa(e.name)}</span>;
         const classe = cn(
-          "flex h-8 w-full min-w-0 items-center justify-center pl-3 pr-3 text-xs font-medium transition-colors",
+          "flex h-8 w-full min-w-0 items-center justify-center pl-3 pr-2 text-xs font-medium transition-colors",
           feita || corrente ? corFeita : "bg-muted text-muted-foreground",
           corrente && "font-semibold",
           clicavel && !corrente && "hover:bg-accent hover:text-accent-foreground",
@@ -68,7 +69,7 @@ export function TrilhaDeEtapas({
         return (
           // A etapa corrente ganha mais espaço: é a única cujo nome importa
           // ler inteiro, e as outras viram setas curtas.
-          <li key={e.id} className={cn("min-w-0", corrente ? "flex-[2]" : "flex-1")} title={e.name}>
+          <li key={e.id} className={cn("min-w-0", corrente ? "flex-[1.6]" : "flex-1")} title={e.name}>
             {clicavel && !corrente ? (
               <button type="button" onClick={() => onEscolher!(e.id)} className={classe} style={estilo}
                 aria-label={`Mover para ${e.name}`}>
@@ -93,7 +94,7 @@ export function FatosDoNegocio({ fatos }: { fatos: { rotulo: string; valor: Reac
     <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
       {fatos.map((f) => (
         <div key={f.rotulo} className="min-w-0">
-          <dt className="text-xs text-muted-foreground">{f.rotulo}</dt>
+          <dt className="truncate text-label text-muted-foreground">{f.rotulo}</dt>
           <dd className="mt-0.5 truncate text-sm font-semibold text-foreground">{f.valor}</dd>
         </div>
       ))}
@@ -108,19 +109,18 @@ export function AlertaDeAtraso({ proxima, onReagendar }: {
   onReagendar?: () => void;
 }) {
   const { atividade, diasDeAtraso } = proxima;
-  const tipo = ATIVIDADE_ROTULO[atividade.type];
   const quanto = diasDeAtraso === 0 ? "desde hoje" : `${diasDeAtraso} ${pluralizar(diasDeAtraso, "dia")}`;
   return (
-    <div role="status" className="flex items-center gap-3 rounded-lg bg-destructive-soft p-3">
+    <div role="status" title={atividade.title ?? undefined}
+      className="flex items-center gap-3 rounded-lg bg-destructive-soft py-2 pl-3.5 pr-2">
       <Clock aria-hidden="true" className="h-4 w-4 shrink-0 text-destructive" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-destructive">{tipo} atrasada {quanto}</p>
-        <p className="truncate text-xs text-destructive">
-          {atividade.title ? `${atividade.title} · ` : ""}Era {quandoCompleto(atividade.due_date!)}
-        </p>
+        <p className="truncate font-semibold leading-tight text-destructive">{nomeDaAtividade(atividade)} atrasada {quanto}</p>
+        <p className="mt-0.5 truncate text-xs leading-tight text-destructive">Era {quandoCompleto(atividade.due_date!)}</p>
       </div>
       {onReagendar && (
-        <Button size="sm" variant="outline" onClick={onReagendar} className="shrink-0 border-transparent">
+        <Button size="sm" variant="outline" onClick={onReagendar}
+          className="shrink-0 border-transparent bg-card font-semibold text-destructive shadow-sm hover:bg-card hover:text-destructive">
           Reagendar
         </Button>
       )}
@@ -150,11 +150,11 @@ export type AcaoRapida = {
  * e-mail no contato" ensina mais que um botão sumido.
  */
 export function AcoesRapidas({ acoes }: { acoes: AcaoRapida[] }) {
-  const base = "flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-card text-label font-medium text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  const base = "flex h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-border bg-card text-label font-medium text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
   return (
     <div className="grid grid-cols-5 gap-2">
       {acoes.map(({ chave, rotulo, Icone, titulo, onClick, para, desabilitado }) => {
-        const miolo = (<><Icone aria-hidden="true" className="h-4 w-4 text-muted-foreground" /><span className="truncate">{rotulo}</span></>);
+        const miolo = (<><Icone aria-hidden="true" className="h-4 w-4 text-foreground" /><span className="truncate">{rotulo}</span></>);
         if (para && !desabilitado) {
           return <Link key={chave} to={para} title={titulo} className={base}>{miolo}</Link>;
         }

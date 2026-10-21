@@ -41,8 +41,8 @@ describe("todas as abas usam a mesma barra", () => {
     expect(infratores, infratores.join("\n")).toEqual([]);
   });
 
+  // Dashboard saiu: o Visual 01 (p06) não tem abas no Painel.
   const COM_ABAS = [
-    "src/pages/Dashboard.tsx",
     "src/pages/Reports.tsx",
     "src/pages/Settings.tsx",
     "src/pages/Integrations.tsx",

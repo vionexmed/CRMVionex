@@ -49,14 +49,14 @@ describe("indicadores da faixa", () => {
 
   afterEach(() => vi.useRealTimers());
 
-  it("expiram em breve: só enviados ainda válidos em até 2 dias", () => {
+  it("expiram amanhã: só enviados ainda válidos que vencem hoje ou amanhã", () => {
     // `estadoDoOrcamento` olha o relógio real: sem congelá-lo, tudo estaria vencido.
     vi.useFakeTimers();
     vi.setSystemTime(agora);
     const r = resumirOrcamentos([
+      orc({ valido_ate: "2026-05-15" }),
       orc({ valido_ate: "2026-05-16" }),
       orc({ valido_ate: "2026-05-17" }),
-      orc({ valido_ate: "2026-05-18" }),
       orc({ valido_ate: "2026-05-14" }),
       orc({ status: "aprovado", valido_ate: "2026-05-16" }),
     ], agora);

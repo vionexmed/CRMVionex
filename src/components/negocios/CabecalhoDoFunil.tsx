@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatarNumero } from "@/lib/formato";
-import { Iniciais } from "@/components/layout/ListaV1";
+import { AvatarDaPessoa } from "@/components/negocios/AvatarDaPessoa";
 
 /**
  * Funis como pílulas com contagem, no lugar do select "Funil".
@@ -15,7 +15,7 @@ import { Iniciais } from "@/components/layout/ListaV1";
  * mesmo número do indicador "Em aberto" logo abaixo.
  */
 export function SeletorDeFunil({ funis, valor, onChange, contagens, linkNovoFunil }: {
-  funis: { id: string; name: string }[];
+  funis: { id: string; name: string; is_default?: boolean | null }[];
   valor: string;
   onChange: (id: string) => void;
   /** Ausente para um funil: a contagem não aparece (ainda carregando). */
@@ -26,22 +26,26 @@ export function SeletorDeFunil({ funis, valor, onChange, contagens, linkNovoFuni
    */
   linkNovoFunil?: string;
 }) {
+  // O padrão primeiro, os outros por nome: a ordem de criação no banco não diz
+  // nada a quem lê, e mudaria a posição das pílulas a cada funil novo.
+  const ordenados = [...funis].sort((a, b) =>
+    Number(!!b.is_default) - Number(!!a.is_default) || a.name.localeCompare(b.name, "pt-BR"));
   return (
     <div role="group" aria-label="Funis" className="flex min-w-0 flex-wrap items-center gap-2">
-      {funis.map((f) => {
+      {ordenados.map((f) => {
         const ativo = f.id === valor;
         const n = contagens?.get(f.id);
         return (
           <button key={f.id} type="button" aria-pressed={ativo} onClick={() => onChange(f.id)}
             className={cn(
-              "inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              ativo ? "border-transparent bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-surface-2",
+              "inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              ativo ? "border-transparent bg-primary font-semibold text-primary-foreground" : "border-border bg-card font-medium text-foreground hover:bg-surface-2",
             )}>
             {f.name}
             {n !== undefined && (
               <span className={cn(
                 "rounded-full px-1.5 text-xs font-semibold tabular-nums",
-                ativo ? "bg-primary-foreground/20 text-primary-foreground" : "text-muted-foreground",
+                ativo ? "bg-primary-foreground/20 text-primary-foreground" : "px-0 text-muted-foreground",
               )}>
                 {formatarNumero(n)}
               </span>
@@ -60,33 +64,32 @@ export function SeletorDeFunil({ funis, valor, onChange, contagens, linkNovoFuni
 }
 
 /**
- * Quem trabalha o funil: iniciais da equipe, sobrepostas.
+ * Quem trabalha o funil: as iniciais de quem tem negócio ABERTO nele, de quem
+ * tem mais para quem tem menos -- a pilha responde "de quem é este funil?".
  *
  * Só informa -- filtrar por pessoa é o chip "Responsável", e duas portas para o
  * mesmo filtro com aparências diferentes confundiriam qual está ligada. O nome
  * completo de todos vai no `title`, já que as iniciais sozinhas não identificam.
  */
-export function TimeDoFunil({ membros, maximo = 4 }: {
-  membros: { id: string; name: string | null; email?: string | null }[];
+export function TimeDoFunil({ pessoas, tons, maximo = 4 }: {
+  /** Já em ordem. */
+  pessoas: { id: string; name: string | null; email?: string | null }[];
+  /** Tom de cada pessoa, de `tonsDaEquipe`. */
+  tons: Map<string, string>;
   maximo?: number;
 }) {
-  if (membros.length === 0) return null;
-  const visiveis = membros.slice(0, maximo);
-  const resto = membros.length - visiveis.length;
-  const nomes = membros.map((m) => m.name || m.email || "Sem nome").join(", ");
+  if (pessoas.length === 0) return null;
+  // Sem "+N": a pilha mostra os que mais carregam o funil, e o `title` lista
+  // todos -- um quinto círculo só com número disputaria com as iniciais.
+  const visiveis = pessoas.slice(0, maximo);
+  const nomes = pessoas.map((m) => m.name || m.email || "Sem nome").join(", ");
   return (
     <div title={nomes} aria-label={`Time: ${nomes}`}
-      className="flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-card pl-1.5 pr-3">
-      <div className="flex -space-x-1.5">
+      className="flex h-[42px] shrink-0 items-center gap-2.5 rounded-lg border border-border bg-card pl-2 pr-3.5 shadow-sm">
+      <div className="flex -space-x-1">
         {visiveis.map((m) => (
-          <Iniciais key={m.id} nome={m.name || m.email} tamanho="sm" className="ring-2 ring-card" />
+          <AvatarDaPessoa key={m.id} nome={m.name || m.email} tom={tons.get(m.id)} tamanho="md" className="ring-2 ring-card" />
         ))}
-        {resto > 0 && (
-          <span aria-hidden="true"
-            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-label font-semibold text-muted-foreground ring-2 ring-card">
-            +{resto}
-          </span>
-        )}
       </div>
       <span className="text-sm font-medium text-foreground">Time</span>
     </div>

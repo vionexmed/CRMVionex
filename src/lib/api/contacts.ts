@@ -10,6 +10,30 @@ type ContactUpdate = Database["public"]["Tables"]["contacts"]["Update"];
 
 export const PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
+/**
+ * `contacts` + `ultimo_contato` (migração 20261021130000). Não está nos tipos
+ * gerados, então a linha ganha o campo opcional aqui.
+ */
+export const VISAO_COM_ULTIMO_CONTATO = "contatos_com_ultimo_contato";
+export type ContactRow = Contact & { ultimo_contato?: string | null };
+
+/** Dias sem interação a partir dos quais o contato entra em "sem resposta". */
+export const DIAS_SEM_RESPOSTA = 3;
+
+export type ContactSortKey =
+  | "name" | "email" | "status" | "created_at" | "title"
+  | "lifecycle_stage" | "lead_score" | "last_contact";
+
+/**
+ * A visão some quando a migração ainda não foi aplicada: lembrar disso evita
+ * repetir uma consulta que sabidamente falha a cada troca de página.
+ */
+let visaoIndisponivel = false;
+const erroDeRelacaoAusente = (e: unknown) => {
+  const code = (e as { code?: string } | null)?.code;
+  return code === "42P01" || code === "PGRST205" || code === "PGRST200";
+};
+
 export interface ContactListParams {
   page?: number;
   pageSize?: number;
@@ -20,6 +44,17 @@ export interface ContactListParams {
    * existia opção para lead nem para "em negociação".
    */
   lifecycleStage?: string;
+  /**
+   * Vários estágios de uma vez ("Estágio: Lead, Qualificado, Oportunidade").
+   * Vazio = sem filtro. Se `lifecycleStage` também vier, os dois valem (AND).
+   */
+  lifecycleStages?: string[];
+  /**
+   * "Sem resposta há 3+ dias": a última interação (atividade concluída,
+   * mensagem ou e-mail enviado) tem mais de `DIAS_SEM_RESPOSTA` dias. Só existe
+   * na visão; clientes e descartados ficam de fora -- não esperam retorno.
+   */
+  semResposta?: boolean;
   ownerId?: string;
   companyId?: string;
   country?: string;
@@ -40,12 +75,12 @@ export interface ContactListParams {
    * `listarCidades`, então a contagem ao lado de cada um bate com o resultado.
    */
   city?: string;
-  sortKey?: "name" | "email" | "status" | "created_at" | "title";  // "status" mantido: é a coluna de ordenação do cabeçalho da tabela
+  sortKey?: ContactSortKey;  // "status" mantido: é a coluna de ordenação do cabeçalho da tabela
   sortDir?: "asc" | "desc";
 }
 
 export interface ContactListResult {
-  data: Contact[];
+  data: ContactRow[];
   count: number;
 }
 
@@ -55,8 +90,9 @@ export interface ContactListResult {
  */
 const sanitizeSearch = (s: string) => s.replace(/[,()"\\]/g, " ").trim();
 
-const buildListQuery = (orgId: string, params: ContactListParams) => {
-  const { search, lifecycleStage, ownerId, companyId, country, city, createdFrom, createdTo, origin, sortKey = "created_at", sortDir = "desc" } = params;
+const buildListQuery = (orgId: string, params: ContactListParams, fonte: string = TABLES.CONTACTS) => {
+  const naVisao = fonte === VISAO_COM_ULTIMO_CONTATO;
+  const { search, lifecycleStage, lifecycleStages, semResposta, ownerId, companyId, country, city, createdFrom, createdTo, origin, sortKey = "created_at", sortDir = "desc" } = params;
 
   // Contatos é a lista de TODAS as pessoas da organização.
   //
@@ -69,13 +105,22 @@ const buildListQuery = (orgId: string, params: ContactListParams) => {
   // nunca apareciam no funil. A tela escondia gente sem dizer, e a contagem no
   // topo não era o total de pessoas.
   let query = supabase
-    .from(TABLES.CONTACTS)
+    .from(fonte as typeof TABLES.CONTACTS)
     .select("*", { count: "exact" })
     .eq("org_id", orgId);
 
   // Ciclo de vida: a coluna que vale. `status` é legado.
   if (lifecycleStage && lifecycleStage !== "all") {
     query = query.eq("lifecycle_stage", lifecycleStage as LifecycleStage);
+  }
+  if (lifecycleStages && lifecycleStages.length > 0) {
+    query = query.in("lifecycle_stage", lifecycleStages as LifecycleStage[]);
+  }
+  if (semResposta && naVisao) {
+    const limite = new Date(Date.now() - DIAS_SEM_RESPOSTA * 86_400_000).toISOString();
+    query = query
+      .filter("ultimo_contato", "lt", limite)
+      .not("lifecycle_stage", "in", "(customer,disqualified)");
   }
   if (ownerId && ownerId !== "all") query = query.eq("owner_id", ownerId);
   if (companyId && companyId !== "all") query = query.eq("company_id", companyId);
@@ -132,6 +177,16 @@ const buildListQuery = (orgId: string, params: ContactListParams) => {
   const ascending = sortDir === "asc";
   if (sortKey === "name") {
     query = query.order("first_name", { ascending }).order("last_name", { ascending });
+  } else if (sortKey === "last_contact") {
+    // Sem a visão não há de onde tirar o último contato: cai para a data de
+    // criação, o que mantém a lista utilizável até a migração subir.
+    // `nullsFirst: false` porque o Postgres põe NULL primeiro em ordem
+    // decrescente, e "nunca contatado" não é o contato mais recente.
+    query = naVisao
+      ? query.order("ultimo_contato", { ascending, nullsFirst: false }).order("created_at", { ascending: false })
+      : query.order("created_at", { ascending });
+  } else if (sortKey === "lead_score") {
+    query = query.order("lead_score", { ascending, nullsFirst: false }).order("created_at", { ascending: false });
   } else {
     query = query.order(sortKey, { ascending });
   }
@@ -237,9 +292,18 @@ export const contactsApi = {
   list: async (orgId: string, params: ContactListParams = {}): Promise<ContactListResult> => {
     const { page = 0, pageSize = PAGE_SIZE } = params;
     const from = page * pageSize;
-    const query = buildListQuery(orgId, params).range(from, from + pageSize - 1);
+    const consultar = (fonte: string) => buildListQuery(orgId, params, fonte).range(from, from + pageSize - 1);
 
-    const { data, error, count } = await query;
+    if (!visaoIndisponivel) {
+      const r = await consultar(VISAO_COM_ULTIMO_CONTATO);
+      if (!r.error) return { data: (r.data ?? []) as ContactRow[], count: r.count ?? 0 };
+      if (!erroDeRelacaoAusente(r.error)) throw r.error;
+      visaoIndisponivel = true;
+    }
+    // Sem a visão, "sem resposta" não tem como ser respondido: devolver a lista
+    // inteira sob esse rótulo seria mentir, então a lista vem vazia.
+    if (params.semResposta) return { data: [], count: 0 };
+    const { data, error, count } = await consultar(TABLES.CONTACTS);
     if (error) throw error;
     return { data: data ?? [], count: count ?? 0 };
   },
@@ -249,8 +313,33 @@ export const contactsApi = {
    * 1000 para contornar o max-rows do PostgREST. Usado na exportação CSV e
    * na visão kanban por vendedor.
    */
-  listAll: async (orgId: string, params: ContactListParams = {}): Promise<Contact[]> =>
-    buscarEmBlocos<Contact>((inicio, fim) => buildListQuery(orgId, params).range(inicio, fim)),
+  listAll: async (orgId: string, params: ContactListParams = {}): Promise<Contact[]> => {
+    // "Sem resposta" só existe na visão. Exportar com esse filtro e receber a
+    // base inteira seria pior que não exportar.
+    const precisaDaVisao = !!params.semResposta;
+    if (precisaDaVisao && visaoIndisponivel) return [];
+    const fonte = precisaDaVisao ? VISAO_COM_ULTIMO_CONTATO : TABLES.CONTACTS;
+    try {
+      return await buscarEmBlocos<Contact>((inicio, fim) => buildListQuery(orgId, params, fonte).range(inicio, fim));
+    } catch (e) {
+      if (precisaDaVisao && erroDeRelacaoAusente(e)) { visaoIndisponivel = true; return []; }
+      throw e;
+    }
+  },
+
+  /**
+   * Quantos contatos há em "sem resposta há 3+ dias". `null` quando a visão
+   * ainda não existe no banco: a aba some do número em vez de mostrar zero.
+   */
+  contarSemResposta: async (orgId: string): Promise<number | null> => {
+    if (visaoIndisponivel) return null;
+    const r = await buildListQuery(orgId, { semResposta: true }, VISAO_COM_ULTIMO_CONTATO).range(0, 0);
+    if (r.error) {
+      if (erroDeRelacaoAusente(r.error)) { visaoIndisponivel = true; return null; }
+      throw r.error;
+    }
+    return r.count ?? 0;
+  },
 
   /**
    * Lista leve para pickers (selects de contato em Negócios/Tarefas).

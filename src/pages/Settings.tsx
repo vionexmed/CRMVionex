@@ -5,7 +5,7 @@
  * as edições futuras. Por isso as abas de organização (Geral, Funis e etapas,
  * Campos, Assinatura, Plano) só aparecem para owner/admin.
  *
- * As abas pessoais (Notificações, Aparência) valem para qualquer papel. Antes a
+ * As abas pessoais (Perfil, Notificações, Aparência, Design system) valem para qualquer papel. Antes a
  * página inteira estava atrás de RequireAdmin, então um funcionário não conseguia
  * nem trocar o próprio tema.
  */
@@ -20,37 +20,43 @@ import { CustomFieldsTab } from "@/components/settings/CustomFieldsTab";
 import { EmailSignatureTab } from "@/components/settings/EmailSignatureTab";
 import { NotificationsTab } from "@/components/settings/NotificationsTab";
 import { AppearanceTab } from "@/components/settings/AppearanceTab";
+import { ProfileTab } from "@/components/settings/ProfileTab";
+import { DesignSystemTab } from "@/components/settings/DesignSystemTab";
 import { BillingTab } from "@/components/settings/BillingTab";
 import { PageTabs } from "@/components/layout/PageTabs";
-import { Bell, CreditCard, FormInput, GitBranch, Palette, SlidersHorizontal } from "lucide-react";
+import { Bell, CreditCard, FormInput, GitBranch, Layers, Palette, SlidersHorizontal, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageShell } from "@/components/layout/PageShell";
 
-const ABAS_PESSOAIS = ["notifications", "appearance"] as const;
+/** Perfil, Notificações, Aparência e Design system valem para qualquer papel. */
+const ABAS_PESSOAIS = ["profile", "notifications", "appearance", "design-system"] as const;
 const ABAS_ADMIN = [
-  "general", "pipelines", "custom-fields", "email-signature", "notifications", "appearance", "billing",
+  "profile", "general", "pipelines", "custom-fields", "email-signature", "notifications", "appearance", "billing", "design-system",
 ] as const;
 
-/** Grupos da navegação lateral. Os valores são os de `?aba=`, então links antigos seguem valendo.
- *  "Perfil" não tem aba própria: o perfil pessoal mora em Geral (só admin), e
- *  duplicar o item levaria à mesma tela com dois nomes. */
+/** Grupos da navegação lateral. Os valores são os de `?aba=`, então links antigos seguem valendo. */
 const GRUPOS = [
   {
     rotulo: "Você",
     itens: [
-      { valor: "notifications", rotulo: "Notificações", admin: false },
-      { valor: "appearance", rotulo: "Aparência", admin: false },
+      { valor: "profile", rotulo: "Perfil", admin: false, novo: false },
+      { valor: "notifications", rotulo: "Notificações", admin: false, novo: false },
+      { valor: "appearance", rotulo: "Aparência", admin: false, novo: false },
     ],
   },
   {
     rotulo: "Empresa",
     itens: [
-      { valor: "general", rotulo: "Geral", admin: true },
-      { valor: "pipelines", rotulo: "Funis e etapas", admin: true },
-      { valor: "custom-fields", rotulo: "Campos personalizados", admin: true },
-      { valor: "email-signature", rotulo: "Assinatura de e-mail", admin: true },
-      { valor: "billing", rotulo: "Plano e cobrança", admin: true },
+      { valor: "general", rotulo: "Geral", admin: true, novo: false },
+      { valor: "pipelines", rotulo: "Funis e etapas", admin: true, novo: false },
+      { valor: "custom-fields", rotulo: "Campos personalizados", admin: true, novo: false },
+      { valor: "email-signature", rotulo: "Assinatura de e-mail", admin: true, novo: false },
+      { valor: "billing", rotulo: "Plano e cobrança", admin: true, novo: false },
     ],
+  },
+  {
+    rotulo: "Sistema",
+    itens: [{ valor: "design-system", rotulo: "Design system", admin: false, novo: true }],
   },
 ] as const;
 
@@ -62,7 +68,7 @@ export default function Settings() {
   // válidas segue o papel, então `?aba=billing` de um funcionário cai no padrão.
   const validas = isAdmin ? ABAS_ADMIN : ABAS_PESSOAIS;
   const [aba, setAba] = useAbaNaUrl(
-    "aba", isAdmin ? "general" : "notifications", validas,
+    "aba", "profile", validas,
   );
   const grupos = GRUPOS
     .map((g) => ({ ...g, itens: g.itens.filter((i) => isAdmin || !i.admin) }))
@@ -70,6 +76,8 @@ export default function Settings() {
 
   return (
     <PageShell
+      // A referência desta tela começa 11px acima das demais (sem o respiro do cabeçalho).
+      className="md:-mt-[11px]"
       title="Configurações"
       description="Seu perfil, a empresa e como o Vionex se parece para todo o time."
     >
@@ -78,6 +86,7 @@ export default function Settings() {
         <div className="lg:hidden">
           <PageTabs
             abas={[
+              { valor: "profile", rotulo: "Perfil", icone: User },
               ...(isAdmin
                 ? [
                     { valor: "general", rotulo: "Geral", icone: SlidersHorizontal },
@@ -89,6 +98,7 @@ export default function Settings() {
               { valor: "notifications", rotulo: "Notificações", icone: Bell, rotuloCurto: "Notif." },
               { valor: "appearance", rotulo: "Aparência", icone: Palette },
               ...(isAdmin ? [{ valor: "billing", rotulo: "Plano", icone: CreditCard }] : []),
+              { valor: "design-system", rotulo: "Design system", icone: Layers, rotuloCurto: "Design" },
             ]}
           />
         </div>
@@ -107,11 +117,12 @@ export default function Settings() {
                         onClick={() => setAba(item.valor)}
                         aria-current={ativo ? "page" : undefined}
                         className={cn(
-                          "flex min-h-8 w-full items-center rounded-md px-3 text-left text-sm transition-colors",
+                          "flex min-h-[34px] w-full items-center justify-between rounded-md px-3 text-left text-sm transition-colors",
                           ativo ? "bg-accent font-semibold text-accent-foreground" : "text-foreground hover:bg-muted",
                         )}
                       >
                         {item.rotulo}
+                        {item.novo && <span className="vx-selo-nav rounded-full bg-primary px-2 py-1 font-bold uppercase tracking-wide text-primary-foreground">Novo</span>}
                       </button>
                     </li>
                   );
@@ -125,7 +136,7 @@ export default function Settings() {
           {isAdmin && (
             <>
               <TabsContent value="general" className="mt-0">
-                <GeneralTab orgId={orgId} userId={user?.id} profile={profile} />
+                <GeneralTab orgId={orgId} />
               </TabsContent>
               <TabsContent value="pipelines" className="mt-0">
                 <PipelinesTab orgId={orgId} />
@@ -141,6 +152,12 @@ export default function Settings() {
               </TabsContent>
             </>
           )}
+          <TabsContent value="profile" className="mt-0">
+            <ProfileTab userId={user?.id} profile={profile} />
+          </TabsContent>
+          <TabsContent value="design-system" className="mt-0">
+            <DesignSystemTab />
+          </TabsContent>
           <TabsContent value="notifications" className="mt-0">
             <NotificationsTab orgId={orgId} userId={user?.id} />
           </TabsContent>

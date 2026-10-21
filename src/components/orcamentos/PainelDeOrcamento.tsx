@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Copy, Check, Mail, Pencil, ExternalLink, Loader2, Eye } from "lucide-react";
+import { Copy, Check, Mail, Pencil, ExternalLink, Loader2, BookmarkPlus } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { mensagemErro } from "@/lib/erro-supabase";
-import { formatarMoeda, formatarData, formatarDataHora, formatarTempoRelativo } from "@/lib/formato";
+import { formatarMoeda, formatarDataHora } from "@/lib/formato";
 import { nomeDoContato } from "@/lib/contato-formato";
 import { totaisDoOrcamento, type OrcamentoComRelacoes } from "@/lib/api/orcamentos";
 import { SeloDeOrcamento } from "@/components/orcamentos/SeloDeOrcamento";
@@ -12,7 +12,13 @@ import { Iniciais } from "@/components/layout/ListaV1";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { useMembers } from "@/hooks/queries/useMembers";
-import { clienteDoOrcamento, codigoDoOrcamento } from "@/lib/orcamento-resumo";
+import { clienteDoOrcamento, codigoDoOrcamento, dataCurtaSemPonto, resumoDeVisualizacoes } from "@/lib/orcamento-resumo";
+import { CartaoDaProposta } from "@/components/orcamentos/CartaoDaProposta";
+import { tintaDe } from "@/components/orcamentos/TabelaDeOrcamentos";
+import { diasDeValidade } from "@/lib/orcamento-modelos";
+import { FormularioDeModelo, type ModeloInicial } from "@/components/orcamentos/ModelosDeOrcamento";
+import { useAuth } from "@/contexts/AuthContext";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { estadoDoOrcamento } from "@/lib/orcamento-calculo";
 import { useAtualizarOrcamento } from "@/hooks/queries/useOrcamentos";
 import { useUpdateDeal } from "@/hooks/queries/useDeals";
@@ -82,6 +88,9 @@ function CorpoDoOrcamento({
 
   const [copiado, setCopiado] = useState(false);
   const [compondo, setCompondo] = useState(false);
+  const [aceitando, setAceitando] = useState(false);
+  const [comoModelo, setComoModelo] = useState<ModeloInicial | null>(null);
+  const { user } = useAuth();
 
   const itens = (orcamento.itens ?? []).map((i) => ({
     preco_unit: Number(i.preco_unit),
@@ -91,8 +100,12 @@ function CorpoDoOrcamento({
   const totais = totaisDoOrcamento(itens, Number(orcamento.desconto) || 0);
 
   const { nome: cliente } = clienteDoOrcamento(orcamento);
+  // "Dr. Henrique Prado": o tratamento só entra se `title` for mesmo um
+  // tratamento -- o campo também guarda cargo ("Diretor"), que não cabe antes do nome.
+  const tratamento = /^(dra?|sra?|prof\.?)\.?$/i.test(orcamento.contact?.title?.trim() ?? "")
+    ? `${orcamento.contact!.title!.trim().replace(/\.?$/, ".")} ` : "";
   const pessoa = orcamento.contact
-    ? nomeDoContato(orcamento.contact.first_name, orcamento.contact.last_name)
+    ? tratamento + nomeDoContato(orcamento.contact.first_name, orcamento.contact.last_name)
     : "Sem contato";
   const link = linkPublico(orcamento.token);
   const estado = estadoDoOrcamento(orcamento);
@@ -152,130 +165,125 @@ function CorpoDoOrcamento({
     }
   };
 
+  /**
+   * Registra o aceite pela equipe (cliente que respondeu por telefone ou
+   * WhatsApp). Diz QUEM registrou em `decidido_por`: sem isso, "o cliente
+   * aprovou" e "o vendedor marcou como aprovado" seriam indistinguíveis.
+   */
+  const aceitar = async () => {
+    const quem = membros.find((m) => m.id === user?.id)?.name ?? "a equipe";
+    try {
+      await atualizar.mutateAsync({
+        id: orcamento.id,
+        patch: { status: "aprovado", decidido_em: new Date().toISOString(), decidido_por: `Registrado por ${quem}` },
+      });
+      setAceitando(false);
+    } catch (e: unknown) {
+      toast({ title: "Não foi possível registrar o aceite", description: mensagemErro(e), variant: "destructive" });
+    }
+  };
+
+  const salvarComoModelo = () =>
+    setComoModelo({
+      nome: "",
+      titulo: orcamento.titulo,
+      itens: (orcamento.itens ?? []).map((i) => ({
+        produto_id: i.produto_id, nome: i.nome, descricao: i.descricao, unidade: i.unidade,
+        preco_unit: Number(i.preco_unit), quantidade: Number(i.quantidade), desconto: Number(i.desconto),
+      })),
+      validade_dias: diasDeValidade(orcamento.valido_ate),
+      desconto: Number(orcamento.desconto) || 0,
+      condicoes: orcamento.condicoes ?? null,
+      observacoes: orcamento.observacoes,
+    });
+
   const codigo = codigoDoOrcamento(orcamento.numero);
+  const linhas = (orcamento.itens ?? []).map((i) => ({
+    nome: i.nome,
+    apoio: i.descricao || `${Number(i.quantidade)} ${i.unidade} × ${formatarMoeda(Number(i.preco_unit), orcamento.moeda)}`,
+    valor: Math.max(0, Number(i.preco_unit) * Number(i.quantidade) - Number(i.desconto)),
+  }));
+  const visitas = resumoDeVisualizacoes(orcamento);
 
   return (
     <>
-      <div className="shrink-0 border-b border-border p-5">
+      <div className="shrink-0 p-5 pb-3">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             {emGaveta ? (
-              <SheetTitle className="truncate font-mono text-base font-semibold">{codigo}</SheetTitle>
+              <SheetTitle className="vx-titulo-painel truncate">{codigo}</SheetTitle>
             ) : (
-              <h2 className="vx-titulo-painel truncate font-mono">{codigo}</h2>
+              <h2 className="vx-titulo-painel truncate">{codigo}</h2>
             )}
-            <p className="vx-subtitulo mt-0.5 flex items-center gap-1.5">
-              {orcamento.visto_em ? (
-                <>
-                  <Eye aria-hidden="true" className="h-3.5 w-3.5 text-info" />
-                  Visualizado {formatarTempoRelativo(orcamento.visto_em)}
-                </>
-              ) : (
-                <SeloDeOrcamento orcamento={orcamento} />
-              )}
-            </p>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {visitas ?? <SeloDeOrcamento orcamento={orcamento} />}
+            </div>
           </div>
-          {dono && <span title={dono} className={cn("shrink-0", emGaveta && "mr-8")}><Iniciais nome={dono} destaque /></span>}
+          {dono && <span title={dono} className={cn("shrink-0", emGaveta && "mr-8")}><Iniciais nome={dono} className={cn("h-7 w-7", tintaDe(dono))} /></span>}
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5">
         {/* ── A proposta, como o cliente a lê ── */}
-        <section className="rounded-lg border border-border bg-surface-2 p-3">
-          <div className="rounded-md bg-card p-4">
-            <div className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2">
-                <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">V</span>
-                <span className="text-sm font-semibold">Vionex</span>
-              </span>
-              {orcamento.valido_ate && (
-                <span className={cn("text-xs", estado === "expirado" ? "font-semibold text-warning" : "text-muted-foreground")}>
-                  válido até {formatarData(orcamento.valido_ate)}
-                </span>
-              )}
-            </div>
-
-            <h3 className="vx-titulo-painel mt-4">Proposta comercial</h3>
-            <p className="vx-subtitulo mt-0.5">
-              Para {cliente}{cliente !== pessoa && orcamento.contact ? ` · ${pessoa}` : ""}
-            </p>
-
-            <ul className="mt-3 divide-y divide-border">
-              {(orcamento.itens ?? []).map((i) => (
-                <li key={i.id} className="flex items-start justify-between gap-3 py-2.5">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{i.nome}</p>
-                    <p className="text-xs tabular-nums text-muted-foreground">
-                      {Number(i.quantidade)} {i.unidade} × {formatarMoeda(Number(i.preco_unit), orcamento.moeda)}
-                    </p>
-                  </div>
-                  <p className="shrink-0 text-sm font-semibold tabular-nums">
-                    {formatarMoeda(
-                      Math.max(0, Number(i.preco_unit) * Number(i.quantidade) - Number(i.desconto)),
-                      orcamento.moeda,
-                    )}
-                  </p>
-                </li>
-              ))}
-            </ul>
-
-            <div className="space-y-1.5 border-t border-border pt-3 text-sm">
-              {totais.desconto > 0 && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span className="tabular-nums">{formatarMoeda(totais.subtotal, orcamento.moeda)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Desconto</span>
-                    <span className="font-medium tabular-nums text-success">
-                      − {formatarMoeda(totais.desconto, orcamento.moeda)}
-                    </span>
-                  </div>
-                </>
-              )}
-              <div className="flex items-baseline justify-between pt-1">
-                <span className="font-semibold">Total</span>
-                <span className="text-xl font-bold tabular-nums">
-                  {formatarMoeda(totais.total, orcamento.moeda)}
-                </span>
-              </div>
-            </div>
-
+        <section className="rounded-lg border border-border bg-surface-2 p-5">
+          <CartaoDaProposta
+            marca="Vionex"
+            validade={orcamento.valido_ate ? dataCurtaSemPonto(orcamento.valido_ate) : null}
+            vencida={estado === "expirado"}
+            para={`${cliente}${cliente !== pessoa && orcamento.contact ? ` · ${pessoa}` : ""}`}
+            linhas={linhas}
+            desconto={totais.desconto}
+            total={totais.total}
+            moeda={orcamento.moeda}
+            condicoes={orcamento.condicoes}
+          >
             {orcamento.status === "rascunho" ? (
-              <Button className="mt-4 w-full" onClick={marcarEnviado} disabled={atualizar.isPending}>
+              <Button className="w-full" onClick={marcarEnviado} disabled={atualizar.isPending}>
                 {atualizar.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                 Marcar como enviado
               </Button>
+            ) : orcamento.status === "enviado" && estado !== "expirado" ? (
+              <Button className="w-full" onClick={() => setAceitando(true)}>Aceitar proposta</Button>
             ) : (
-              <Button className="mt-4 w-full" onClick={copiar}>
-                {copiado ? <Check className="mr-1.5 h-4 w-4" /> : <Copy className="mr-1.5 h-4 w-4" />}
-                {copiado ? "Link copiado" : "Copiar link da proposta"}
+              <Button className="w-full" disabled variant="secondary">
+                {aprovado ? "Proposta aceita" : orcamento.status === "recusado" ? "Proposta recusada" : "Proposta vencida"}
               </Button>
             )}
-          </div>
+          </CartaoDaProposta>
         </section>
 
-        {/* ── O link do cliente ── */}
+        {/* ── Ações ── */}
         <section className="space-y-2">
-          <p className="break-all rounded-md bg-muted/50 p-2 text-xs tabular-nums text-muted-foreground">{link}</p>
-          <div className="flex flex-wrap gap-2">
-            {orcamento.status === "rascunho" && (
-              <Button variant="outline" size="sm" onClick={copiar}>
-                {copiado ? <Check className="mr-1 h-3.5 w-3.5 text-success" /> : <Copy className="mr-1 h-3.5 w-3.5" />}
-                {copiado ? "Copiado" : "Copiar"}
-              </Button>
-            )}
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant="outline" size="sm" onClick={copiar}>
+              {copiado ? <Check className="mr-1 h-3.5 w-3.5 text-success" /> : <Copy className="mr-1 h-3.5 w-3.5" />}
+              {copiado ? "Copiado" : "Copiar link"}
+            </Button>
             <Button variant="outline" size="sm"
               disabled={!orcamento.contact?.email}
               title={orcamento.contact?.email ? undefined : "O contato não tem e-mail"}
               onClick={() => setCompondo(true)}>
-              <Mail className="mr-1 h-3.5 w-3.5" />Enviar por e-mail
+              <Mail className="mr-1 h-3.5 w-3.5" />E-mail
             </Button>
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild>
               <a href={link} target="_blank" rel="noreferrer">
                 <ExternalLink className="mr-1 h-3.5 w-3.5" />Ver como cliente
               </a>
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Editar só antes da decisão: mudar item de orçamento já aprovado
+                faria o CRM discordar do que o cliente aprovou por escrito. */}
+            <Button
+              variant="ghost" size="sm"
+              disabled={!!orcamento.decidido_em}
+              title={orcamento.decidido_em ? "O cliente já respondeu — não dá para alterar" : undefined}
+              onClick={() => aoEditar(orcamento)}
+            >
+              <Pencil className="mr-1 h-3.5 w-3.5" />Editar
+            </Button>
+            <Button variant="ghost" size="sm" onClick={salvarComoModelo} disabled={linhas.length === 0}>
+              <BookmarkPlus className="mr-1 h-3.5 w-3.5" />Salvar como modelo
             </Button>
           </div>
         </section>
@@ -286,6 +294,7 @@ function CorpoDoOrcamento({
             ["Criado", orcamento.created_at],
             ["Enviado", orcamento.enviado_em],
             ["Visto pelo cliente", orcamento.visto_em],
+            ["Última visualização", orcamento.ultima_visualizacao_em && orcamento.ultima_visualizacao_em !== orcamento.visto_em ? orcamento.ultima_visualizacao_em : null],
             [
               orcamento.status === "recusado" ? "Recusado" : "Aprovado",
               orcamento.decidido_em,
@@ -341,18 +350,25 @@ function CorpoDoOrcamento({
         )}
       </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border p-4">
-        {/* Editar só antes da decisão: mudar item de orçamento já aprovado
-            faria o CRM discordar do que o cliente aprovou por escrito. */}
-        <Button
-          variant="outline" size="sm"
-          disabled={!!orcamento.decidido_em}
-          title={orcamento.decidido_em ? "O cliente já respondeu — não dá para alterar" : undefined}
-          onClick={() => aoEditar(orcamento)}
-        >
-          <Pencil className="mr-1 h-3.5 w-3.5" />Editar
-        </Button>
-      </div>
+      <FormularioDeModelo inicial={comoModelo} aoFechar={() => setComoModelo(null)} />
+
+      <Dialog open={aceitando} onOpenChange={setAceitando}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="vx-titulo-painel">Registrar aceite de {codigo}?</DialogTitle>
+            <DialogDescription className="text-xs">
+              Use quando o cliente aceitou fora do link (telefone, WhatsApp). O orçamento passa a
+              “Aceito” e deixa de poder ser editado.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setAceitando(false)} disabled={atualizar.isPending}>Cancelar</Button>
+            <Button size="sm" onClick={aceitar} disabled={atualizar.isPending}>
+              {atualizar.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Registrar aceite
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* O compositor já vincula ao contato e ao negócio, então o envio entra no
           histórico. O link vai no corpo. */}

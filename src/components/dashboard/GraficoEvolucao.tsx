@@ -20,7 +20,7 @@ import { useId, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { formatarNumero, pluralizar } from "@/lib/formato";
 import { useHoverTooltip } from "./svg/useHoverTooltip";
-import { dataDoDia, diaComSemana, diaCurto } from "./periodo-do-painel";
+import { dataDoDia, diaComSemana, diaCurto, projetar } from "./periodo-do-painel";
 
 export type PontoDoDia = { dia: string; valor: number };
 
@@ -52,7 +52,7 @@ export function GraficoEvolucao({
   rotuloComparacao,
   projecao,
   acao,
-  altura = 240,
+  altura = 174,
 }: {
   titulo: string;
   /** Singular e plural do que se conta: "lead"/"leads". */
@@ -84,8 +84,9 @@ export function GraficoEvolucao({
   const melhor = pontos.reduce<PontoDoDia | null>((m, p) => (!m || p.valor > m.valor ? p : m), null);
   const nome = (n: number) => pluralizar(Math.round(n), unidade.singular, unidade.plural);
 
-  // Rótulos ralos: com 30 dias, mostrar todos vira borrão.
-  const passoRotulo = Math.max(1, Math.ceil(total / 5));
+  // Rótulos ralos: com 30 dias, mostrar todos vira borrão. Seis por eixo, como
+  // na referência (1, 3, 5, 7, 9 e 11 out).
+  const passoRotulo = Math.max(1, Math.ceil(total / 6));
   const xDe = (i: number) => (total > 1 ? (i / (total - 1)) * 100 : 50);
   const yDe = (v: number) => 100 - (v / teto) * 100;
 
@@ -98,16 +99,16 @@ export function GraficoEvolucao({
 
   return (
     <div className="min-w-0">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-[var(--respiro)] pt-[var(--respiro)]">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-[var(--respiro)] pt-[calc(var(--respiro)-3px)]">
         <p className="text-sm font-semibold">{titulo}</p>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral">
           <span className="flex items-center gap-1.5">
-            <span aria-hidden className="h-0.5 w-4 rounded-full bg-primary" />
+            <span aria-hidden className="h-[3px] w-3.5 rounded-full bg-primary" />
             {legendaAtual}
           </span>
           {legendaAnterior && anteriorVisivel && (
             <span className="flex items-center gap-1.5">
-              <span aria-hidden className="w-4 border-t-2 border-dashed border-muted-foreground" />
+              <span aria-hidden className="w-3.5 border-t-2 border-dashed border-muted-foreground" />
               {legendaAnterior}
             </span>
           )}
@@ -120,9 +121,9 @@ export function GraficoEvolucao({
           O gráfico aparece a partir do segundo dia do período.
         </p>
       ) : (
-        <div className="flex gap-2 px-[var(--respiro)] pb-2 pt-4">
+        <div className="flex gap-3 px-[var(--respiro)] pb-1.5 pt-6">
           {/* Eixo Y fora do SVG: não distorce com preserveAspectRatio="none". */}
-          <div className="relative w-7 shrink-0 text-right text-label tabular-nums text-muted-foreground" style={{ height: altura }} aria-hidden>
+          <div className="relative w-5 shrink-0 text-right text-label tabular-nums text-muted-foreground" style={{ height: altura }} aria-hidden>
             {marcas.map((m) => (
               <span key={m} className="absolute right-0 -translate-y-1/2" style={{ top: `${yDe(m)}%` }}>
                 {formatarNumero(m)}
@@ -148,8 +149,10 @@ export function GraficoEvolucao({
               >
                 <defs>
                   <linearGradient id={`area-${idGrad}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" style={{ stopColor: "hsl(var(--primary))", stopOpacity: 0.16 }} />
-                    <stop offset="100%" style={{ stopColor: "hsl(var(--primary))", stopOpacity: 0.02 }} />
+                    {/* Área chapada, como na referência: o degradê sumia perto do
+                        eixo e os dias fracos pareciam sem dado. */}
+                    <stop offset="0%" style={{ stopColor: "hsl(var(--primary))", stopOpacity: 0.12 }} />
+                    <stop offset="100%" style={{ stopColor: "hsl(var(--primary))", stopOpacity: 0.12 }} />
                   </linearGradient>
                 </defs>
 
@@ -202,8 +205,8 @@ export function GraficoEvolucao({
                       o tema, então ela sempre contrasta com o cartão embaixo. */}
                   <div
                     className={cn(
-                      "pointer-events-none absolute top-2 z-10 min-w-[140px] rounded-md bg-foreground px-3 py-2 text-xs text-background shadow-md",
-                      iHover > total * 0.6 ? "-translate-x-[calc(100%+12px)]" : "translate-x-3",
+                      "pointer-events-none absolute top-3.5 z-10 min-w-[140px] rounded-md bg-foreground px-3 py-2 text-label text-background shadow-md",
+                      iHover > total * 0.6 ? "-translate-x-[calc(100%+14px)]" : "translate-x-3.5",
                     )}
                     style={{ left: `${xDe(iHover)}%` }}
                   >
@@ -245,7 +248,7 @@ export function GraficoEvolucao({
       )}
 
       {total > 0 && (
-        <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 border-t border-border px-[var(--respiro)] py-3 text-xs text-muted-foreground">
+        <dl className="flex flex-wrap gap-x-6 gap-y-1 border-t border-border px-[var(--respiro)] py-3 text-xs text-muted-foreground">
           <div className="flex gap-1">
             <dt>Média</dt>
             <dd className="font-semibold text-foreground tabular-nums">
@@ -266,7 +269,7 @@ export function GraficoEvolucao({
             <div className="flex gap-1">
               <dt>Projeção do {projecao.nomeDoPeriodo}</dt>
               <dd className="font-semibold text-foreground tabular-nums">
-                ≈ {formatarNumero(Math.round(media * projecao.diasNoPeriodo))} {unidade.plural}
+                ≈ {formatarNumero(projetar(media, projecao.diasNoPeriodo))} {unidade.plural}
               </dd>
             </div>
           )}

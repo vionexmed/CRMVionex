@@ -23,15 +23,15 @@ const SELO: Record<string, { rotulo: string; tom: Tom }> = {
  * como pílula tracejada (ainda não é um estado "de verdade", só um começo).
  *
  * Para o ENVIADO a regra escolhe o que mais ajuda quem espera resposta: vencer
- * logo ganha de "visualizado", porque é o que pede ação. Não há contador de
- * visualizações no banco -- só `visto_em` -- então o selo diz "Visualizado" e
- * não "Visualizado 3×"; inventar o número seria mentir.
+ * logo ganha de "visualizado", porque é o que pede ação. O "3×" vem de
+ * `visualizacoes`; num banco sem a coluna (migração pendente) o selo diz só
+ * "Visualizado" -- inventar o número seria mentir.
  */
 export function SeloDeOrcamento({
   orcamento,
   className,
 }: {
-  orcamento: Pick<Orcamento, "status" | "valido_ate"> & { visto_em?: string | null };
+  orcamento: Pick<Orcamento, "status" | "valido_ate"> & { visto_em?: string | null; visualizacoes?: number | null };
   className?: string;
 }) {
   const estado = estadoDoOrcamento(orcamento);
@@ -59,12 +59,14 @@ export function SeloDeOrcamento({
     if (orcamento.visto_em) {
       return (
         <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-info", className)}>
-          <Eye aria-hidden="true" className="h-3.5 w-3.5" />Visualizado
+          <Eye aria-hidden="true" className="h-3.5 w-3.5" />
+          Visualizado{Number(orcamento.visualizacoes) > 0 ? ` ${Number(orcamento.visualizacoes)}×` : ""}
         </span>
       );
     }
   }
 
   const s = SELO[estado] ?? SELO.enviado;
-  return <SeloComPonto tom={s.tom} className={className}>{s.rotulo}</SeloComPonto>;
+  // "Enviado" é o estado neutro: o texto fica no tom do corpo (só o ponto é cinza).
+  return <SeloComPonto tom={s.tom} className={cn(s.tom === "neutro" && "text-foreground", className)}>{s.rotulo}</SeloComPonto>;
 }

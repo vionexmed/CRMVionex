@@ -122,12 +122,36 @@ Deno.serve(async (req) => {
     const { data: org } = await admin
       .from("organizations").select("name").eq("id", orc.org_id).maybeSingle();
 
+    /*
+      Para quem é a proposta, e as condições que o CLIENTE lê.
+
+      Consultas à parte e tolerantes: `condicoes` vem de uma migração que pode
+      não ter sido aplicada ainda (coluna ausente = erro 42703), e isso não pode
+      derrubar a página inteira do cliente. `observacoes` continua FORA: é interna.
+    */
+    const { data: extra } = await admin
+      .from("orcamentos").select("condicoes").eq("id", orc.id).maybeSingle();
+    const { data: pessoa } = orc.contact_id
+      ? await admin.from("contacts").select("first_name, last_name, title, company_id").eq("id", orc.contact_id).maybeSingle()
+      : { data: null };
+    const { data: empresaDoCliente } = pessoa?.company_id
+      ? await admin.from("companies").select("name").eq("id", pessoa.company_id).maybeSingle()
+      : { data: null };
+    const tratamento = /^(dra?|sra?|prof\.?)\.?$/i.test((pessoa?.title ?? "").trim())
+      ? `${String(pessoa!.title).trim().replace(/\.?$/, ".")} ` : "";
+    const nomeDaPessoa = pessoa
+      ? `${tratamento}${[pessoa.first_name, pessoa.last_name].filter(Boolean).join(" ")}`.trim()
+      : "";
+    const para = [empresaDoCliente?.name, nomeDaPessoa].filter(Boolean).join(" · ") || null;
+
     const expirado = venceu(orc.valido_ate);
 
     const publico = {
       numero: orc.numero,
       titulo: orc.titulo,
       empresa: org?.name ?? null,
+      para,
+      condicoes: extra?.condicoes ?? null,
       status: orc.status,
       valido_ate: orc.valido_ate,
       expirado,
@@ -152,9 +176,19 @@ Deno.serve(async (req) => {
         e-mail: "visto" quer dizer que chegou aos olhos, não quantas vezes.
         Regravar a cada F5 apagaria a informação útil, que é QUANDO ele abriu.
       */
+      /*
+        O CONTADOR soma toda abertura (`visualizacoes`), por função atômica:
+        duas abas ao mesmo tempo não perdem contagem. Falhar aqui nunca impede
+        o cliente de ver a proposta -- é medição, não requisito.
+      */
+      const { error: erroContagem } = await admin.rpc("registrar_visualizacao_orcamento", { _id: orc.id });
+      if (erroContagem) console.error("registrar_visualizacao_orcamento", erroContagem);
       if (!orc.visto_em) {
-        await admin.from("orcamentos")
-          .update({ visto_em: new Date().toISOString() }).eq("id", orc.id);
+        if (erroContagem) {
+          // Sem a função (migração ainda não aplicada), mantém o registro antigo.
+          await admin.from("orcamentos")
+            .update({ visto_em: new Date().toISOString() }).eq("id", orc.id);
+        }
         await registrarAtividade(
           admin, orc,
           `Orçamento #${orc.numero} visualizado pelo cliente`,

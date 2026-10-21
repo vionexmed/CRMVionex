@@ -49,7 +49,7 @@ export interface StatCardProps {
    * pessoas dizem quantas portas foram batidas. Mostrar só um obriga a escolher
    * qual pergunta o painel responde.
    */
-  secundario?: { valor: number | null; rotulo: string };
+  secundario?: { valor: number | null; rotulo: string } | { texto: string | null };
   /** Métrica sem fonte de dado no banco — mostra o texto e apaga o tile. */
   noSource?: boolean;
   /** Métrica de fila (valor "agora"), sem comparação com período anterior. */
@@ -135,7 +135,9 @@ export function StatCard({
     ? "sem fonte de dado"
     : value === null
       ? "sem dados no período"
-      : secundario && secundario.valor !== null
+      : secundario && "texto" in secundario && secundario.texto
+        ? secundario.texto
+        : secundario && "valor" in secundario && secundario.valor !== null
         ? `${formatValue(secundario.valor, "number")} ${secundario.rotulo}`
         : noComparison
           ? "no momento"
@@ -146,6 +148,11 @@ export function StatCard({
       className={cn(
         "group relative min-w-0 vx-respiro",
         emFaixa ? "rounded-none border-l border-t border-border" : "vx-elevado rounded-lg bg-card",
+        // Na faixa de destaque as abas inativas ficam no cinza da superfície.
+        emFaixa && emphasis && ativo === false && "bg-surface-2",
+        // Na faixa de destaque, o respiro da referência: um pouco mais em cima
+        // (a barra da aba ativa ocupa 2px) e um pouco menos embaixo.
+        emFaixa && emphasis && "pb-[calc(var(--respiro)-3px)] pt-[calc(var(--respiro)+2px)]",
         clickable && "cursor-pointer transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
         noSource && "opacity-60",
       )}
@@ -161,15 +168,21 @@ export function StatCard({
       } : undefined}
       onClick={clickable ? () => (onCardClick ? onCardClick() : navigate(href!)) : undefined}
     >
-      {/* O sublinhado da métrica no gráfico. Embaixo, encostado na divisória
-          da faixa, como a aba ativa de uma barra de abas -- é o que ela é. */}
-      {ativo && <span aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 bg-primary" />}
+      {/* A aba ativa da faixa: barra no TOPO, sobre a borda do cartão, e o
+          fundo branco contra o cinza das outras -- como no Visual 01. Não é
+          decoração de tile: só a métrica que o gráfico mostra a tem. */}
+      {ativo && <span aria-hidden className="absolute inset-x-0 top-px h-0.5 bg-primary" />}
 
       <div className="flex items-start justify-between gap-2">
-        <span className={cn("min-w-0 text-xs font-medium leading-snug", ativo ? "text-foreground" : "text-muted-foreground")}>
+        <span
+          title={emphasis ? hint : undefined}
+          className={cn("min-w-0 text-xs font-medium leading-snug", emphasis ? "text-muted-foreground" : ativo ? "text-foreground" : "text-muted-foreground")}
+        >
           {label}
         </span>
-        {hint && (
+        {/* Na faixa de destaque o "i" sai (a referência não tem): a explicação
+            continua no `title` do rótulo e na lista por trás do número. */}
+        {hint && !emphasis && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -188,7 +201,7 @@ export function StatCard({
         )}
       </div>
 
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
+      <div className={cn("flex flex-wrap items-baseline gap-x-2", emphasis ? "mt-0.5" : "mt-1.5")}>
         {valorComPrevia}
         {delta !== null && (
           <span

@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatarMoeda, formatarData } from "@/lib/formato";
+import { CartaoDaProposta } from "@/components/orcamentos/CartaoDaProposta";
+import { dataCurtaSemPonto } from "@/lib/orcamento-resumo";
 import { cn } from "@/lib/utils";
 
 type ItemPublico = {
@@ -17,6 +19,10 @@ type OrcamentoPublicoDados = {
   numero: number;
   titulo: string | null;
   empresa: string | null;
+  /** "Hospital São Lucas · Dr. Henrique Prado": para quem é a proposta. */
+  para?: string | null;
+  /** Condições de pagamento que o cliente lê (não é a observação interna). */
+  condicoes?: string | null;
   status: string;
   valido_ate: string | null;
   expirado: boolean;
@@ -123,182 +129,115 @@ export default function OrcamentoPublico() {
   const podeDecidir = !decidido && !dados.expirado;
 
   const marca = dados.empresa ?? "Vionex";
+  const linhas = dados.itens.map((item) => ({
+    nome: item.nome,
+    apoio: item.descricao
+      || `${item.quantidade} ${item.unidade} × ${formatarMoeda(item.preco_unit, dados.moeda)}${item.desconto > 0 ? ` − ${formatarMoeda(item.desconto, dados.moeda)}` : ""}`,
+    valor: item.total,
+  }));
 
   return (
     <div className="min-h-screen bg-background px-4 py-8">
-      {/* Um cartão só, como a proposta do V1: quem abre o link lê UM documento,
-          e não uma pilha de caixas. Só tokens, para seguir o tema do navegador
-          sem cor fixa. */}
-      <article className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-border bg-card">
-        <header className="p-6 pb-4">
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex min-w-0 items-center gap-2">
-              <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-base font-bold text-primary-foreground">
-                {marca.charAt(0).toUpperCase()}
-              </span>
-              <span className="truncate text-sm font-semibold">{marca}</span>
-            </span>
-            {dados.valido_ate && (
-              <span className={cn("shrink-0 text-xs", dados.expirado ? "font-semibold text-warning" : "text-muted-foreground")}>
-                válido até {formatarData(dados.valido_ate)}
-              </span>
-            )}
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              {/* `vx-titulo-tela` e nao classes a mao: era exatamente a
-                  mesma composicao, e escrever de novo criaria mais um
-                  titulo solto que aquele arquivo existe para evitar. */}
-              <h1 className="vx-titulo-tela">Proposta comercial</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {dados.titulo || `Orçamento #${dados.numero}`}
-              </p>
-              <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">Nº {dados.numero}</p>
-            </div>
-
+      {/* O MESMO cartão da prévia no CRM: quem vende e quem lê veem o mesmo
+          documento. Só tokens, para seguir o tema do navegador. */}
+      <article className="mx-auto max-w-md">
+        <div className="rounded-lg border border-border bg-surface-2 p-3">
+          <CartaoDaProposta
+            marca={marca}
+            validade={dados.valido_ate ? dataCurtaSemPonto(dados.valido_ate) : null}
+            vencida={dados.expirado}
+            para={dados.para || dados.titulo || `Orçamento #${dados.numero}`}
+            linhas={linhas}
+            desconto={dados.desconto}
+            total={dados.total}
+            moeda={dados.moeda}
+            condicoes={dados.condicoes}
+          >
             {decidido ? (
-              <span className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
-                aprovado ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive",
-              )}>
-                {aprovado ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                {aprovado ? "Aprovado" : "Recusado"}
-              </span>
-            ) : dados.expirado ? (
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1 text-xs font-semibold text-warning">
-                <Clock className="h-3.5 w-3.5" />Vencido
-              </span>
-            ) : null}
-          </div>
-        </header>
-
-        <section className="px-6">
-          <ul className="divide-y divide-border border-t border-border">
-            {dados.itens.map((item, i) => (
-              <li key={i} className="flex items-start justify-between gap-4 py-3.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{item.nome}</p>
-                  {item.descricao && (
-                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                      {item.descricao}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-                    {item.quantidade} {item.unidade} × {formatarMoeda(item.preco_unit, dados.moeda)}
-                    {item.desconto > 0 && ` − ${formatarMoeda(item.desconto, dados.moeda)}`}
+              <div className="rounded-md bg-surface-2 p-4 text-center">
+                <span className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
+                  aprovado ? "bg-success-soft text-success" : "bg-destructive-soft text-destructive",
+                )}>
+                  {aprovado ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                  {aprovado ? "Aprovado" : "Recusado"}
+                </span>
+                <p className="mt-2 text-sm font-medium">
+                  {aprovado ? "Você aprovou este orçamento." : "Você recusou este orçamento."}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {dados.decidido_por} · {formatarData(dados.decidido_em)}
+                </p>
+                {dados.motivo_recusa && (
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    “{dados.motivo_recusa}”
                   </p>
-                </div>
-                <p className="shrink-0 text-sm font-semibold tabular-nums">
-                  {formatarMoeda(item.total, dados.moeda)}
+                )}
+              </div>
+            ) : dados.expirado ? (
+              <div className="rounded-md bg-warning-soft p-4 text-center">
+                <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-warning">
+                  <Clock className="h-3.5 w-3.5" />Este orçamento venceu
                 </p>
-              </li>
-            ))}
-          </ul>
-
-          <div className="space-y-1.5 border-t border-border py-4">
-            {dados.desconto > 0 && (
-              <>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="tabular-nums">{formatarMoeda(dados.subtotal, dados.moeda)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Desconto</span>
-                  <span className="font-medium tabular-nums text-success">
-                    − {formatarMoeda(dados.desconto, dados.moeda)}
-                  </span>
-                </div>
-              </>
-            )}
-            <div className="flex items-baseline justify-between pt-1">
-              <span className="text-sm font-semibold">Total</span>
-              <span className="text-2xl font-bold tabular-nums tracking-tight">
-                {formatarMoeda(dados.total, dados.moeda)}
-              </span>
-            </div>
-          </div>
-        </section>
-
-        <div className="border-t border-border bg-surface-2 p-6">
-          {decidido ? (
-            <div className="text-center">
-              <p className="text-sm font-medium">
-                {aprovado ? "Você aprovou este orçamento." : "Você recusou este orçamento."}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {dados.decidido_por} · {formatarData(dados.decidido_em)}
-              </p>
-              {dados.motivo_recusa && (
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  “{dados.motivo_recusa}”
-                </p>
-              )}
-            </div>
-          ) : dados.expirado ? (
-            <div className="text-center">
-              <p className="text-sm font-medium text-warning">Este orçamento venceu</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Peça um novo a quem enviou — os preços podem ter mudado.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Seu nome *</Label>
-                <Input
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  placeholder="Como você assina"
-                  className="text-sm"
-                />
-                {/* Dizer POR QUE o nome é pedido: sem isso, um campo obrigatório
-                    numa página pública lê como coleta de dado. */}
-                <p className="text-label text-muted-foreground">
-                  Fica registrado junto da sua resposta, para quem enviou saber quem respondeu.
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Peça um novo a quem enviou — os preços podem ter mudado.
                 </p>
               </div>
-
-              {recusando && (
+            ) : (
+              <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">O que não ficou bom?</Label>
-                  <Textarea
-                    value={motivo}
-                    onChange={(e) => setMotivo(e.target.value)}
-                    placeholder="Preço, prazo, escopo… (opcional)"
-                    className="min-h-[70px] text-sm"
+                  <Label className="text-xs">Seu nome *</Label>
+                  <Input
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Como você assina"
+                    className="text-sm"
                   />
+                  {/* Dizer POR QUE o nome é pedido: sem isso, um campo obrigatório
+                      numa página pública lê como coleta de dado. */}
+                  <p className="text-label text-muted-foreground">
+                    Fica registrado junto da sua resposta, para quem enviou saber quem respondeu.
+                  </p>
                 </div>
-              )}
 
-              {erro && <p className="text-xs text-destructive">{erro}</p>}
+                {recusando && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">O que não ficou bom?</Label>
+                    <Textarea
+                      value={motivo}
+                      onChange={(e) => setMotivo(e.target.value)}
+                      placeholder="Preço, prazo, escopo… (opcional)"
+                      className="min-h-[70px] text-sm"
+                    />
+                  </div>
+                )}
 
-              <div className="flex flex-col gap-2 sm:flex-row">
+                {erro && <p className="text-xs text-destructive">{erro}</p>}
+
                 <Button
-                  className="flex-1"
+                  className="w-full"
                   disabled={!nome.trim() || enviando || !podeDecidir}
                   onClick={() => decidir("aprovado")}
                 >
                   {enviando && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                  <CheckCircle2 className="mr-1.5 h-4 w-4" />Aprovar orçamento
+                  Aceitar proposta
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  className="w-full"
                   disabled={enviando || !podeDecidir}
                   onClick={() => (recusando ? decidir("recusado") : setRecusando(true))}
                 >
-                  <XCircle className="mr-1.5 h-4 w-4" />
                   {recusando ? "Confirmar recusa" : "Recusar"}
                 </Button>
               </div>
-            </div>
-          )}
+            )}
+          </CartaoDaProposta>
         </div>
       </article>
 
-      <p className="mx-auto max-w-2xl py-4 text-center text-label text-muted-foreground">
-        Este orçamento foi enviado por {dados.empresa ?? "seu contato"}.
+      <p className="mx-auto max-w-md py-4 text-center text-label text-muted-foreground">
+        Este orçamento foi enviado por {dados.empresa ?? "seu contato"} · Nº {dados.numero}.
       </p>
     </div>
   );

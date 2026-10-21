@@ -6,7 +6,30 @@ export type Produto = Database["public"]["Tables"]["produtos"]["Row"];
 type ProdutoInsert = Database["public"]["Tables"]["produtos"]["Insert"];
 type ProdutoUpdate = Database["public"]["Tables"]["produtos"]["Update"];
 
+/** O que `produtos_metricas` devolve (migração 20261021140100). */
+export type MetricasDeProdutos = {
+  por_produto: { produto_id: string; clientes: number; vendas_mes: number }[];
+  receita_recorrente: number;
+  mais_vendido: { produto_id: string; nome: string; clientes: number; vendas_mes: number } | null;
+  ticket_medio: number | null;
+};
+
 export const produtosApi = {
+  /**
+   * Números de venda do catálogo, calculados no banco a partir de orçamento
+   * aprovado e negócio ganho. Devolve `null` se a função ainda não existe
+   * (migração não aplicada): a tela mostra "—" em vez de quebrar.
+   */
+  metricas: async (orgId: string): Promise<MetricasDeProdutos | null> => {
+    const { data, error } = await supabase.rpc("produtos_metricas", { _org_id: orgId });
+    if (error) {
+      // 42883 = função inexistente; PGRST202 = o PostgREST não a conhece.
+      if (error.code === "42883" || error.code === "PGRST202") return null;
+      throw error;
+    }
+    return (data as unknown as MetricasDeProdutos | null) ?? null;
+  },
+
   /**
    * O catálogo, em ordem alfabética.
    *
@@ -34,6 +57,30 @@ export const produtosApi = {
       .from(TABLES.PRODUTOS).insert(produto).select().single();
     if (error) throw error;
     return data;
+  },
+
+  /**
+   * Insere vários de uma vez (importação). Uma chamada só: o PostgREST insere o
+   * lote numa transação, então a planilha entra inteira ou não entra. Colunas
+   * novas só vão quando preenchidas, para a importação funcionar mesmo antes da
+   * migração de categoria/tipo ser aplicada.
+   */
+  criarVarios: async (
+    orgId: string,
+    linhas: { nome: string; descricao: string | null; preco: number; categoria: string | null; unidade: string | null; sku: string | null; tipo_cobranca: string | null }[],
+  ): Promise<void> => {
+    const registros = linhas.map((l) => ({
+      org_id: orgId,
+      nome: l.nome,
+      descricao: l.descricao,
+      preco: l.preco,
+      ...(l.unidade ? { unidade: l.unidade } : {}),
+      ...(l.sku ? { sku: l.sku } : {}),
+      ...(l.categoria ? { categoria: l.categoria } : {}),
+      ...(l.tipo_cobranca ? { tipo_cobranca: l.tipo_cobranca } : {}),
+    }));
+    const { error } = await supabase.from(TABLES.PRODUTOS).insert(registros);
+    if (error) throw error;
   },
 
   update: async (id: string, produto: ProdutoUpdate): Promise<Produto> => {

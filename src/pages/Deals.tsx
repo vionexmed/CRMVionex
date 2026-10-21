@@ -10,7 +10,7 @@ import { useDeals, useCreateDeal, useUpdateDeal, useUpdateDealStage, useUpdateDe
 import { useContactsPicker } from "@/hooks/queries/useContacts";
 import { useCompanies } from "@/hooks/queries/useCompanies";
 import { useMembers } from "@/hooks/queries/useMembers";
-import { usePipelines, usePipelineStages, useSavePipelineStages } from "@/hooks/queries/usePipelines";
+import { usePipelines, usePipelineStages } from "@/hooks/queries/usePipelines";
 import { useLossReasons } from "@/hooks/queries/useLossReasons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Kanban, List, TrendingUp, Plus, Settings2, Loader2, ChevronLeft, ChevronRight, Trophy, XCircle, Trash2 } from "lucide-react";
+import { SquareKanban, List, LineChart, Loader2, ChevronLeft, ChevronRight, Trophy, XCircle, Trash2 } from "lucide-react";
 import { BarraDeSelecao } from "@/components/layout/BarraDeAcoes";
 import { ErrorState, LoadingState } from "@/components/layout/EstadoDaLista";
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
@@ -37,12 +37,10 @@ import { DealsList } from "@/components/crm/DealsList";
 import { DealsForecast } from "@/components/crm/DealsForecast";
 import { DealsFilters, type DealFilters } from "@/components/crm/DealsFilters";
 import type { Database } from "@/integrations/supabase/types";
-import type { EditingStage } from "@/lib/api/pipelines";
 import { mensagemErro } from "@/lib/erro-supabase";
 import { indexarPorId } from "@/lib/utils";
 import { PageShell } from "@/components/layout/PageShell";
 import { SegmentedControl } from "@/components/layout/SegmentedControl";
-import { LinhaDeEtapa, COR_PADRAO_DE_ETAPA } from "@/components/crm/LinhaDeEtapa";
 import { SemOrganizacao } from "@/components/layout/SemOrganizacao";
 import type { DealWithRelations } from "@/lib/api/deals";
 import { SeletorDeContato } from "@/components/crm/SeletorDeContato";
@@ -51,7 +49,11 @@ import { FaixaDoFunil } from "@/components/negocios/FaixaDoFunil";
 import { ChipsDoFunil } from "@/components/negocios/ChipsDoFunil";
 import { PainelDoNegocio } from "@/components/negocios/PainelDoNegocio";
 import type { TipoParaRegistrar } from "@/components/negocios/acoes-rapidas";
-import { filtrarPorSinal, resumirFunil, type FiltroDeSinal } from "@/components/negocios/sinais";
+import {
+  filtrarPorSinal, resumirFunil, ROTULO_DA_TEMPERATURA, temColunaTemperatura, TEMPERATURAS, tonsDaEquipe,
+  type FiltroDeSinal, type Temperatura,
+} from "@/components/negocios/sinais";
+import { useMetaMensal } from "@/components/negocios/meta-mensal";
 export type { DealWithRelations } from "@/lib/api/deals";
 
 type Deal = Database["public"]["Tables"]["deals"]["Row"];
@@ -99,6 +101,7 @@ function filtrosDaUrl(sp: URLSearchParams): DealFilters {
 function sinaisDaUrl(sp: URLSearchParams): FiltroDeSinal {
   const dias = Number(sp.get("parados"));
   return {
+    quentes: sp.get("quentes") === "1",
     atrasada: sp.get("atrasada") === "1",
     paradosHa: Number.isInteger(dias) && dias > 0 ? dias : null,
   };
@@ -110,7 +113,7 @@ const cabePainel = () =>
 
 export default function Deals() {
   const { orgId } = useOrg();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, role } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -150,6 +153,7 @@ export default function Deals() {
   const setSinais = useCallback((f: FiltroDeSinal) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
+      if (f.quentes) next.set("quentes", "1"); else next.delete("quentes");
       if (f.atrasada) next.set("atrasada", "1"); else next.delete("atrasada");
       if (f.paradosHa !== null) next.set("parados", String(f.paradosHa)); else next.delete("parados");
       return next;
@@ -219,7 +223,7 @@ export default function Deals() {
   const { mutateAsync: updateStage } = useUpdateDealStage();
   const { mutateAsync: updateStatus } = useUpdateDealStatus();
   const { mutateAsync: batchUpdate } = useBatchUpdateDeals();
-  const { mutateAsync: savePipelineStages, isPending: savingPipeline } = useSavePipelineStages();
+  const { data: metaMensal } = useMetaMensal();
 
   // Junção do dono, feita no cliente porque `deals.owner_id` aponta para
   // `auth.users` e não para `profiles` -- sem FK entre as duas, o PostgREST não
@@ -317,9 +321,6 @@ export default function Deals() {
   // Batch selection
   const [selectedDeals, setSelectedDeals] = useState<Set<string>>(new Set());
 
-  // Pipeline customization
-  const [pipelineDialogOpen, setPipelineDialogOpen] = useState(false);
-  const [editingStages, setEditingStages] = useState<EditingStage[]>([]);
 
   // O funil ativo vem da URL (`?funil=`), e cai no padrão quando ausente ou
   // inválido. Era um useState preenchido por efeito: nascia "" e só depois
@@ -381,26 +382,6 @@ export default function Deals() {
       }, { replace: true });
     }
   }, [shouldOpenNew, pipelineStages]);
-
-  const openPipelineEditor = () => {
-    // Cópia antes de ordenar: `.sort()` é IN PLACE, e `pipelineStages` é o
-    // resultado de um useMemo -- é o mesmo array que alimenta as colunas do
-    // kanban. Ordenar aqui reordenava a memoização por efeito colateral, de
-    // dentro de um manipulador de clique.
-    const current = [...pipelineStages]
-      .sort((a, b) => a.order - b.order)
-      .map((s) => ({ id: s.id, name: s.name, color: s.color || COR_PADRAO_DE_ETAPA, win_probability: Number(s.win_probability) || 0, order: s.order }));
-    setEditingStages(current.length > 0 ? current : [{ name: "", color: COR_PADRAO_DE_ETAPA, win_probability: 50, order: 0 }]);
-    setPipelineDialogOpen(true);
-  };
-
-  const handleSavePipeline = async () => {
-    if (!orgId || !selectedPipeline) return;
-    const currentStageIds = pipelineStages.map((s) => s.id);
-    await savePipelineStages({ pipelineId: selectedPipeline, currentStageIds, editingStages });
-    setPipelineDialogOpen(false);
-    toast({ title: "Funil atualizado!" });
-  };
 
   // Apply client-side filters to all deals (Kanban/Forecast)
   const passaNosFiltros = (d: DealWithRelations) => {
@@ -474,6 +455,9 @@ export default function Deals() {
       company_id: d.company_id,
       owner_id: d.owner_id,
       close_date: d.close_date,
+      // Só quando a linha TEM a coluna: sem a migração, mandá-la de volta no
+      // update daria 42703 e nenhuma edição salvaria.
+      ...(temColunaTemperatura(d) ? { temperatura: d.temperatura ?? null } : {}),
     });
     setSheetOpen(true);
   }, []);
@@ -501,6 +485,7 @@ export default function Deals() {
           stage_id: form.stage_id, probability: Number(form.probability) || 0,
           close_date: form.close_date, contact_id: form.contact_id || null,
           company_id: form.company_id || null, owner_id: form.owner_id || null,
+          ...("temperatura" in form ? { temperatura: form.temperatura ?? null } : {}),
         },
       });
     } else {
@@ -559,6 +544,7 @@ export default function Deals() {
             stage_id: form.stage_id, probability: Number(form.probability) || 0,
             close_date: form.close_date, contact_id: contactId,
             company_id: form.company_id || null, owner_id: form.owner_id || user?.id || null,
+            ...(form.temperatura ? { temperatura: form.temperatura } : {}),
           },
         });
       } else {
@@ -568,6 +554,7 @@ export default function Deals() {
           probability: Number(form.probability) || 0, close_date: form.close_date,
           status: "open", owner_id: form.owner_id || user?.id,
           contact_id: contactId, company_id: form.company_id || null,
+          ...(form.temperatura ? { temperatura: form.temperatura } : {}),
         });
       }
 
@@ -584,6 +571,15 @@ export default function Deals() {
       toast({ title: "Erro ao salvar negócio", description: mensagemErro(e), variant: "destructive" });
     }
   };
+
+  /** Temperatura escolhida no painel. Mesmo fluxo e mesma mutação da edição. */
+  const definirTemperatura = useCallback(async (id: string, temperatura: Temperatura | null) => {
+    try {
+      await updateDeal({ id, deal: { temperatura } });
+    } catch (e: unknown) {
+      toast({ title: "Erro ao salvar a temperatura", description: mensagemErro(e), variant: "destructive" });
+    }
+  }, [updateDeal, toast]);
 
   const markAsWon = async (dealId: string) => {
     try {
@@ -631,7 +627,9 @@ export default function Deals() {
   const openDeals = filteredAllDeals.filter((d) => d.status === "open");
   const wonDeals  = filteredAllDeals.filter((d) => d.status === "won");
   const lostDeals = filteredAllDeals.filter((d) => d.status === "lost");
-  const totalCount = viewMode === "list" ? listDealsResult.count : filteredAllDeals.length;
+  // A coluna de temperatura existe? Pela chave numa linha lida (ver
+  // temColunaTemperatura). Sem ela, chip "Quentes" e campo do formulário somem.
+  const comTemperatura = allDeals.some(temColunaTemperatura) || listDeals.some(temColunaTemperatura);
 
   // Os indicadores contam o que o quadro MOSTRA em colunas: aberto sem etapa
   // não aparece em coluna nenhuma, e somá-lo faria "Em aberto" discordar da
@@ -648,6 +646,21 @@ export default function Deals() {
   // faixa continua dizendo o tamanho do funil enquanto se olha só os atrasados.
   const abertosVisiveis = filtrarPorSinal(openDeals, sinais, agora);
 
+  // O "Time" do funil: quem tem negócio aberto nele, de quem tem mais para
+  // quem tem menos. Os tons saem da equipe inteira, para a mesma pessoa ter a
+  // mesma cor em qualquer funil.
+  const tons = tonsDaEquipe(members);
+  const negociosPorDono = new Map<string, number>();
+  for (const d of openDeals) {
+    if (d.owner_id && d.stage_id && etapasDoFunil.has(d.stage_id)) {
+      negociosPorDono.set(d.owner_id, (negociosPorDono.get(d.owner_id) ?? 0) + 1);
+    }
+  }
+  const timeDoFunil = members
+    .filter((m) => negociosPorDono.has(m.id))
+    .sort((a, b) => (negociosPorDono.get(b.id)! - negociosPorDono.get(a.id)!)
+      || (a.name || "").localeCompare(b.name || "", "pt-BR"));
+
   const negocioAbertoId = searchParams.get("negocio");
   const negocioAberto = viewMode === "kanban" && negocioAbertoId
     ? allDeals.find((d) => d.id === negocioAbertoId) ?? null
@@ -661,10 +674,18 @@ export default function Deals() {
   return (
     <PageShell
       /* Só no kanban: a coluna é que rola, e para isso o quadro precisa de
-         altura definida. Na lista e na previsão a página rolar é o certo. */
+         altura definida. Na lista e na previsão a página rolar é o certo.
+
+         Os respiros entre título, funis, indicadores, chips e quadro são os da
+         referência (8/20/20/20px), e não o `gap-6` da casca: por isso
+         `gap-0 space-y-0` aqui e margens explícitas em cada faixa. O
+         `md:-mt-2.5` cancela o respiro extra que o cabeçalho põe acima do
+         título para telas com botões ao lado -- esta não tem: criar negócio é
+         o "+ Novo" da barra superior e o "+ Adicionar negócio" de cada coluna,
+         e editar etapas mora em Configurações → Funis e etapas ("+ Funil"). */
       preencherAltura={viewMode === "kanban"}
+      className="gap-0 space-y-0 md:-mt-2.5"
       title="Negócios"
-      contagem={{ valor: totalCount, unidade: "negócio no funil", plural: "negócios no funil" }}
       meta={
         listFetching && viewMode === "list" ? (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -672,19 +693,6 @@ export default function Deals() {
             atualizando
           </span>
         ) : undefined
-      }
-      actions={
-        <>
-          {isAdmin && (
-            <Button variant="outline" size="icon" onClick={openPipelineEditor} aria-label="Personalizar funil" title="Personalizar etapas do funil">
-              <Settings2 className="h-4 w-4" />
-            </Button>
-          )}
-          <Button onClick={() => openNew()} className="gap-1">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Negócio</span>
-          </Button>
-        </>
       }
       /*
         A LINHA DOS FUNIS, com a equipe e a troca de visão à direita.
@@ -695,7 +703,7 @@ export default function Deals() {
         fechada.
       */
       toolbar={
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-1.5 flex flex-wrap items-end justify-between gap-3">
           {pipelines.length > 0 ? (
             <SeletorDeFunil
               funis={pipelines}
@@ -705,28 +713,27 @@ export default function Deals() {
               linkNovoFunil={isAdmin ? "/settings?aba=pipelines" : undefined}
             />
           ) : <span />}
-          <div className="flex flex-wrap items-center gap-2">
-            <TimeDoFunil membros={members} />
+          <div className="flex flex-wrap items-center gap-3">
+            <TimeDoFunil pessoas={timeDoFunil} tons={tons} />
             {/* Era um grupo de pílulas escrito à mão, o quarto do projeto, com
                 medidas próprias e sem `aria-pressed` -- nenhuma das quatro cópias
                 anunciava a seleção para leitor de tela. */}
             <SegmentedControl<ViewMode>
               rotuloGrupo="Visualização"
+              variante="cartao"
               valor={viewMode}
               onChange={setViewMode}
               opcoes={[
-                { valor: "kanban", rotulo: "Kanban", icone: Kanban },
+                { valor: "kanban", rotulo: "Kanban", icone: SquareKanban },
                 { valor: "list", rotulo: "Lista", icone: List },
-                { valor: "forecast", rotulo: "Previsão", icone: TrendingUp },
+                { valor: "forecast", rotulo: "Previsão", icone: LineChart },
               ]}
             />
           </div>
         </div>
       }
     >
-      {/* Um respiro só entre faixa, chips e quadro. A casca em modo de altura
-          cheia não põe espaço entre os filhos. */}
-      <div className={viewMode === "kanban" ? "flex min-h-0 min-w-0 flex-1 flex-col gap-4" : "min-w-0 space-y-4"}>
+      <div className={viewMode === "kanban" ? "mt-5 flex min-h-0 min-w-0 flex-1 flex-col gap-5" : "mt-5 min-w-0 space-y-5"}>
 
       {/* Os indicadores precisam do funil inteiro carregado: na lista, que é
           paginada, eles mediriam só a página. Na previsão também não: ela tem a
@@ -736,6 +743,8 @@ export default function Deals() {
         <FaixaDoFunil
           resumo={resumo}
           onVerParados={() => setSinais({ ...sinais, paradosHa: 14 })}
+          meta={metaMensal?.coluna ? metaMensal.valor : undefined}
+          podeEditarMeta={role === "owner"}
         />
       )}
 
@@ -744,9 +753,13 @@ export default function Deals() {
           filtros={filters}
           onFiltros={setFilters}
           membros={members}
-          sinais={precisaDeTodos ? sinais : undefined}
+          sinais={precisaDeTodos ? { ...sinais, quentes: comTemperatura ? sinais.quentes : undefined } : undefined}
           onSinais={precisaDeTodos ? setSinais : undefined}
           onAbrirFiltros={() => setShowFilters(!showFilters)}
+          onLimparTudo={() => {
+            setFilters({});
+            setSinais({ quentes: false, atrasada: false, paradosHa: null });
+          }}
         />
       )}
 
@@ -828,12 +841,14 @@ export default function Deals() {
         // Quadro e painel lado a lado. O painel NÃO envolve o quadro: nenhum
         // wrapper de kanban ganha transform/filter (CLAUDE.md), e o painel é
         // irmão, não ancestral.
-        <div className="flex min-h-0 min-w-0 flex-1 gap-4">
+        // A margem negativa come o respiro de baixo do <main> (28px) e os 10px
+        // que o `md:-mt-2.5` da casca subiu: na referência o quadro e o painel
+        // vão até a borda da janela, e quem rola é a coluna.
+        <div className="flex min-h-0 min-w-0 flex-1 gap-5 md:-mb-[38px]">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <DealsKanban
               deals={abertosVisiveis}
-              wonDeals={wonDeals}
-              lostDeals={lostDeals}
+              tons={tons}
               stages={pipelineStages}
               onDragEnd={handleDragEnd}
               onDealClick={abrirNegocio}
@@ -850,10 +865,12 @@ export default function Deals() {
             />
           </div>
           {negocioAberto && (
-            <div className="hidden min-h-0 w-[360px] shrink-0 lg:flex">
+            <div className="hidden min-h-0 w-[380px] shrink-0 lg:flex">
               <PainelDoNegocio
                 deal={negocioAberto}
                 etapas={etapasDoAberto}
+                mediaPorEtapa={funilDoAberto === selectedPipeline ? resumo.mediaPorEtapa : null}
+                onTemperatura={definirTemperatura}
                 onFechar={fecharPainel}
                 onGanho={markAsWon}
                 onPerdido={openLossModal}
@@ -1006,6 +1023,21 @@ export default function Deals() {
                 </SelectContent>
               </Select>
             </div>
+            {/* A avaliação do vendedor. Só com a coluna no banco (migração
+                20261021120000): sem ela, gravar daria 42703. */}
+            {comTemperatura && (
+              <div className="space-y-2">
+                <Label>Temperatura</Label>
+                <Select value={form.temperatura || "none"}
+                  onValueChange={(v) => setForm({ ...form, temperatura: v === "none" ? null : v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem classificação</SelectItem>
+                    {TEMPERATURAS.map((t) => <SelectItem key={t} value={t}>{ROTULO_DA_TEMPERATURA[t]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Probabilidade (%)</Label>
@@ -1058,57 +1090,6 @@ export default function Deals() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setLossModalOpen(false)}>Cancelar</Button>
             <Button variant="destructive" onClick={confirmLoss} disabled={!lossReasonId}>Confirmar Perda</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Pipeline Customization Dialog */}
-      <Dialog open={pipelineDialogOpen} onOpenChange={setPipelineDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Personalizar funil</DialogTitle>
-            <DialogDescription>Edite as etapas do seu funil de vendas</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-            {/* A linha é compartilhada com Configurações. Eram dois editores
-                e nenhum completo: aqui não dava para reordenar, lá não dava
-                para renomear nem recolorir. */}
-            {editingStages.map((stage, idx) => (
-              <LinhaDeEtapa
-                key={idx}
-                etapa={stage}
-                indice={idx}
-                total={editingStages.length}
-                onChange={(mudanca) =>
-                  setEditingStages(editingStages.map((s, i) => (i === idx ? { ...s, ...mudanca } : s)))
-                }
-                onRemover={
-                  editingStages.length > 1
-                    ? () => setEditingStages(editingStages.filter((_, i) => i !== idx))
-                    : undefined
-                }
-                onMover={(direcao) => {
-                  const destino = direcao === "cima" ? idx - 1 : idx + 1;
-                  if (destino < 0 || destino >= editingStages.length) return;
-                  const arr = [...editingStages];
-                  [arr[idx], arr[destino]] = [arr[destino], arr[idx]];
-                  // `order` acompanha a posição: é o campo que o banco lê, e a
-                  // etapa de entrada do funil é identificada pelo MENOR order.
-                  setEditingStages(arr.map((s, i) => ({ ...s, order: i })));
-                }}
-              />
-            ))}
-            <Button variant="outline" size="sm"
-              onClick={() => setEditingStages([...editingStages, { name: "", color: COR_PADRAO_DE_ETAPA, win_probability: 50, order: editingStages.length }])}>
-              <Plus className="mr-1 h-3.5 w-3.5" />Adicionar etapa
-            </Button>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPipelineDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSavePipeline} disabled={savingPipeline || editingStages.some((s) => !s.name.trim())}>
-              {savingPipeline && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Salvar
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -20,7 +20,7 @@ import { formatarData, formatarMoedaInteira } from "@/lib/formato";
  * de DealFilters precisa dar erro de tipo aqui (CLAUDE.md).
  */
 export function ChipsDoFunil({
-  filtros, onFiltros, membros, sinais, onSinais, onAbrirFiltros,
+  filtros, onFiltros, membros, sinais, onSinais, onAbrirFiltros, onLimparTudo,
 }: {
   filtros: DealFilters;
   onFiltros: (f: DealFilters) => void;
@@ -29,6 +29,7 @@ export function ChipsDoFunil({
   sinais?: FiltroDeSinal;
   onSinais?: (s: FiltroDeSinal) => void;
   onAbrirFiltros: () => void;
+  onLimparTudo: () => void;
 }) {
   const dono = filtros.ownerId ? membros.find((m) => m.id === filtros.ownerId) : null;
   const sem = (campo: keyof DealFilters) => () => onFiltros({ ...filtros, [campo]: undefined });
@@ -40,7 +41,12 @@ export function ChipsDoFunil({
           Responsável: {dono?.name || dono?.email || "—"}
         </ChipDeFiltro>
       ) : (
-        <ChipDeFiltro onClick={onAbrirFiltros}>Responsável: todos</ChipDeFiltro>
+        // "todos" também é um filtro à vista, com o × que zera TUDO o que
+        // estreita o quadro (valor, data e os chips de sinal): é a saída
+        // única para "por que o funil está vazio?".
+        <ChipDeFiltro ativo onClick={onAbrirFiltros} onRemover={onLimparTudo} rotuloRemover="Limpar todos os filtros">
+          Responsável: todos
+        </ChipDeFiltro>
       )}
 
       {filtros.minValue !== undefined && (
@@ -66,6 +72,13 @@ export function ChipsDoFunil({
 
       {sinais && onSinais && (
         <>
+          {/* `deals.temperatura`, a avaliação do vendedor. Sem a coluna no
+              banco o chip não aparece: filtraria tudo para fora. */}
+          {sinais.quentes !== undefined && (
+            <ChipDeFiltro ativo={sinais.quentes} onClick={() => onSinais({ ...sinais, quentes: !sinais.quentes })}>
+              Quentes
+            </ChipDeFiltro>
+          )}
           <ChipDeFiltro ativo={sinais.atrasada} onClick={() => onSinais({ ...sinais, atrasada: !sinais.atrasada })}>
             Atividade atrasada
           </ChipDeFiltro>

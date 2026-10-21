@@ -115,15 +115,40 @@ export function quandoCurto(iso: string, agora: number = Date.now()): string {
   return formatarDataHoraCurta(iso);
 }
 
-/** "sex, 9 out, 15:00" -- para dizer QUANDO era a atividade que venceu. */
+/** "sex, 9 out às 15:00" -- para dizer QUANDO era a atividade que venceu. */
 export function quandoCompleto(iso: string): string {
   const t = Date.parse(iso);
-  return Number.isNaN(t) ? "—" : diaDaSemanaDataHora.format(t).replace(/\./g, "");
+  if (Number.isNaN(t)) return "—";
+  // Por partes, e não pelo texto do Intl: a vírgula antes da hora muda entre
+  // versões de navegador, e "às" é o que a frase pede.
+  const p = Object.fromEntries(diaDaSemanaDataHora.formatToParts(t).map((x) => [x.type, x.value]));
+  const limpa = (v?: string) => (v ?? "").replace(/\./g, "");
+  return `${limpa(p.weekday)}, ${p.day} ${limpa(p.month)} às ${p.hour}:${p.minute}`;
+}
+
+/** "30 out" no ano corrente; "30 out 2027" fora dele. Data pura (AAAA-MM-DD) sem fuso. */
+export function dataCurta(data: string, agora: number = Date.now()): string {
+  const [a, m, d] = data.slice(0, 10).split("-").map(Number);
+  if (!a || !m || !d) return "—";
+  const mes = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(new Date(a, m - 1, d)).replace(/\./g, "");
+  return a === new Date(agora).getFullYear() ? `${d} ${mes}` : `${d} ${mes} ${a}`;
+}
+
+/**
+ * O nome curto da atividade: o TÍTULO quando ele é uma palavra só ("WhatsApp",
+ * "Demonstração"), senão o tipo ("Reunião"). Título de uma palavra é o nome que
+ * o vendedor deu ao compromisso e diz mais que o tipo; título longo ("Reunião
+ * com Dr. Henrique") não cabe na linha do card e o tipo resume sem cortar.
+ */
+export function nomeDaAtividade(a: Pick<AtividadeDoNegocio, "type" | "title">): string {
+  const t = a.title?.trim() ?? "";
+  if (t && !/\s/.test(t) && t.length <= 16) return t;
+  return ATIVIDADE_ROTULO[a.type];
 }
 
 /** "Ligação seg, 09:00" ou "Reunião atrasada 2 dias". */
 export function rotuloDaProxima(p: ProximaAtividade, agora: number = Date.now()): string {
-  const tipo = ATIVIDADE_ROTULO[p.atividade.type];
+  const tipo = nomeDaAtividade(p.atividade);
   if (!p.atrasada) return `${tipo} ${quandoCurto(p.atividade.due_date!, agora)}`;
   if (p.diasDeAtraso === 0) return `${tipo} atrasada`;
   return `${tipo} atrasada ${p.diasDeAtraso} ${pluralizar(p.diasDeAtraso, "dia")}`;
@@ -135,16 +160,85 @@ export function rotuloDaProxima(p: ProximaAtividade, agora: number = Date.now())
  * Dias desde o último movimento do negócio.
  *
  * Movimento = qualquer atividade registrada (pela conclusão, ou pela criação
- * nas linhas antigas -- `aconteceuEm`) ou a criação do próprio negócio. Mudar
- * de etapa NÃO conta: o banco não guarda quando aconteceu, e `updated_at`
- * também anda quando alguém só corrige o valor -- contá-lo faria um negócio
- * esquecido parecer vivo por causa de uma edição de cadastro.
+ * nas linhas antigas -- `aconteceuEm`) ou a criação do próprio negócio.
+ * `updated_at` fica fora: anda quando alguém só corrige o valor, e faria um
+ * negócio esquecido parecer vivo por causa de uma edição de cadastro.
+ *
+ * É a régua de RESERVA: com `etapa_desde` no banco, "parado" é não avançar
+ * de etapa (`diasSemAvancar`).
  */
 export function diasParado(deal: Pick<DealWithRelations, "created_at" | "atividades">, agora: number = Date.now()): number {
   let ultimo = deal.created_at ? Date.parse(deal.created_at) : 0;
   for (const a of deal.atividades ?? []) ultimo = Math.max(ultimo, aconteceuEm(a));
   if (!ultimo || Number.isNaN(ultimo)) return 0;
   return Math.max(0, Math.floor((agora - ultimo) / DIA));
+}
+
+/**
+ * Dias na etapa atual, por `etapa_desde`. null quando o banco não tem a
+ * coluna: o painel omite a frase em vez de chutar pela criação.
+ */
+export function diasNaEtapa(deal: { etapa_desde?: string | null }, agora: number = Date.now()): number | null {
+  const t = deal.etapa_desde ? Date.parse(deal.etapa_desde) : NaN;
+  return Number.isNaN(t) ? null : Math.max(0, Math.floor((agora - t) / DIA));
+}
+
+/**
+ * "Parado" no funil: dias sem AVANÇAR de etapa (`etapa_desde`). É a pergunta
+ * que a coluna responde -- um negócio com ligação toda semana e três meses em
+ * "Proposta enviada" está parado, por mais que se fale com o cliente. Sem a
+ * coluna no banco (migração 20261021120000), cai na régua antiga de
+ * movimento (`diasParado`).
+ *
+ * Card, chip "Parados há N+ dias" e o "parados há 14+ dias" da faixa usam
+ * TODOS esta função -- o chip não pode filtrar um conjunto diferente do que o
+ * card pinta.
+ */
+export function diasSemAvancar(
+  deal: Pick<DealWithRelations, "created_at" | "atividades"> & { etapa_desde?: string | null },
+  agora: number = Date.now(),
+): number {
+  return diasNaEtapa(deal, agora) ?? diasParado(deal, agora);
+}
+
+/* ── Etapa abreviada ───────────────────────────────────────────────────────── */
+
+const VOGAL = "aeiouáéíóúâêôãõà";
+const ATE_A_SILABA = new RegExp(`^[^${VOGAL}]*[${VOGAL}]+[^${VOGAL}]*`, "i");
+
+/**
+ * "Proposta enviada" → "Prop.", "Negociação" → "Neg.", "Fechamento" → "Fech.".
+ *
+ * Primeira palavra até o fim da primeira sílaba fechada: corta antes da
+ * segunda vogal, que é onde a abreviação portuguesa costuma cortar. Na trilha
+ * do painel só a etapa ATUAL tem espaço para o nome inteiro; o nome completo
+ * das outras vai no `title`.
+ */
+export function abreviarEtapa(nome: string): string {
+  const palavra = nome.trim().split(/\s+/)[0] ?? "";
+  const corte = palavra.match(ATE_A_SILABA)?.[0] ?? palavra;
+  return corte.length >= palavra.length ? palavra : `${corte}.`;
+}
+
+/* ── Temperatura ───────────────────────────────────────────────────────────── */
+
+export type Temperatura = "quente" | "morno" | "frio";
+export const TEMPERATURAS: readonly Temperatura[] = ["quente", "morno", "frio"];
+export const ROTULO_DA_TEMPERATURA: Record<Temperatura, string> = { quente: "Quente", morno: "Morno", frio: "Frio" };
+
+/** O valor gravado, ou null para "ninguém classificou" e para valor desconhecido. */
+export function temperaturaDe(deal: { temperatura?: string | null }): Temperatura | null {
+  const t = deal.temperatura;
+  return t === "quente" || t === "morno" || t === "frio" ? t : null;
+}
+
+/**
+ * O banco tem a coluna? Sem a migração 20261021120000 o `*` simplesmente não
+ * traz `temperatura` -- e escrever nela daria 42703. É a presença da CHAVE na
+ * linha lida que responde, não o valor (nulo é "não classificado").
+ */
+export function temColunaTemperatura(deal: object | null | undefined): boolean {
+  return !!deal && "temperatura" in deal;
 }
 
 /* ── Identidade ────────────────────────────────────────────────────────────── */
@@ -176,6 +270,8 @@ export function identidadeDoNegocio(deal: DealWithRelations): Identidade {
 /* ── Filtros de sinal ──────────────────────────────────────────────────────── */
 
 export type FiltroDeSinal = {
+  /** Só negócios marcados como quentes (`deals.temperatura = 'quente'`). */
+  quentes?: boolean;
   /** Só negócios com atividade pendente vencida. */
   atrasada: boolean;
   /** Só negócios parados há N+ dias. null = desligado. */
@@ -187,10 +283,11 @@ export function filtrarPorSinal<T extends DealWithRelations>(
   filtro: FiltroDeSinal,
   agora: number = Date.now(),
 ): T[] {
-  if (!filtro.atrasada && filtro.paradosHa === null) return deals as T[];
+  if (!filtro.quentes && !filtro.atrasada && filtro.paradosHa === null) return deals as T[];
   return deals.filter((d) => {
+    if (filtro.quentes && temperaturaDe(d) !== "quente") return false;
     if (filtro.atrasada && !proximaAtividade(d.atividades, agora)?.atrasada) return false;
-    if (filtro.paradosHa !== null && diasParado(d, agora) < filtro.paradosHa) return false;
+    if (filtro.paradosHa !== null && diasSemAvancar(d, agora) < filtro.paradosHa) return false;
     return true;
   });
 }
@@ -205,7 +302,22 @@ export type ResumoDoFunil = {
   };
   /** null quando NENHUMA etapa tem probabilidade: o card some em vez de dizer R$ 0. */
   ponderada: number | null;
-  ganhosNoMes: { total: number; quantidade: number };
+  ganhosNoMes: {
+    total: number;
+    quantidade: number;
+    /** Soma por semana do mês: S1 = dias 1–7 … S4 = dia 22 em diante. */
+    porSemana: [number, number, number, number];
+    /** Índice (0–3) da semana de hoje. */
+    semanaAtual: number;
+  };
+  /**
+   * Média de dias por etapa até a vitória, nos ganhos do funil: (entrada na
+   * etapa final − criação) ÷ etapas percorridas. Não há histórico de etapa no
+   * banco, então é o que dá para medir -- e só com `etapa_desde` de verdade:
+   * o preenchimento da migração copiou a criação, e esses negócios (0 dia)
+   * puxariam a média para baixo sem terem sido medidos. null sem amostra.
+   */
+  mediaPorEtapa: number | null;
   /** null sem nenhum negócio encerrado: 0% sugeriria que tudo foi perdido. */
   taxa: { ganhos: number; encerrados: number; percentual: number } | null;
   parados14: number;
@@ -257,6 +369,22 @@ export function resumirFunil({
 
   const encerrados = ganhos.length + perdidos.length;
 
+  const porSemana: [number, number, number, number] = [0, 0, 0, 0];
+  for (const d of doMes) {
+    const dia = Number(d.close_date!.slice(8, 10));
+    porSemana[Math.min(3, Math.floor((dia - 1) / 7))] += valor(d);
+  }
+
+  const posicao = new Map(ordenadas.map((e, i) => [e.id, i]));
+  const amostras: number[] = [];
+  for (const d of ganhos as (DealWithRelations & { etapa_desde?: string | null })[]) {
+    const k = d.stage_id ? posicao.get(d.stage_id) ?? 0 : 0;
+    const entrou = d.etapa_desde ? Date.parse(d.etapa_desde) : NaN;
+    const criado = d.created_at ? Date.parse(d.created_at) : NaN;
+    if (k < 1 || Number.isNaN(entrou) || Number.isNaN(criado) || entrou - criado < 3_600_000) continue;
+    amostras.push((entrou - criado) / DIA / k);
+  }
+
   return {
     aberto: {
       total: totalAberto,
@@ -266,10 +394,38 @@ export function resumirFunil({
       })),
     },
     ponderada,
-    ganhosNoMes: { total: doMes.reduce((s, d) => s + valor(d), 0), quantidade: doMes.length },
+    ganhosNoMes: {
+      total: doMes.reduce((s, d) => s + valor(d), 0), quantidade: doMes.length,
+      porSemana, semanaAtual: Math.min(3, Math.floor((hoje.getDate() - 1) / 7)),
+    },
+    mediaPorEtapa: amostras.length > 0 ? Math.round(amostras.reduce((a, b) => a + b, 0) / amostras.length) : null,
     taxa: encerrados > 0
       ? { ganhos: ganhos.length, encerrados, percentual: Math.round((ganhos.length / encerrados) * 100) }
       : null,
-    parados14: abertos.filter((d) => diasParado(d, agora) >= 14).length,
+    parados14: abertos.filter((d) => diasSemAvancar(d, agora) >= 14).length,
   };
+}
+
+/* ── Tom da pessoa ─────────────────────────────────────────────────────────── */
+
+/**
+ * Cada pessoa da equipe com um tom fixo nas iniciais, o mesmo na pilha "Time"
+ * e no card: bater o olho e reconhecer "é da Carla" sem ler.
+ *
+ * Pela posição na equipe ORDENADA POR NOME, e não por hash do id: com cinco
+ * pessoas e cinco tons, hash repetiria tom entre duas delas. Lista literal
+ * pelo mesmo motivo de CLASSES_DE_ETAPA (Tailwind só gera a classe inteira).
+ */
+export const TONS_DE_PESSOA = [
+  "bg-accent text-accent-foreground",
+  "bg-success-soft text-success",
+  "bg-warning-soft text-warning",
+  "bg-secondary text-neutral",
+  "bg-info-soft text-info",
+] as const;
+
+export function tonsDaEquipe(membros: readonly { id: string; name: string | null; email?: string | null }[]): Map<string, string> {
+  const ordenados = [...membros].sort((a, b) =>
+    (a.name || a.email || "").localeCompare(b.name || b.email || "", "pt-BR"));
+  return new Map(ordenados.map((m, i) => [m.id, TONS_DE_PESSOA[i % TONS_DE_PESSOA.length]]));
 }

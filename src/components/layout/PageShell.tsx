@@ -19,7 +19,7 @@ export function PageShell({ kicker, title, description, contagem, actions, meta,
   className?: string;
 }) {
   if (surface) return (
-    <div className={cn("-m-4 min-w-0 md:-m-6", className)}>
+    <div className={cn("-m-4 min-w-0 md:-m-7", className)}>
       <div className="px-4 pt-5 sm:px-6">
         <PageHeader kicker={kicker ?? ""} title={title} description={description} contagem={contagem} actions={actions} meta={meta} />
       </div>

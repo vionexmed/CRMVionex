@@ -165,12 +165,21 @@ describe("as fontes pedem só os pesos usados", () => {
   it("o CSS e o Tailwind usam a mesma pilha do sistema", () => {
     const CSS = readFileSync("src/index.css", "utf8");
     const TW = readFileSync("tailwind.config.ts", "utf8");
+    // A família agora vem de UM token, `--font-ui` (o ThemeContext o troca entre
+    // Sistema e Inter). O CSS e o Tailwind apontam para ele; a pilha do sistema
+    // mora no :root e no ThemeContext, e as duas têm de ser a mesma.
     const declaradas = [...CSS.matchAll(/font-family: ([^;]+);/g)].map((m) => m[1].trim())
       .filter((f) => !f.startsWith("'JetBrains Mono'"));
     expect(declaradas.length).toBeGreaterThan(0);
-    for (const f of declaradas) expect(f.startsWith("-apple-system, BlinkMacSystemFont"), f).toBe(true);
-    expect(TW).toContain("sans: ['-apple-system', 'BlinkMacSystemFont'");
-    expect(TW).toContain("heading: ['-apple-system', 'BlinkMacSystemFont'");
+    for (const f of declaradas) expect(f, f).toBe("var(--font-ui)");
+    const raiz = CSS.match(/--font-ui: ([^;]+);/)?.[1].trim() ?? "";
+    expect(raiz.startsWith("-apple-system, BlinkMacSystemFont")).toBe(true);
+    const TEMA = readFileSync("src/contexts/ThemeContext.tsx", "utf8");
+    expect(TEMA).toContain(raiz);
+    expect(TW).toContain("sans: ['var(--font-ui)']");
+    expect(TW).toContain("heading: ['var(--font-ui)']");
+    // Inter só é baixada sob demanda, nunca pelo index.html.
+    expect(HTML).not.toContain("family=Inter");
   });
 
   it("JetBrains não pede o peso 600", () => {

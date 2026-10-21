@@ -494,7 +494,7 @@ export default function Inbox() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-80px)] -m-6 bg-background">
+    <div className="flex h-[calc(100vh-88px)] -m-6 bg-background">
       {/* ============== Sidebar (Gmail-style) ============== */}
       <aside className={cn("shrink-0 border-r border-border flex flex-col transition-[width] duration-200", pastasRecolhidas ? "w-14" : "w-56")}>
         <div className={cn("flex items-center gap-1", pastasRecolhidas ? "flex-col p-2" : "p-3")}>

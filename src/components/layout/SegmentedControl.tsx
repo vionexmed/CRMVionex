@@ -38,6 +38,12 @@ export function SegmentedControl<T extends string>({
   rotuloGrupo,
   /** Esconde o texto no celular, mantendo só o ícone. */
   compactoNoCelular = true,
+  /**
+   * "cartao": cartão com respiro interno e a opção ativa como pílula na cor de
+   * destaque (Negócios, Visual 01). O padrão, "linha", segue igual nas outras
+   * telas -- a variante é aditiva para não mexer em quem já está certo.
+   */
+  variante = "linha",
   className,
 }: {
   opcoes: OpcaoSegmento<T>[];
@@ -45,6 +51,7 @@ export function SegmentedControl<T extends string>({
   onChange: (v: T) => void;
   rotuloGrupo: string;
   compactoNoCelular?: boolean;
+  variante?: "linha" | "cartao";
   className?: string;
 }) {
   return (
@@ -52,7 +59,8 @@ export function SegmentedControl<T extends string>({
       role="group"
       aria-label={rotuloGrupo}
       className={cn(
-        "flex max-w-full shrink-0 overflow-x-auto rounded-md border border-border bg-background",
+        "flex max-w-full shrink-0 overflow-x-auto border border-border",
+        variante === "cartao" ? "gap-1 rounded-lg bg-card p-1 shadow-sm" : "rounded-md bg-background",
         className,
       )}
     >
@@ -68,12 +76,12 @@ export function SegmentedControl<T extends string>({
             aria-pressed={ativo}
             aria-label={`${rotuloGrupo} ${rotulo}`}
             className={cn(
-              "vx-control flex min-h-9 min-w-9 shrink-0 items-center justify-center gap-2 border-r border-border px-3 py-2 text-xs font-medium transition-colors duration-150 last:border-r-0",
+              "vx-control flex min-h-9 min-w-9 shrink-0 items-center justify-center gap-2 px-3 py-2 font-medium transition-colors duration-150",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-              ativo
-                ? "bg-muted"
-                : "text-muted-foreground hover:text-foreground",
-              ativo && !corAtiva && "text-foreground",
+              variante === "cartao"
+                ? cn("rounded-md text-sm", ativo ? "bg-accent font-semibold" : "text-muted-foreground hover:bg-surface-2 hover:text-foreground")
+                : cn("border-r border-border text-xs last:border-r-0", ativo ? "bg-muted" : "text-muted-foreground hover:text-foreground"),
+              ativo && !corAtiva && (variante === "cartao" ? "text-primary" : "text-foreground"),
             )}
             style={ativo && corAtiva ? { color: corAtiva } : undefined}
           >

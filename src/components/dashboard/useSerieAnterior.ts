@@ -13,15 +13,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/hooks/useOrg";
-import { getSdrRanges, type SdrPeriod } from "@/hooks/useSdrMetrics";
+import { rangeDeComparacao, type SdrComparacao, type SdrPeriod } from "@/hooks/useSdrMetrics";
 import type { PontoSerie } from "@/hooks/useSdrCharts";
 
-export function useSerieAnterior(period: SdrPeriod) {
+export function useSerieAnterior(period: SdrPeriod, comparacao: SdrComparacao = "anterior") {
   const { orgId } = useOrg();
-  const { previous } = getSdrRanges(period);
+  const previous = rangeDeComparacao(period, comparacao);
 
   return useQuery<PontoSerie[]>({
-    queryKey: ["sdr-charts", orgId ?? "", period, "anterior"],
+    queryKey: ["sdr-charts", orgId ?? "", period, "anterior", comparacao],
     // "Todo o período" não tem anterior: não há o que buscar.
     enabled: !!orgId && !!previous,
     refetchOnMount: "always",

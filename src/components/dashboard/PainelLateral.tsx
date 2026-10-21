@@ -6,28 +6,33 @@
  * que leva à tela onde a ação acontece -- um número sem caminho obriga a
  * procurar.
  *
- * Só entra linha com fonte no banco (ver usePendencias.ts). A referência visual
- * tinha também "tempo médio vs. meta" e barras por hora no Atendimento: não há
- * meta de tempo de resposta gravada nem agregação por hora, então ficaram fora
- * em vez de virar número inventado.
+ * Só entra linha com fonte no banco (ver usePendencias.ts e useAtendimento.ts).
+ * A meta de resposta vem de Configurações > Geral; sem ela, o "meta 15" some
+ * em vez de virar um número inventado. As barras por hora são as mensagens
+ * recebidas no período, pela hora local.
  */
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
-import { FileText, Hourglass } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Iniciais } from "@/components/layout/ListaV1";
 import { ATIVIDADE_ICONE, type ActivityType } from "@/lib/atividade-tipos";
-import { formatarMoedaCurta, formatarNumero, pluralizar } from "@/lib/formato";
+import { formatarMoedaInteira, formatarNumero, pluralizar } from "@/lib/formato";
 import { DIAS_DE_AVISO, diasParaVencer } from "@/lib/orcamento-resumo";
 import { cn } from "@/lib/utils";
 import type { MetricValue } from "@/hooks/useSdrMetrics";
 import {
   useAtividadesAtrasadas, useNegociosParados, usePropostasVencendo, TETO_PARADOS,
 } from "./usePendencias";
-import { formatValue, variation } from "./formato-da-metrica";
+import { formatValue } from "./formato-da-metrica";
+import {
+  NOMES_NA_FILA, tempoDeEspera, useLeadsAguardando, useMensagensPorHora, useMetaResposta,
+} from "./useAtendimento";
+import type { SdrPeriod } from "@/hooks/useSdrMetrics";
+
 
 /** Plural por tipo: "ligação" não vira "ligaçãos". */
 const TIPO_PLURAL: Record<ActivityType, [string, string]> = {
@@ -42,13 +47,17 @@ const TIPO_PLURAL: Record<ActivityType, [string, string]> = {
 /** Ícones sobrepostos, no lugar das iniciais quando a pendência não tem pessoa. */
 function PilhaDeIcones({ icones, tom }: { icones: LucideIcon[]; tom: "perigo" | "marca" }) {
   return (
-    <span className="flex shrink-0 -space-x-1.5" aria-hidden>
+    <span className={cn("flex shrink-0", tom === "perigo" ? "-space-x-1" : "-space-x-2")} aria-hidden>
       {icones.map((Icone, i) => (
         <span
           key={i}
           className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-full ring-2 ring-card",
-            tom === "perigo" ? "bg-destructive-soft text-destructive" : "bg-accent text-accent-foreground",
+            "flex items-center justify-center ring-2 ring-card",
+            // Atrasadas: círculos no tom de perigo. Documentos: o quadrado de
+            // arquivo, no tom da marca, com a borda que o separa do vizinho.
+            tom === "perigo"
+              ? "h-7 w-7 rounded-full bg-destructive-soft text-destructive"
+              : "h-8 w-8 rounded-md border border-primary/20 bg-accent text-primary",
           )}
         >
           <Icone className="h-3.5 w-3.5" />
@@ -67,12 +76,12 @@ function Linha({ marca, titulo, detalhe, acao, onAcao, principal = false }: {
   principal?: boolean;
 }) {
   return (
-    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+    <li className="flex items-center gap-3 py-[0.8rem] first:pt-0 last:pb-0">
       {/* Largura fixa para os títulos alinharem entre linhas com 1 e 3 marcas. */}
       <span className="flex w-20 shrink-0">{marca}</span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold leading-snug">{titulo}</p>
-        <p className="text-xs leading-snug text-muted-foreground">{detalhe}</p>
+        <p className="text-sm font-semibold">{titulo}</p>
+        <p className="text-xs text-muted-foreground">{detalhe}</p>
       </div>
       <Button size="sm" variant={principal ? "default" : "outline"} onClick={onAcao} className="shrink-0">
         {acao}
@@ -94,6 +103,8 @@ export function Pendencias({ aguardando, carregandoMetricas }: {
   carregandoMetricas: boolean;
 }) {
   const navigate = useNavigate();
+  // A contagem é a do card; esta consulta só traz os rostos e o "espera há".
+  const fila = useLeadsAguardando(!!aguardando && aguardando > 0);
   const atividades = useAtividadesAtrasadas();
   const parados = useNegociosParados();
   const propostas = usePropostasVencendo();
@@ -112,9 +123,22 @@ export function Pendencias({ aguardando, carregandoMetricas }: {
       <Linha
         key="aguardando"
         principal
-        marca={<PilhaDeIcones icones={[Hourglass]} tom="marca" />}
+        marca={
+          <span className="flex -space-x-2" aria-hidden>
+            {(fila.data ?? []).slice(0, NOMES_NA_FILA).map((l) => (
+              <Iniciais key={l.id} nome={l.nome} tamanho="sm" className="ring-2 ring-card" />
+            ))}
+            {aguardando > Math.min(NOMES_NA_FILA, fila.data?.length ?? 0) && (fila.data?.length ?? 0) > 0 && (
+              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-destructive-soft text-label font-semibold text-destructive ring-2 ring-card">
+                +{aguardando - Math.min(NOMES_NA_FILA, fila.data!.length)}
+              </span>
+            )}
+          </span>
+        }
         titulo={`${formatarNumero(aguardando)} ${pluralizar(aguardando, "lead aguardando", "leads aguardando")}`}
-        detalhe="Sem nenhuma abordagem registrada"
+        detalhe={fila.data?.[0]
+          ? `O mais antigo espera há ${tempoDeEspera(fila.data[0].desde)}`
+          : "Sem nenhuma abordagem registrada"}
         acao="Atender"
         onAcao={() => navigate("/contacts?estagio=lead")}
       />,
@@ -143,19 +167,21 @@ export function Pendencias({ aguardando, carregandoMetricas }: {
   const p = parados.data;
   if (p && p.length > 0) {
     const soma = p.reduce((s, d) => s + d.valor, 0);
+    // "há 14+ dias": o MENOR tempo parado da lista é o que vale para todos.
+    const menorParado = Math.min(...p.map((d) => d.dias));
     const quantos = p.length >= TETO_PARADOS ? `${TETO_PARADOS}+` : formatarNumero(p.length);
     linhas.push(
       <Linha
         key="parados"
         marca={
-          <span className="flex -space-x-1.5">
+          <span className="flex -space-x-2">
             {p.slice(0, 3).map((d, i) => (
-              <Iniciais key={i} nome={d.contato} className="ring-2 ring-card" />
+              <Iniciais key={i} nome={d.titulo} forma="empresa" className="shadow-sm ring-2 ring-card" />
             ))}
           </span>
         }
         titulo={`${quantos} ${pluralizar(p.length, "negócio parado", "negócios parados")}`}
-        detalhe={`${soma > 0 ? `${formatarMoedaCurta(soma)} ` : ""}sem atividade há 7+ dias`}
+        detalhe={`${soma > 0 ? `${formatarMoedaInteira(soma)} ` : ""}sem atividade há ${Number.isFinite(menorParado) ? menorParado : 7}+ dias`}
         acao="Revisar"
         onAcao={() => navigate("/deals")}
       />,
@@ -180,8 +206,8 @@ export function Pendencias({ aguardando, carregandoMetricas }: {
 
   return (
     <Card className="min-w-0">
-      <CardHeader className="flex-row items-center justify-between space-y-0">
-        <CardTitle>Pendências</CardTitle>
+      <CardHeader className="flex-row items-center justify-between space-y-0 pb-[1.625rem] pt-[calc(var(--respiro)+1px)]">
+        <CardTitle className="vx-titulo-painel">Pendências</CardTitle>
         {!carregando && linhas.length > 0 && (
           <span className="text-xs font-semibold text-destructive">
             {linhas.length} {pluralizar(linhas.length, "pendência")}
@@ -196,7 +222,7 @@ export function Pendencias({ aguardando, carregandoMetricas }: {
         ) : (
           <>
             {linhas.length > 0 ? (
-              <ul className="divide-y divide-border">{linhas}</ul>
+              <ul>{linhas}</ul>
             ) : (
               falhas.length < 3 && (
                 <p className="border-l-2 border-border py-2 pl-4 text-xs text-muted-foreground">
@@ -218,58 +244,104 @@ export function Pendencias({ aguardando, carregandoMetricas }: {
   );
 }
 
-export function AtendimentoAgora({ tempoResposta, aguardando, carregando }: {
+export function AtendimentoAgora({ tempoResposta, aguardando, carregando, period }: {
   tempoResposta: MetricValue | undefined;
   aguardando: number | null;
   carregando: boolean;
+  period: SdrPeriod;
 }) {
   const tempo = tempoResposta?.value ?? null;
-  const delta = variation(tempo, tempoResposta?.previous, "duration");
+  const meta = useMetaResposta().data ?? null;
+  const porHora = useMensagensPorHora(period);
 
   return (
     <Card className="min-w-0">
-      <CardHeader>
-        <CardTitle>Atendimento agora</CardTitle>
+      <CardHeader className="pb-4 pt-[calc(var(--respiro)-1px)]">
+        <CardTitle className="vx-titulo-painel">Atendimento agora</CardTitle>
       </CardHeader>
       <CardContent>
         {carregando ? (
           <Skeleton className="h-24" />
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            <div className="min-w-0 rounded-md border border-border bg-surface-2 p-3">
-              <p className="text-xs text-muted-foreground">Tempo médio de resposta</p>
-              <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
-                <span className={cn("text-2xl font-semibold tabular-nums tracking-tight", tempo === null && "text-muted-foreground")}>
+            <div className="min-w-0 rounded-md border border-border bg-surface-2 p-3 pt-3.5">
+              <p className="text-xs leading-5 text-muted-foreground">Tempo médio de resposta</p>
+              <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
+                <span className={cn("text-2xl font-semibold tracking-tight", tempo === null && "text-muted-foreground")}>
                   {tempo === null ? "—" : formatValue(tempo, "duration")}
                 </span>
-                {/* Cair é bom: menos tempo esperando a primeira resposta. */}
-                {delta !== null && delta.valor !== 0 && (
-                  <span className={cn("text-xs font-semibold tabular-nums", delta.valor < 0 ? "text-success" : "text-destructive")}>
-                    {delta.valor < 0 ? "▼" : "▲"} {Math.abs(delta.valor)}%
-                    <span className="sr-only"> em relação ao período anterior</span>
+                {/* A meta diz se o número é bom; dentro dela, verde. */}
+                {tempo !== null && meta !== null && (
+                  <span className={cn("text-xs font-semibold tabular-nums", tempo <= meta ? "text-success" : "text-destructive")}>
+                    meta {formatarNumero(meta)}
                   </span>
                 )}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {tempo === null ? "sem resposta medida no período" : "por WhatsApp, no período"}
-              </p>
             </div>
-            <div className="min-w-0 rounded-md border border-border bg-surface-2 p-3">
-              <p className="text-xs text-muted-foreground">Aguardando agora</p>
-              <p className="mt-1.5 flex items-baseline gap-1.5">
+            <div className="min-w-0 rounded-md border border-border bg-surface-2 p-3 pt-3.5">
+              <p className="text-xs leading-5 text-muted-foreground">Aguardando agora</p>
+              <p className="mt-1 flex items-baseline gap-2">
                 <span className={cn(
-                  "text-2xl font-semibold tabular-nums tracking-tight",
+                  "text-2xl font-semibold tracking-tight",
                   aguardando === null ? "text-muted-foreground" : aguardando > 0 ? "text-destructive" : "text-foreground",
                 )}>
                   {aguardando === null ? "—" : formatarNumero(aguardando)}
                 </span>
                 {aguardando !== null && <span className="text-xs text-muted-foreground">{pluralizar(aguardando, "lead")}</span>}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">sem nenhuma abordagem</p>
             </div>
           </div>
         )}
+        <BarrasPorHora dados={porHora.data} carregando={porHora.isLoading} falhou={!!porHora.error} />
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Mensagens recebidas por hora: quando a fila enche. O pico leva a cor cheia
+ * e o rótulo embaixo dele; as outras horas ficam no tom claro da marca.
+ */
+function BarrasPorHora({ dados, carregando, falhou }: {
+  dados: { hora: number; total: number }[] | undefined;
+  carregando: boolean;
+  falhou: boolean;
+}) {
+  if (carregando) return <Skeleton className="mt-5 h-16" />;
+  if (falhou) return <p className="mt-5 text-xs text-destructive">Não foi possível carregar as mensagens por hora.</p>;
+  const lista = dados ?? [];
+  const max = Math.max(0, ...lista.map((d) => d.total));
+  if (lista.length === 0 || max === 0) {
+    return <p className="mt-5 border-l-2 border-border pl-4 text-xs text-muted-foreground">Nenhuma mensagem recebida no período.</p>;
+  }
+  const iPico = lista.findIndex((d) => d.total === max);
+  const fim = lista[lista.length - 1].hora + 1;
+  // Posição do rótulo do pico: o centro da barra, em % da largura.
+  const centroPico = ((iPico + 0.5) / lista.length) * 100;
+
+  return (
+    <figure className="mt-3" aria-label={`Mensagens recebidas por hora; pico às ${lista[iPico].hora}h`}>
+      <div className="flex h-[52px] items-end gap-1.5">
+        {lista.map((d, i) => (
+          <span
+            key={d.hora}
+            title={`${d.hora}h: ${formatarNumero(d.total)} ${pluralizar(d.total, "mensagem", "mensagens")}`}
+            className={cn("flex-1 rounded-t-[2px]", i === iPico ? "bg-primary" : "bg-primary/30")}
+            style={{ height: `${Math.max(4, (d.total / max) * 100)}%` }}
+          />
+        ))}
+      </div>
+      <figcaption className="relative mt-3.5 h-4 text-label text-muted-foreground">
+        {/* As pontas saem quando o rótulo do pico encostaria nelas. */}
+        {iPico > 1 && <span className="absolute left-0">{lista[0].hora}h</span>}
+        <span
+          className={cn("absolute whitespace-nowrap", iPico === 0 ? "" : iPico === lista.length - 1 ? "-translate-x-full" : "-translate-x-1/2")}
+          style={{ left: iPico === 0 ? 0 : iPico === lista.length - 1 ? "100%" : `${centroPico}%` }}
+        >
+          {lista[iPico].hora}h · pico
+        </span>
+        {iPico < lista.length - 2 && <span className="absolute right-0">{fim}h</span>}
+      </figcaption>
+    </figure>
   );
 }

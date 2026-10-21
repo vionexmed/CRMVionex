@@ -97,15 +97,19 @@ describe("contagem e texto fixo não dividem o mesmo campo", () => {
   });
 
   /** As nove que contavam precisam ter migrado, não simplesmente perdido o número. */
+  // Negócios saiu: no Visual 01 a contagem mora nas pílulas de funil
+  // ("Vendas Clínicas 31") e no cartão "Em aberto", não ao lado do título.
   const QUE_CONTAM = [
-    "Contacts", "Companies", "Deals", "Activities",
+    "Contacts", "Companies", "Activities",
   ];
   it.each(QUE_CONTAM)("%s passa contagem", (nome) => {
     expect(readFileSync(`src/pages/${nome}.tsx`, "utf8")).toMatch(/contagem=\{\{/);
   });
 
   /** E as seis que explicam continuam explicando. */
-  const QUE_EXPLICAM = ["Dashboard", "Reports", "MyEmail", "Integrations", "SecuritySettings"];
+  // Reports e Dashboard saíram da lista: o Visual 01 (p18, p06) mostra só o
+  // título, sem subtítulo.
+  const QUE_EXPLICAM = ["MyEmail", "Integrations", "SecuritySettings"];
   it.each(QUE_EXPLICAM)("%s mantém description em texto fixo", (nome) => {
     expect(readFileSync(`src/pages/${nome}.tsx`, "utf8")).toMatch(/description="/);
   });

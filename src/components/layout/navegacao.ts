@@ -1,6 +1,6 @@
 import type { ElementType } from "react";
 import {
-  Activity, AlertTriangle, BarChart3, Building2, Handshake,
+  Activity, AlertTriangle, BarChart3, Briefcase, Building2, Handshake,
   LayoutDashboard, Mail, Megaphone, MessageSquare,
   Package, Plug, Receipt, Settings, Shield, Users, UsersRound,
 } from "lucide-react";
@@ -32,7 +32,7 @@ export const NAV_SECTIONS: NavSection[] = [
     { label: "Contatos", path: "/contacts", icon: Users, aliases: ["/leads"] },
     { label: "Empresas", path: "/companies", icon: Building2 },
   ] },
-  { id: "negocios", label: "Negócios", icon: Handshake, entryPath: "/deals", items: [
+  { id: "negocios", label: "Negócios", icon: Briefcase, entryPath: "/deals", items: [
     { label: "Funil", path: "/deals", icon: Handshake },
     { label: "Produtos", path: "/produtos", icon: Package },
     { label: "Orçamentos", path: "/orcamentos", icon: Receipt },
