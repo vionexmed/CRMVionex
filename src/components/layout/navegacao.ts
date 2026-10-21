@@ -1,7 +1,7 @@
 import type { ElementType } from "react";
 import {
   Activity, AlertTriangle, BarChart3, Building2, Handshake,
-  Inbox, Instagram, LayoutDashboard, Mail, Megaphone, MessageSquare,
+  LayoutDashboard, Mail, Megaphone, MessageSquare,
   Package, Plug, Receipt, Settings, Shield, Users, UsersRound,
 } from "lucide-react";
 
@@ -37,10 +37,16 @@ export const NAV_SECTIONS: NavSection[] = [
     { label: "Produtos", path: "/produtos", icon: Package },
     { label: "Orçamentos", path: "/orcamentos", icon: Receipt },
   ] },
-  { id: "comunicacao", label: "Comunicação", icon: MessageSquare, entryPath: "/comunicacao/whatsapp", items: [
-    { label: "WhatsApp", path: "/comunicacao/whatsapp", icon: MessageSquare, aliases: ["/conversations", "/comunicacao"] },
-    { label: "Instagram", path: "/comunicacao/instagram", icon: Instagram, aliases: ["/instagram"] },
-    { label: "E-mail", path: "/comunicacao/email", icon: Inbox, aliases: ["/inbox"] },
+  /*
+   * UM destino para os três canais. O canal é filtro DENTRO de Atendimento
+   * (`?canal=`), porque quem atende pensa em QUEM espera resposta, não no
+   * aplicativo por onde a pergunta chegou. `/inbox` (caixa de e-mail completa:
+   * pastas, spam, anexos) continua sendo tela, fora do menu -- o cabeçalho de
+   * Atendimento leva até ela --, e por isso é alias: abrir a caixa mantém
+   * Comunicação acesa. As rotas antigas de canal redirecionam para cá.
+   */
+  { id: "comunicacao", label: "Comunicação", icon: MessageSquare, entryPath: "/atendimento", items: [
+    { label: "Atendimento", path: "/atendimento", icon: MessageSquare, aliases: ["/conversations", "/instagram", "/inbox", "/comunicacao"] },
   ] },
   { id: "analise", label: "Análise", icon: BarChart3, entryPath: "/reports", items: [
     { label: "Relatórios", path: "/reports", icon: BarChart3 },

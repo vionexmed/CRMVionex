@@ -64,10 +64,10 @@ describe("telas guardam a visão na URL", () => {
     expect(s).not.toMatch(/useState\(""\)/);
   });
 
-  it("Conversas: ?thread= e ?q=, com replace", () => {
-    const s = limpo("src/pages/Conversations.tsx");
-    expect(s).toContain('params.get("thread")');
-    expect(s).toContain('params.get("q")');
+  it("Atendimento: ?thread= e ?q=, com replace", () => {
+    const s = limpo("src/pages/Atendimento.tsx");
+    expect(s).toContain('parametros.get("thread")');
+    expect(s).toContain('parametros.get("q")');
     expect(s).toContain("replace: true");
   });
 });

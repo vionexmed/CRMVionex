@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { CommunicationLayout, LegacyChannelRedirect } from "@/components/layout/CommunicationLayout";
 import { RequireAdmin } from "@/components/layout/RequireAdmin";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineDetector } from "@/components/OfflineDetector";
@@ -199,20 +200,29 @@ const App = () => (
                     20260909140000 o histórico de e-mail e de conversa é da
                     organização, como o resto do CRM. */}
                 <Route path="/settings/email" element={<SuspenseRoute><MyEmail /></SuspenseRoute>} />
-                {/* UMA tela para os três canais. Eram três destinos, e quem
-                    atende tinha de adivinhar em qual deles a conversa estava. */}
-                <Route path="/atendimento" element={<SuspenseRoute><Atendimento /></SuspenseRoute>} />
-                <Route path="/comunicacao" element={<Navigate to="/atendimento?canal=whatsapp" replace />} />
-                <Route path="/comunicacao/whatsapp" element={<Navigate to="/atendimento?canal=whatsapp" replace />} />
-                <Route path="/comunicacao/instagram" element={<Navigate to="/atendimento?canal=instagram" replace />} />
-                <Route path="/comunicacao/email" element={<Navigate to="/inbox" replace />} />
-                {/* As rotas de canal viram redirecionamento COM O FILTRO já
-                    aplicado: link salvo e favorito continuam chegando à mesma
-                    conversa, agora ao lado das dos outros canais. `replace` para
-                    o botão Voltar não cair de novo aqui. */}
-                <Route path="/conversations" element={<Navigate to="/atendimento?canal=whatsapp" replace />} />
-                <Route path="/instagram" element={<Navigate to="/atendimento?canal=instagram" replace />} />
-                <Route path="/inbox" element={<SuspenseRoute><Inbox /></SuspenseRoute>} />
+
+                {/* UMA tela para os três canais (Atendimento). Eram três
+                    destinos, e quem atende tinha de adivinhar em qual deles a
+                    conversa estava. As rotas antigas de canal -- as de antes e as
+                    `/comunicacao/*` do Visual 01 -- viram redirecionamento COM O
+                    FILTRO já aplicado e preservando `?thread=`/`#`: link salvo e
+                    favorito continuam chegando à mesma conversa. `replace` para o
+                    botão Voltar não cair de novo aqui. */}
+                <Route path="/conversations" element={<LegacyChannelRedirect to="/atendimento" canal="whatsapp" />} />
+                <Route path="/instagram" element={<LegacyChannelRedirect to="/atendimento" canal="instagram" />} />
+                <Route path="/comunicacao" element={<LegacyChannelRedirect to="/atendimento" />} />
+                <Route path="/comunicacao/whatsapp" element={<LegacyChannelRedirect to="/atendimento" canal="whatsapp" />} />
+                <Route path="/comunicacao/instagram" element={<LegacyChannelRedirect to="/atendimento" canal="instagram" />} />
+                <Route path="/comunicacao/email" element={<LegacyChannelRedirect to="/inbox" />} />
+                <Route element={<CommunicationLayout />}>
+                  <Route path="/atendimento" element={<SuspenseRoute><Atendimento /></SuspenseRoute>} />
+                  {/* A CAIXA COMPLETA FICA, e não é teimosia: `/inbox` tem pastas
+                      do Gmail, rótulos, spam, lixeira, adiar e anexos -- gestão de
+                      caixa, que não cabe numa lista de conversas e que virar
+                      redirecionamento APAGARIA. Saiu da barra lateral; o cabeçalho
+                      de Atendimento leva até ela, e o link salvo continua valendo. */}
+                  <Route path="/inbox" element={<SuspenseRoute><Inbox /></SuspenseRoute>} />
+                </Route>
 
                 {/* Todo mundo vê quem é da equipe. As ações (trocar papel, remover,
                     convidar) já são protegidas por isAdmin dentro da própria página. */}

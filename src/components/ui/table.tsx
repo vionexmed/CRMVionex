@@ -34,13 +34,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
   ({ className, ...props }, ref) => (
     <tr
       ref={ref}
-      // O realce de linha é NEUTRO. Selecionada é um degrau mais firme que
-      // sob o cursor -- os dois estados existem ao mesmo tempo numa seleção em
-      // lote, e precisam continuar distinguíveis.
-      className={cn(
-        "border-b border-border/70 transition-colors data-[state=selected]:bg-muted hover:bg-muted/55",
-        className,
-      )}
+      className={cn("border-b transition-colors data-[state=selected]:bg-muted hover:bg-muted/50", className)}
       {...props}
     />
   ),

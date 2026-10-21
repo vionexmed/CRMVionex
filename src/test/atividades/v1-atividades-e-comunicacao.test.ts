@@ -11,7 +11,9 @@ const sem = (s: string) =>
 const ler = (p: string) => sem(readFileSync(p, "utf8"));
 
 const ATIV = ler("src/pages/Activities.tsx");
-const CONV = ler("src/pages/Conversations.tsx");
+// As três telas de canal viraram Atendimento (main): os contratos do V1 seguem
+// valendo na tela única.
+const CONV = ler("src/pages/Atendimento.tsx");
 const INBOX = ler("src/pages/Inbox.tsx");
 const SINO = ler("src/components/crm/NotificationBell.tsx");
 const PALETA = ler("src/components/CommandPalette.tsx");
@@ -34,8 +36,8 @@ describe("Atividades", () => {
 
 describe("Conversas", () => {
   it("preserva ?thread= e ?q=", () => {
-    expect(CONV).toContain('params.get("thread")');
-    expect(CONV).toContain('params.get("q")');
+    expect(CONV).toContain('parametros.get("thread")');
+    expect(CONV).toContain('parametros.get("q")');
   });
   it("bolhas: saída em primary, entrada em card com borda", () => {
     expect(CONV).toContain('"bg-primary text-primary-foreground"');

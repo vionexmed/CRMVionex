@@ -80,15 +80,18 @@ const buildListQuery = (orgId: string, params: ContactListParams) => {
   if (ownerId && ownerId !== "all") query = query.eq("owner_id", ownerId);
   if (companyId && companyId !== "all") query = query.eq("company_id", companyId);
   // A localização é salva no metadata pelo cadastro e pela importação.
-  const pais = country?.trim();
-  const literal = (value: string) => value.replace(/[\\%_*]/g, (char) => `\\${char}`);
-  if (pais) query = query.ilike("metadata->>pais", literal(pais));
-  if (createdFrom) query = query.gte("created_at", createdFrom);
-  if (createdTo) query = query.lte("created_at", createdTo);
   // ilike sem curinga: igualdade que ignora maiúsculas. Os curingas do próprio
   // valor são escapados, senão uma cidade com "_" casaria com qualquer letra.
-  const cidade = city?.trim();
-  if (cidade) query = query.ilike("metadata->>cidade", cidade.replace(/[\\%_]/g, (c) => `\\${c}`));
+  //
+  // A cidade NÃO é aparada: o valor vem de `listarCidades`, que preserva a
+  // grafia gravada (inclusive espaço sobrando), e é essa grafia que a contagem
+  // ao lado da opção promete. Valor só de espaços não filtra.
+  const literal = (value: string) => value.replace(/[\\%_*]/g, (char) => `\\${char}`);
+  const pais = country?.trim();
+  if (pais) query = query.ilike("metadata->>pais", literal(pais));
+  if (city?.trim()) query = query.ilike("metadata->>cidade", literal(city));
+  if (createdFrom) query = query.gte("created_at", createdFrom);
+  if (createdTo) query = query.lte("created_at", createdTo);
   // Filtro por origem (metadata.source). Agrupa valores em buckets amigáveis.
   if (origin && origin !== "all") {
     if (origin === "cadastro_likawave") {

@@ -57,11 +57,14 @@ describe("todo destino do menu existe no roteador", () => {
    * aplicado: é o mesmo critério de `/tasks` e `/leads`.
    */
   it("as rotas de canal redirecionam para a tela única", () => {
+    // `LegacyChannelRedirect` aplica `?canal=` POR CIMA da query original (e
+    // usa replace): `/conversations?thread=…` chega à mesma conversa. O
+    // comportamento está coberto em navigation/estrutura-e-aliases.test.tsx.
     expect(APP).toMatch(
-      /path="\/conversations" element=\{<Navigate to="\/atendimento\?canal=whatsapp" replace \/>\}/,
+      /path="\/conversations" element=\{<LegacyChannelRedirect to="\/atendimento" canal="whatsapp" \/>\}/,
     );
     expect(APP).toMatch(
-      /path="\/instagram" element=\{<Navigate to="\/atendimento\?canal=instagram" replace \/>\}/,
+      /path="\/instagram" element=\{<LegacyChannelRedirect to="\/atendimento" canal="instagram" \/>\}/,
     );
   });
 

@@ -23,8 +23,8 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Edit2, X, Phone, Mail,
-  Building2, Briefcase, Save, MapPin, Star, MessageCircle, ShieldOff, ShieldCheck,
+  Edit2, X,
+  Save, MessageCircle, ShieldOff, ShieldCheck,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { mensagemErro } from "@/lib/erro-supabase";
@@ -688,7 +688,7 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
                               sem conversa selecionada, e `wa.me` ao lado cobre o
                               primeiro contato. */}
                           <Link
-                            to={`/comunicacao/whatsapp?thread=${encodeURIComponent(`whatsapp:${contact.id}`)}`}
+                            to={`/atendimento?thread=${encodeURIComponent(`whatsapp:${contact.id}`)}`}
                             onClick={onClose}
                             className="text-label text-primary hover:underline"
                           >

@@ -25,7 +25,11 @@ export function AreaNavigation({ sectionId }: { sectionId: string }) {
   );
 }
 
-/** HubSpot: troca de canal no contexto da caixa; cada rota conserva seu contrato. */
+/**
+ * Casca da área Comunicação (Atendimento e caixa de e-mail completa): devolve o
+ * respiro que o `<main>` tira desta área. A faixa de módulos só aparece quando a
+ * área tem mais de um módulo.
+ */
 export function CommunicationLayout() {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -35,8 +39,15 @@ export function CommunicationLayout() {
   );
 }
 
-/** replace impede que Voltar caia no alias novamente; OAuth e bookmarks conservam parâmetros. */
-export function LegacyChannelRedirect({ to }: { to: string }) {
+/**
+ * replace impede que Voltar caia no alias novamente; OAuth e bookmarks conservam
+ * parâmetros (`?thread=`, `#mensagem`). `canal` aplica o filtro de canal do
+ * Atendimento por cima da query original, sem apagar o resto.
+ */
+export function LegacyChannelRedirect({ to, canal }: { to: string; canal?: string }) {
   const { search, hash } = useLocation();
-  return <Navigate to={{ pathname: to, search, hash }} replace />;
+  const params = new URLSearchParams(search);
+  if (canal) params.set("canal", canal);
+  const query = params.toString();
+  return <Navigate to={{ pathname: to, search: query ? `?${query}` : "", hash }} replace />;
 }

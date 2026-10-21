@@ -209,7 +209,12 @@ describe("a lateral ancora a tela", () => {
    * troca de cor de destaque deixaria o item ativo na cor antiga.
    */
   it("o item ativo usa a cor de destaque da lateral", () => {
-    const b = bloco(".vx-nav-active {");
+    // Lido SEM comentários (CSS_LIMPO): a regra tem prosa dentro do bloco, e
+    // medir a prosa foi exatamente o que deixou um teste anterior verde
+    // guardando uma regra que não existia mais.
+    const i = CSS_LIMPO.indexOf(".vx-nav-active {");
+    expect(i, "regra .vx-nav-active não encontrada").toBeGreaterThan(-1);
+    const b = CSS_LIMPO.slice(i, CSS_LIMPO.indexOf("}", i));
     expect(b).toContain("hsl(var(--sidebar-primary))");
     expect(b).toContain("hsl(var(--sidebar-primary-foreground))");
     expect(b).not.toMatch(/#[0-9a-f]{3,6}|rgba?\(/i);
