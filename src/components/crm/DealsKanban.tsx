@@ -457,13 +457,11 @@ function WonLostDropZone({
   return (
     <div
       ref={setNodeRef}
-      // SEM transform aqui -- CLAUDE.md documenta `scale-*` num wrapper de
-      // kanban como o gatilho exato que faz o DragOverlay (portal para
-      // document.body) fugir do cursor pela largura da sidebar. O destaque é
-      // só cor/anel, nunca escala.
+      // Só cor no realce. Havia um `scale-105` aqui -- e escala é transform,
+      // que num ancestral vira bloco de contenção do DragOverlay (CLAUDE.md).
       className={cn(
         "flex w-16 shrink-0 flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors",
-        isOver ? "border-primary bg-primary/10 ring-2 ring-primary/30" : "border-border bg-card/50",
+        isOver ? "border-primary bg-accent" : "border-border bg-card/50",
       )}
     >
       <Icon className={`h-5 w-5 ${color}`} />

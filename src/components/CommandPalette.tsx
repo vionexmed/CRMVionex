@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, Building2, Handshake, Search, type LucideIcon } from "lucide-react";
+import { Users, Building2, Handshake, Inbox, Search, type LucideIcon } from "lucide-react";
 import { CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Iniciais } from "@/components/layout/ListaV1";
@@ -49,7 +49,12 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       keywords: `${section.label} ${item.label} ${(item.aliases ?? []).join(" ")}`,
     })));
     const account = ACCOUNT_ITEMS.filter((item) => isAdmin || !item.adminOnly).map((item) => ({ ...item, keywords: `Conta ${item.label}` }));
-    return [...new Map([...items, ...account].map((item) => [item.path, item])).values()];
+    // Atendimento reúne os três canais; quem busca pelo nome do canal chega nele.
+    // A caixa de e-mail completa (pastas, spam, anexos) saiu do menu, mas segue
+    // alcançável pela paleta.
+    const canais = items.map((item) => item.path === "/atendimento" ? { ...item, keywords: `${item.keywords} WhatsApp Instagram E-mail` } : item);
+    const caixa = { label: "Caixa de e-mail", path: "/inbox", icon: Inbox, keywords: "Comunicação e-mail Gmail pastas spam anexos" };
+    return [...new Map([...canais, caixa, ...account].map((item) => [item.path, item])).values()];
   }, [isAdmin]);
   const matchingPages = pages.filter((page) => normalize(`${page.label} ${page.keywords}`).includes(normalize(term)));
 

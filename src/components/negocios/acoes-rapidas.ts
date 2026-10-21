@@ -40,7 +40,7 @@ export function montarAcoesRapidas({ deal, registrar, escreverEmail }: {
       chave: "whatsapp", rotulo: "WhatsApp", Icone: MessageCircle,
       titulo: !deal.contact ? "Sem contato vinculado" : !telefone ? "Sem telefone no contato" : "Abrir conversa no WhatsApp",
       desabilitado: !deal.contact || !telefone,
-      para: deal.contact ? `/comunicacao/whatsapp?thread=${encodeURIComponent(`whatsapp:${deal.contact.id}`)}` : undefined,
+      para: deal.contact ? `/atendimento?thread=${encodeURIComponent(`whatsapp:${deal.contact.id}`)}` : undefined,
     },
     { chave: "tarefa", rotulo: "Tarefa", Icone: Calendar, titulo: "Agendar tarefa", onClick: () => registrar("task") },
   ];

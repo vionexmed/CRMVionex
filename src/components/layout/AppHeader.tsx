@@ -45,8 +45,10 @@ export function AppHeader({ onOpenSearch, actions }: AppHeaderProps) {
   if (section) {
     parts.push({ label: section.label, href: section.entryPath });
     if (item && item.label !== section.label && section.items.length > 1) parts.push({ label: item.label, href: item.path });
-    else if (section.items.length === 1 && item) parts.push({ label: item.label === section.label ? "Visão geral" : item.label });
+    else if (section.items.length === 1 && item) parts.push({ label: item.label === section.label ? "Visão geral" : item.label, href: item.path });
     if (pathname.startsWith("/deals/")) parts.push({ label: "Detalhe" });
+    // A caixa de e-mail completa é alias de Atendimento no menu, mas é outra tela.
+    if (pathname === "/inbox" || pathname.startsWith("/inbox/")) parts.push({ label: "Caixa de e-mail" });
   } else if (pathname.startsWith("/settings")) {
     parts.push({ label: "Configurações", href: "/settings" });
     if (item && item.label !== "Configurações") parts.push({ label: item.label });
