@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Iniciais } from "@/components/layout/ListaV1";
 import { Card, CardContent} from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Edit2, X, Save, Building2, Globe, Users, DollarSign} from "lucide-react";
+import { Edit2, X, Save, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Database } from "@/integrations/supabase/types";
 import { PageTabs } from "@/components/layout/PageTabs";
@@ -98,34 +98,30 @@ export function CompanyDrawer({ company, onClose, onUpdate }: CompanyDrawerProps
         {/* Header */}
         <div className="border-b border-border p-6">
           <div className="flex items-start gap-4">
-            {company.domain ? (
-              <img src={`https://logo.clearbit.com/${company.domain}`} alt="" className="h-14 w-14 rounded-lg bg-muted object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-            ) : (
-              <Avatar className="h-14 w-14"><AvatarFallback className="bg-primary/10 text-primary text-lg"><Building2 className="h-6 w-6" /></AvatarFallback></Avatar>
-            )}
+            <Iniciais nome={company.name} forma="empresa" tamanho="lg" className="h-12 w-12 text-sm" />
             <div className="flex-1">
               <h2 className="vx-titulo-painel">{company.name}</h2>
               {company.industry && <p className="text-sm text-muted-foreground">{company.industry}</p>}
               {company.domain && <p className="text-xs text-muted-foreground">{company.domain}</p>}
             </div>
-            <Button variant="outline" size="sm" onClick={() => setEditing(!editing)}>
+            <Button variant="outline" size="sm" onClick={() => setEditing(!editing)} aria-label={editing ? "Cancelar edição" : "Editar empresa"}>
               {editing ? <X className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
             </Button>
           </div>
 
           {/* Metrics */}
-          <div className="grid grid-cols-3 gap-3 mt-4">
-            <div className="rounded-lg border border-border p-2.5 text-center">
-              <p className="vx-titulo-painel">{totalDeals}</p>
-              <p className="text-label text-muted-foreground uppercase">Negócios</p>
+          <div className="mt-4 grid grid-cols-3 divide-x divide-border overflow-hidden rounded-lg border border-border bg-card">
+            <div className="p-3">
+              <p className="text-xs text-muted-foreground">Negócios</p>
+              <p className="mt-1 text-lg font-bold tabular-nums">{totalDeals}</p>
             </div>
-            <div className="rounded-lg border border-border p-2.5 text-center">
-              <p className="text-lg font-bold text-primary">{formatarMoeda(totalValue)}</p>
-              <p className="text-label text-muted-foreground uppercase">Valor Total</p>
+            <div className="p-3">
+              <p className="text-xs text-muted-foreground">Valor total</p>
+              <p className="mt-1 text-lg font-bold tabular-nums">{formatarMoeda(totalValue)}</p>
             </div>
-            <div className="rounded-lg border border-border p-2.5 text-center">
-              <p className="text-lg font-bold text-success">{formatarMoeda(wonValue)}</p>
-              <p className="text-label text-muted-foreground uppercase">Ganhos</p>
+            <div className="p-3">
+              <p className="text-xs text-muted-foreground">Ganhos</p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-success">{formatarMoeda(wonValue)}</p>
             </div>
           </div>
         </div>
@@ -179,28 +175,31 @@ export function CompanyDrawer({ company, onClose, onUpdate }: CompanyDrawerProps
               </div>
             ) : (
               <div className="space-y-3">
-                {company.website && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Globe className="h-4 w-4 text-muted-foreground" />
-                    <a href={company.website.startsWith("http") ? company.website : `https://${company.website}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.website}</a>
+                <h3 className="vx-titulo-secao">Dados da empresa</h3>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  {company.website && (
+                    <div className="min-w-0">
+                      <dt className="text-xs text-muted-foreground">Website</dt>
+                      <dd className="truncate"><a href={company.website.startsWith("http") ? company.website : `https://${company.website}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.website}</a></dd>
+                    </div>
+                  )}
+                  {company.size && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Funcionários</dt>
+                      <dd>{company.size}</dd>
+                    </div>
+                  )}
+                  {company.revenue && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Receita</dt>
+                      <dd>{formatarMoeda(Number(company.revenue))}</dd>
+                    </div>
+                  )}
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Criado em</dt>
+                    <dd>{company.created_at ? formatarData(company.created_at) : "—"}</dd>
                   </div>
-                )}
-                {company.size && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>{company.size} funcionários</span>
-                  </div>
-                )}
-                {company.revenue && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    <span>Receita: {formatarMoeda(Number(company.revenue))}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="text-muted-foreground">Criado em</span>
-                  <span>{company.created_at ? formatarData(company.created_at) : "—"}</span>
-                </div>
+                </dl>
               </div>
             )}
           </TabsContent>
@@ -214,18 +213,14 @@ export function CompanyDrawer({ company, onClose, onUpdate }: CompanyDrawerProps
                   A lista era cortada em 20 EM SILÊNCIO -- e com uma planilha de
                   centenas de leads da mesma instituição, o resto ficava
                   invisível sem nada na tela sugerindo que havia mais. */}
-              <p className="pb-1 text-label font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="vx-titulo-secao pb-1">
                 {contacts.length} {contacts.length === 1 ? "pessoa vinculada" : "pessoas vinculadas"}
               </p>
               {contacts.slice(0, LIMITE_CONTATOS).map((c) => (
                 <div key={c.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                      {c.first_name[0]}{c.last_name?.[0] || ""}
-                    </AvatarFallback>
-                  </Avatar>
+                  <Iniciais nome={`${c.first_name} ${c.last_name ?? ""}`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{c.first_name} {c.last_name}</p>
+                    <p className="text-sm font-semibold truncate">{c.first_name} {c.last_name}</p>
                     {c.email && <p className="text-xs text-muted-foreground truncate">{c.email}</p>}
                   </div>
                   {c.title && <span className="text-xs text-muted-foreground">{c.title}</span>}

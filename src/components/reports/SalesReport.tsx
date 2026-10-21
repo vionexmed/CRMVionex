@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FaixaDeIndicadores, Indicador, Iniciais } from "@/components/layout/ListaV1";
+import { CartaoDeRelatorio, GradeDeRelatorio, VazioDoBloco } from "@/components/reports/CartaoDeRelatorio";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RoscaComLegenda } from "@/components/dashboard/svg/RoscaComLegenda";
 import { BarrasAgrupadas } from "@/components/dashboard/svg/BarrasAgrupadas";
 import {
-  TrendingUp, XCircle, Download, Clock, Trophy, Target,
+  Download,
 } from "lucide-react";
 import {
   Deal, Stage, Profile, Company,
@@ -20,10 +21,12 @@ import {
   downloadCSV,
 } from "@/components/reports/types";
 
+type Agrupamento = "stage" | "owner" | "company" | "month";
+
 export function SalesReport({ deals, stages, members, companies }: {
   deals: Deal[]; stages: Stage[]; members: Profile[]; companies: Company[];
 }) {
-  const [groupBy, setGroupBy] = useState<"stage" | "owner" | "company" | "month">("stage");
+  const [groupBy, setGroupBy] = useState<Agrupamento>("stage");
   const { toast } = useToast();
 
   const wonDeals = deals.filter((d) => d.status === "won");
@@ -48,7 +51,7 @@ export function SalesReport({ deals, stages, members, companies }: {
   const funnelData = useMemo(() => stages.map((s, i) => {
     const count = deals.filter((d) => d.stage_id === s.id && d.status === "open").length;
     const val = deals.filter((d) => d.stage_id === s.id && d.status === "open").reduce((sum, d) => sum + (Number(d.value) || 0), 0);
-    return { name: s.name, count, value: val, color: s.color || CHART_COLORS[i % CHART_COLORS.length] };
+    return { name: s.name, count, value: val, color: s.color || `var(--stage-${Math.min(i + 1, 6)})` };
   }), [stages, deals]);
 
   // Waterfall
@@ -138,209 +141,180 @@ export function SalesReport({ deals, stages, members, companies }: {
   };
 
   return (
-    <div className="space-y-4 mt-4">
-      {/* KPIs */}
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
-        {[
-          { label: "Win Rate", value: `${winRate}%`, icon: Trophy, color: "text-primary" },
-          { label: "Ganhos", value: `${wonDeals.length}`, sub: fmt(wonValue), icon: TrendingUp, color: "text-success" },
-          { label: "Perdidos", value: `${lostDeals.length}`, icon: XCircle, color: "text-destructive" },
-          { label: "Ticket Médio", value: fmt(avgTicket), icon: Target, color: "text-primary" },
-          { label: "Ciclo Médio", value: `${avgCycle} dias`, icon: Clock, color: "text-warning" },
-        ].map((k) => (
-          <Card key={k.label}>
-            <CardContent className="p-3 flex items-center gap-2">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-lg bg-muted`}>
-                <k.icon className={`h-4 w-4 ${k.color}`} />
-              </div>
-              <div>
-                <p className="text-lg font-bold">{k.value}</p>
-                <p className="text-label text-muted-foreground uppercase">{k.label}</p>
-                {k.sub && <p className="text-label text-muted-foreground">{k.sub}</p>}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+    <div className="min-w-0 space-y-4">
+      <FaixaDeIndicadores>
+        <Indicador rotulo="Taxa de ganho" valor={`${winRate}%`} apoio={`${totalClosed} ${totalClosed === 1 ? "fechado" : "fechados"}`} />
+        <Indicador rotulo="Ganhos" valor={wonDeals.length} apoio={fmt(wonValue)} tom={wonDeals.length > 0 ? "sucesso" : undefined} />
+        <Indicador rotulo="Perdidos" valor={lostDeals.length} apoio={`${pct(lostDeals.length, totalClosed)}% dos fechados`} />
+        <Indicador rotulo="Ticket médio" valor={fmt(avgTicket)} apoio="por negócio ganho" />
+        <Indicador rotulo="Ciclo médio" valor={`${avgCycle} dias`} apoio="da criação ao ganho" />
+      </FaixaDeIndicadores>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Waterfall */}
-        <Card>
-          <CardHeader><CardTitle>Waterfall de Negócios</CardTitle></CardHeader>
-          <CardContent>
-            {/* A cor pertence à LINHA aqui, não à série: ganho é verde,
-                perdido é vermelho, aberto é neutro. */}
-            <BarrasAgrupadas
-              linhas={waterfallData}
-              rotulo={(w) => w.name}
-              formatar={fmt}
-              vazio="Nenhum negócio no período"
-              series={[{ nome: "Valor", cor: (w) => w.fill, valor: (w) => w.value }]}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Funnel */}
-        <Card>
-          <CardHeader><CardTitle>Negócios por etapa</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-1.5">
-              {funnelData.map((s) => {
-                const max = Math.max(...funnelData.map((f) => f.value), 1);
-                return (
-                  <div key={s.name}>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-label font-medium">{s.name}</span>
-                      <span className="text-label text-muted-foreground">{s.count} · {fmt(s.value)}</span>
-                    </div>
-                    <div className="h-4 rounded bg-muted overflow-hidden">
-                      <div className="h-full rounded" style={{ width: `${Math.max((s.value / max) * 100, 2)}%`, backgroundColor: s.color }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Conversion rates */}
-        <Card>
-          <CardHeader><CardTitle>Taxa de conversão por etapa</CardTitle></CardHeader>
-          <CardContent>
-            <BarrasAgrupadas
-              linhas={stageConversion}
-              rotulo={(e) => e.name}
-              formatar={(v) => `${v}%`}
-              vazio="Nenhuma etapa com movimento"
-              series={[{ nome: "Conversão", cor: CHART_COLORS[0], valor: (e) => e.rate }]}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Avg time per stage */}
-        <Card>
-          <CardHeader><CardTitle>Tempo médio por etapa (dias)</CardTitle></CardHeader>
-          <CardContent>
-            {/* Este já era `layout="vertical"` no recharts, ou seja, barras
-                horizontais -- a troca não muda nada aqui. */}
-            <BarrasAgrupadas
-              linhas={avgTimePerStage}
-              rotulo={(e) => e.name}
-              formatar={(v) => `${v} d`}
-              vazio="Sem tempo de permanência registrado"
-              series={[{ nome: "Dias", cor: "hsl(var(--warning))", valor: (e) => e.days }]}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Loss reasons */}
-        <Card>
-          <CardHeader><CardTitle>Motivos de Perda</CardTitle></CardHeader>
-          <CardContent>
-            {lossReasons.length > 0 ? (
-              <RoscaComLegenda
-                tamanho={140}
-                fatias={lossReasons.map((l, i) => ({
-                  nome: l.name,
-                  valor: l.value,
-                  cor: CHART_COLORS[i % CHART_COLORS.length],
-                }))}
-              />
-            ) : <div className="flex h-[200px] items-center justify-center text-xs text-muted-foreground">Nenhuma perda registrada</div>}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Grouped deals table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Negócios Agrupados</CardTitle>
-            <div className="flex gap-2">
-              <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
-                <SelectTrigger className="h-8 w-32 text-label"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="stage">Por etapa</SelectItem>
-                  <SelectItem value="owner">Por Dono</SelectItem>
-                  <SelectItem value="company">Por Empresa</SelectItem>
-                  <SelectItem value="month">Por Mês</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" className="h-8 text-label" onClick={exportDealsCSV}>
-                <Download className="h-3 w-3 mr-1" />CSV
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="vx-table">
+      <GradeDeRelatorio>
+        <CartaoDeRelatorio
+          titulo="Negócios agrupados"
+          rente
+          acoes={<>
+            <Select value={groupBy} onValueChange={(v) => setGroupBy(v as Agrupamento)}>
+              <SelectTrigger aria-label="Agrupar por" className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="stage">Por etapa</SelectItem>
+                <SelectItem value="owner">Por responsável</SelectItem>
+                <SelectItem value="company">Por empresa</SelectItem>
+                <SelectItem value="month">Por mês</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={exportDealsCSV}>
+              <Download aria-hidden />Exportar CSV
+            </Button>
+          </>}
+        >
+          <div className="vx-table rounded-none border-x-0 border-b-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-label">Grupo</TableHead>
-                  <TableHead className="text-label text-center">Total</TableHead>
-                  <TableHead className="text-label text-center">Ganhos</TableHead>
-                  <TableHead className="text-label text-center">Perdidos</TableHead>
-                  <TableHead className="text-label text-center">Win Rate</TableHead>
-                  <TableHead className="text-label text-right">Valor Ganho</TableHead>
+                  <TableHead>Grupo</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Ganhos</TableHead>
+                  <TableHead className="text-right">Perdidos</TableHead>
+                  <TableHead className="text-right">Taxa de ganho</TableHead>
+                  <TableHead className="text-right">Valor ganho</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {groupedData.map((g) => (
-                  <TableRow key={g.label}>
-                    <TableCell className="text-xs font-medium">{g.label}</TableCell>
-                    <TableCell className="text-xs text-center">{g.deals.length}</TableCell>
-                    <TableCell className="text-xs text-center text-success">{g.won}</TableCell>
-                    <TableCell className="text-xs text-center text-destructive">{g.lost}</TableCell>
-                    <TableCell className="text-xs text-center">
-                      <Badge variant={pct(g.won, g.won + g.lost) >= 50 ? "default" : "secondary"} className="text-label">
-                        {pct(g.won, g.won + g.lost)}%
-                      </Badge>
+                {groupedData.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-xs text-muted-foreground">Nenhum negócio no período.</TableCell></TableRow>
+                )}
+                {groupedData.map((g) => {
+                  const taxa = pct(g.won, g.won + g.lost);
+                  return (
+                    <TableRow key={g.label}>
+                      <TableCell className="text-xs font-medium">{g.label}</TableCell>
+                      <TableCell className="text-right text-xs">{g.deals.length}</TableCell>
+                      <TableCell className="text-right text-xs text-success">{g.won}</TableCell>
+                      <TableCell className="text-right text-xs text-destructive">{g.lost}</TableCell>
+                      <TableCell className="text-right text-xs">
+                        <Badge variant={taxa >= 50 ? "success" : "neutral"}>{taxa}%</Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-semibold">{fmt(g.value)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </CartaoDeRelatorio>
+
+        <CartaoDeRelatorio titulo="Situação dos negócios" descricao="Quantidade por desfecho">
+          {/* A cor pertence à LINHA aqui, não à série: ganho é verde,
+              perdido é vermelho, aberto é a cor de destaque. */}
+          <BarrasAgrupadas
+            linhas={waterfallData}
+            rotulo={(w) => w.name}
+            formatar={(v) => String(v)}
+            vazio="Nenhum negócio no período"
+            series={[{ nome: "Negócios", cor: (w) => w.fill, valor: (w) => w.value }]}
+          />
+        </CartaoDeRelatorio>
+
+        <CartaoDeRelatorio titulo="Negócios por etapa" descricao="Em aberto: quantidade e valor">
+          {funnelData.length === 0 ? (
+            <VazioDoBloco>Nenhuma etapa configurada.</VazioDoBloco>
+          ) : (
+            <ol className="space-y-3">
+              {funnelData.map((s) => {
+                const max = Math.max(...funnelData.map((f) => f.value), 1);
+                return (
+                  <li key={s.name} className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] items-center gap-3">
+                    <span className="truncate text-xs font-medium">{s.name}</span>
+                    {/* A cor é DADO, não tema: é a que o usuário escolheu para a
+                        etapa em Configurações. Trilho em surface-2 porque
+                        `bg-muted` some sobre o cartão no tema claro. */}
+                    <div className="h-5 overflow-hidden rounded bg-surface-2">
+                      <div className="h-full rounded" style={{ width: `${Math.max((s.value / max) * 100, 2)}%`, backgroundColor: s.color }} />
+                    </div>
+                    <span className="whitespace-nowrap text-right text-xs tabular-nums">
+                      <span className="font-semibold">{s.count}</span>
+                      <span className="text-muted-foreground"> · {fmt(s.value)}</span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </CartaoDeRelatorio>
+
+        <CartaoDeRelatorio titulo="Motivos de perda">
+          {lossReasons.length > 0 ? (
+            <RoscaComLegenda
+              tamanho={140}
+              fatias={lossReasons.map((l, i) => ({
+                nome: l.name,
+                valor: l.value,
+                cor: CHART_COLORS[i % CHART_COLORS.length],
+              }))}
+            />
+          ) : <VazioDoBloco>Nenhuma perda registrada.</VazioDoBloco>}
+        </CartaoDeRelatorio>
+
+        <CartaoDeRelatorio titulo="Taxa de conversão por etapa" descricao="Negócios numa etapa sobre os da etapa anterior">
+          <BarrasAgrupadas
+            linhas={stageConversion}
+            rotulo={(e) => e.name}
+            formatar={(v) => `${v}%`}
+            vazio="Nenhuma etapa com movimento"
+            series={[{ nome: "Conversão", cor: CHART_COLORS[0], valor: (e) => e.rate }]}
+          />
+        </CartaoDeRelatorio>
+
+        <CartaoDeRelatorio titulo="Tempo médio por etapa" descricao="Em dias">
+          {/* Este já era `layout="vertical"` no recharts, ou seja, barras
+              horizontais -- a troca não muda nada aqui. */}
+          <BarrasAgrupadas
+            linhas={avgTimePerStage}
+            rotulo={(e) => e.name}
+            formatar={(v) => `${v} d`}
+            vazio="Sem tempo de permanência registrado"
+            series={[{ nome: "Dias", cor: "hsl(var(--chart-3))", valor: (e) => e.days }]}
+          />
+        </CartaoDeRelatorio>
+      </GradeDeRelatorio>
+
+      {ownerStats.length > 0 && (
+        <CartaoDeRelatorio titulo="Desempenho por responsável" rente>
+          <div className="vx-table rounded-none border-x-0 border-b-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Responsável</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Ganhos</TableHead>
+                  <TableHead className="text-right">Perdidos</TableHead>
+                  <TableHead className="text-right">Taxa de ganho</TableHead>
+                  <TableHead className="text-right">Receita</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ownerStats.map((o) => (
+                  <TableRow key={o.name}>
+                    <TableCell className="text-xs">
+                      <span className="flex items-center gap-2 font-medium">
+                        <Iniciais nome={o.name} tamanho="sm" />{o.name}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-xs text-right font-medium">{fmt(g.value)}</TableCell>
+                    <TableCell className="text-right text-xs">{o.total}</TableCell>
+                    <TableCell className="text-right text-xs text-success">{o.won}</TableCell>
+                    <TableCell className="text-right text-xs text-destructive">{o.lost}</TableCell>
+                    <TableCell className="text-right text-xs">
+                      <Badge variant={o.winRate >= 50 ? "success" : "neutral"}>{o.winRate}%</Badge>
+                    </TableCell>
+                    <TableCell className="text-right text-xs font-semibold">{fmt(o.value)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Owner performance */}
-      {ownerStats.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle>Performance por Vendedor</CardTitle></CardHeader>
-          <CardContent>
-            <div className="vx-table">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-label">Vendedor</TableHead>
-                    <TableHead className="text-label text-center">Total</TableHead>
-                    <TableHead className="text-label text-center">Ganhos</TableHead>
-                    <TableHead className="text-label text-center">Perdidos</TableHead>
-                    <TableHead className="text-label text-center">Win Rate</TableHead>
-                    <TableHead className="text-label text-right">Receita</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ownerStats.map((o) => (
-                    <TableRow key={o.name}>
-                      <TableCell className="text-xs font-medium">{o.name}</TableCell>
-                      <TableCell className="text-xs text-center">{o.total}</TableCell>
-                      <TableCell className="text-xs text-center text-success">{o.won}</TableCell>
-                      <TableCell className="text-xs text-center text-destructive">{o.lost}</TableCell>
-                      <TableCell className="text-xs text-center">
-                        <Badge variant={o.winRate >= 50 ? "default" : "secondary"} className="text-label">{o.winRate}%</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-right font-medium">{fmt(o.value)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+        </CartaoDeRelatorio>
       )}
     </div>
   );

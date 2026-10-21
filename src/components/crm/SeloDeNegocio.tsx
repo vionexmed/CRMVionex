@@ -14,10 +14,14 @@ import { cn } from "@/lib/utils";
  * **nunca usados**, com as mesmas cores. Ficaram três anos de ninguém achar.
  */
 
+/**
+ * As variantes de estado do Badge (fundo suave do V1), em vez de classes de
+ * cor por cima do `secondary`: o tema escuro e a cor de destaque vêm junto.
+ */
 const SITUACAO = {
-  open: { rotulo: "Aberto", classe: "" },
-  won: { rotulo: "Ganho", classe: "bg-success/10 text-success" },
-  lost: { rotulo: "Perdido", classe: "bg-destructive/10 text-destructive" },
+  open: { rotulo: "Aberto", variante: "neutral" },
+  won: { rotulo: "Ganho", variante: "success" },
+  lost: { rotulo: "Perdido", variante: "danger" },
 } as const;
 
 export function SeloDeNegocio({
@@ -31,7 +35,7 @@ export function SeloDeNegocio({
   // rótulo para um valor que o banco não deveria ter seria pior que assumi-lo.
   const s = SITUACAO[(status ?? "open") as keyof typeof SITUACAO] ?? SITUACAO.open;
   return (
-    <Badge variant="secondary" className={cn("text-label", s.classe, className)}>
+    <Badge variant={s.variante} className={cn("text-label", className)}>
       {s.rotulo}
     </Badge>
   );

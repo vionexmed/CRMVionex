@@ -66,7 +66,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 describe("busca global com componentes reais e transporte controlado", () => {
   it("usa catálogo sem duplicação e oculta destinos administrativos de membros", async () => {
     mount(); await openSearch();
-    expect(screen.queryByRole("option", { name: /Automações/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Marketing/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole("option", { name: "Atividades" })).toHaveLength(1);
     fireEvent.click(screen.getByRole("option", { name: /Painel|Visão geral/ }));
     expect(screen.getByLabelText("Destino")).toHaveTextContent("/dashboard");
@@ -74,7 +74,7 @@ describe("busca global com componentes reais e transporte controlado", () => {
 
   it("admin encontra os destinos autorizados e o teclado restaura foco ao fechar", async () => {
     state.isAdmin = true; mount(); const input = await openSearch();
-    expect(screen.getByRole("option", { name: /Automações/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Marketing/ })).toBeInTheDocument();
     expect(input).toHaveFocus();
     fireEvent.keyDown(input, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());

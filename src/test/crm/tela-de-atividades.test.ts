@@ -29,13 +29,16 @@ describe("os filtros usam os primitivos, não pílula à mão", () => {
    * consolidado cinco vezes e que esta cópia passou batido duas. Era a sexta —
    * e é por isso que a regra vira teste em vez de recado.
    */
-  it("o tipo de atividade vem do SegmentedControl", () => {
-    expect(TELA).toContain("<SegmentedControl");
-    expect(TELA).toContain('rotuloGrupo="Tipo de atividade"');
+  it("o tipo de atividade vem da lista compartilhada, num seletor", () => {
+    expect(TELA).toContain('aria-label="Tipo de atividade"');
+    expect(TELA).toContain("ATIVIDADE_TIPOS.map");
   });
 
-  it("tipo, busca e responsável ficam na mesma barra", () => {
-    expect(TELA).toContain("<BarraDeFiltros");
+  // No V1 tipo, busca e responsável ficam na LinhaDeFiltros, com chip
+  // removível para o que estiver ativo.
+  it("tipo, busca e responsável ficam na mesma linha de filtros", () => {
+    expect(TELA).toContain("<LinhaDeFiltros");
+    expect(TELA).toContain("<ChipDeFiltro");
   });
 
   /**
@@ -55,9 +58,8 @@ describe("o período é lido como dois eixos", () => {
    * aconteceu" — e os dois grupos até ORDENAM diferente. O código sempre soube;
    * faltava a tela dizer.
    */
-  it("os grupos vêm de HISTORICO, não de uma segunda lista", () => {
-    expect(TELA).toContain("HISTORICO.includes(k)");
-    expect(TELA).toContain("[\"Histórico\", HISTORICO]");
+  it("HISTORICO é a única lista de histórico e manda na ordenação", () => {
+    expect(TELA).toContain("HISTORICO.includes(dateFilter)");
     // A lista literal aparece UMA vez: a declaração. Uma segunda cópia
     // divergiria no dia em que alguém acrescentasse o décimo filtro.
     expect((TELA.match(/\["feitas", "todas"\]/g) ?? []).length).toBe(1);
@@ -78,7 +80,7 @@ describe("o período é lido como dois eixos", () => {
    */
   it("a contagem aparece inclusive quando é zero", () => {
     expect(TELA).not.toMatch(/\{count > 0 && \(/);
-    expect(TELA).toContain("count === 0 && \"opacity-45\"");
+    expect(TELA).toContain("contagem: counts[key]");
   });
 });
 

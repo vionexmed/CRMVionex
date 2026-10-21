@@ -48,7 +48,6 @@ describe("todas as abas usam a mesma barra", () => {
     "src/pages/Integrations.tsx",
     "src/pages/Team.tsx",
     "src/pages/SecuritySettings.tsx",
-    "src/pages/Login.tsx",
     "src/components/crm/ContactDrawer.tsx",
     "src/components/crm/CompanyDrawer.tsx",
     "src/components/crm/AtRiskPanel.tsx",
@@ -83,7 +82,6 @@ describe("as abas estão em português", () => {
   it.each([
     ["src/pages/Reports.tsx", ["Forecast", "Custom"]],
     ["src/pages/SecuritySettings.tsx", ["Audit Log"]],
-    ["src/pages/Login.tsx", ["Magic Link"]],
   ])("%s", (arquivo, termos) => {
     const src = semComentarios(readFileSync(arquivo, "utf8"));
     const i = src.indexOf("<PageTabs");

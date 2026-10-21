@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { DealQualification } from "@/components/crm/DealQualification";
 import { useOrg } from "@/hooks/useOrg";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,8 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -16,8 +20,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  ArrowLeft, Trophy, XCircle, Building2, User, Calendar, Percent,
-  Edit2, Check, X, Trash2, Loader2,
+  ArrowLeft, XCircle, Building2, User, Edit2, Check, X, Trash2, Loader2, MoreHorizontal,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -28,7 +31,9 @@ import { mensagemErro } from "@/lib/erro-supabase";
 import {
   ATIVIDADE_ICONE, ATIVIDADE_ROTULO, ATIVIDADE_JA_ACONTECEU, ATIVIDADE_TIPOS_MANUAIS,
 } from "@/lib/atividade-tipos";
-import { useDealActivities, useCreateActivity, activitiesKeys } from "@/hooks/queries/useActivities";
+import {
+  useDealActivities, useCreateActivity, useUpdateActivity, useDeleteActivities, activitiesKeys,
+} from "@/hooks/queries/useActivities";
 import { OrcamentosDoNegocio } from "@/components/orcamentos/OrcamentosDoNegocio";
 import { usePipelineStages } from "@/hooks/queries/usePipelines";
 import { useMembers } from "@/hooks/queries/useMembers";
@@ -38,6 +43,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Database } from "@/integrations/supabase/types";
 import { formatarData, formatarDataHoraCurta, formatarMoeda } from "@/lib/formato";
 import { SeloDeNegocio } from "@/components/crm/SeloDeNegocio";
+import { EmailComposeModal } from "@/components/crm/EmailComposeModal";
+import { Iniciais } from "@/components/layout/ListaV1";
+import {
+  AcoesRapidas, AlertaDeAtraso, FatosDoNegocio, TrilhaDeEtapas,
+} from "@/components/negocios/ResumoDoNegocio";
+import { montarAcoesRapidas, type TipoParaRegistrar } from "@/components/negocios/acoes-rapidas";
+import { ReagendarAtividade } from "@/components/negocios/ReagendarAtividade";
+import { etapasEmOrdem, identidadeDoNegocio, proximaAtividade } from "@/components/negocios/sinais";
+import type { AtividadeDoNegocio } from "@/lib/api/deals";
 
 type ActivityType = Database["public"]["Enums"]["activity_type"];
 type ContactRow = Database["public"]["Tables"]["contacts"]["Row"];
@@ -47,6 +61,12 @@ type ContactRow = Database["public"]["Tables"]["contacts"]["Row"];
 // mais cinco arquivos, e as cópias já haviam divergido.
 const activityIcons = ATIVIDADE_ICONE;
 const activityLabels = ATIVIDADE_ROTULO;
+
+/** Tipos que se agendam (têm "Quando"). Os outros só registram o que já houve. */
+const TIPOS_COM_QUANDO: ActivityType[] = ["task", "meeting", "call"];
+
+/** `?registrar=` que as ações rápidas do painel do quadro mandam para cá. */
+const PARA_REGISTRAR: TipoParaRegistrar[] = ["note", "call", "task"];
 
 export default function DealDetail() {
   const { id } = useParams<{ id: string }>();
@@ -68,6 +88,10 @@ export default function DealDetail() {
   const updateDealStatus = useUpdateDealStatus();
   const updateDealStage = useUpdateDealStage();
   const createActivity = useCreateActivity();
+  const updateActivity = useUpdateActivity();
+  const deleteActivities = useDeleteActivities();
+  /** Atividade aguardando confirmação de exclusão (diálogo, não window.confirm). */
+  const [atividadeParaExcluir, setAtividadeParaExcluir] = useState<{ id: string; title: string | null } | null>(null);
 
   // Inline edit
   const [editingTitle, setEditingTitle] = useState(false);
@@ -124,7 +148,39 @@ export default function DealDetail() {
   const [contatoNoPainel, setContatoNoPainel] = useState<ContactRow | null>(null);
 
   // Add activity
-  const [activityForm, setActivityForm] = useState({ type: "note" as ActivityType, title: "", body: "" });
+  const [activityForm, setActivityForm] = useState({ type: "note" as ActivityType, title: "", body: "", quando: "" });
+  const tituloDaAtividade = useRef<HTMLInputElement>(null);
+  const [escrevendoEmail, setEscrevendoEmail] = useState(false);
+  const [paraReagendar, setParaReagendar] = useState<AtividadeDoNegocio | null>(null);
+
+  /**
+   * Nota, Ligar e Tarefa: o formulário de atividade, já no tipo, com o cursor
+   * no título. É o mesmo formulário de sempre -- as ações rápidas são atalho
+   * para ele, não um segundo caminho de gravação com regras próprias.
+   */
+  const registrar = (tipo: TipoParaRegistrar) => {
+    setActivityForm((f) => ({ ...f, type: tipo }));
+    // Depois do render: o campo "Quando" pode aparecer e empurrar o título.
+    requestAnimationFrame(() => {
+      tituloDaAtividade.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+      tituloDaAtividade.current?.focus();
+    });
+  };
+
+  // Vindo do painel do quadro com `?registrar=call`: abre direto no tipo. O
+  // parâmetro sai da URL em seguida, senão recarregar repetiria o atalho.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const registrarNaUrl = searchParams.get("registrar") as TipoParaRegistrar | null;
+  useEffect(() => {
+    if (!registrarNaUrl || !PARA_REGISTRAR.includes(registrarNaUrl) || dealLoading) return;
+    registrar(registrarNaUrl);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("registrar");
+      return next;
+    }, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registrarNaUrl, dealLoading]);
 
   // Só redireciona quando o negócio REALMENTE não existe.
   //
@@ -191,7 +247,6 @@ export default function DealDetail() {
   // nada. Com um funil só configurado o bug é invisível, o que o torna pior.
   const currentStage = stages.find((s) => s.id === deal.stage_id);
   const pipelineStages = stages.filter((s) => s.pipeline_id === currentStage?.pipeline_id);
-  const currentStageIndex = pipelineStages.findIndex((s) => s.id === deal.stage_id);
 
   const saveTitle = () => {
     if (!titleDraft.trim()) return;
@@ -246,6 +301,12 @@ export default function DealDetail() {
     );
   };
 
+  // "Quando" só faz sentido para o que se agenda. Nota e e-mail registram algo
+  // que já aconteceu, e um prazo neles viraria um vencimento que ninguém cumpre.
+  const tipoAgendavel = TIPOS_COM_QUANDO.includes(activityForm.type);
+  // Com prazo, o item é agendamento; sem, é registro. Mesma regra de Activities.
+  const comPrazo = tipoAgendavel && !!activityForm.quando;
+
   const addActivity = () => {
     if (!orgId || !activityForm.title) return;
     createActivity.mutate(
@@ -274,13 +335,18 @@ export default function DealDetail() {
         //
         // `task` fica de fora: tarefa é o que falta fazer, e marcá-la concluída
         // ao criar apagaria a única coisa que ela informa.
-        completed_at: ATIVIDADE_JA_ACONTECEU.includes(activityForm.type)
+        //
+        // Se a pessoa preencheu "Quando", é agendamento: reunião marcada para
+        // sexta não pode contar como reunião feita hoje.
+        due_date: comPrazo ? new Date(activityForm.quando).toISOString() : null,
+        completed_at: !comPrazo && ATIVIDADE_JA_ACONTECEU.includes(activityForm.type)
           ? new Date().toISOString()
           : null,
       },
       {
+        onError: (e) => toast({ title: "Erro ao adicionar atividade", description: mensagemErro(e), variant: "destructive" }),
         onSuccess: () => {
-          setActivityForm({ type: "note", title: "", body: "" });
+          setActivityForm({ type: "note", title: "", body: "", quando: "" });
           qc.invalidateQueries({ queryKey: activitiesKeys.byDeal(deal.id) });
           toast({ title: "Atividade adicionada" });
         },
@@ -288,131 +354,178 @@ export default function DealDetail() {
     );
   };
 
+  const alternarConclusao = (a: { id: string; completed_at: string | null }) => {
+    const concluir = !a.completed_at;
+    updateActivity.mutate(
+      { id: a.id, activity: { completed_at: concluir ? new Date().toISOString() : null } },
+      {
+        onSuccess: () => toast({ title: concluir ? "Atividade concluída" : "Atividade reaberta" }),
+        onError: (e) => toast({ title: "Erro ao atualizar atividade", description: mensagemErro(e), variant: "destructive" }),
+      },
+    );
+  };
+
+  const excluirAtividade = () => {
+    if (!atividadeParaExcluir) return;
+    deleteActivities.mutate([atividadeParaExcluir.id], {
+      onSuccess: () => {
+        setAtividadeParaExcluir(null);
+        toast({ title: "Atividade excluída" });
+      },
+      onError: (e) => toast({ title: "Erro ao excluir atividade", description: mensagemErro(e), variant: "destructive" }),
+    });
+  };
+
   const contact = deal.contact ?? null;
   const company = deal.company ?? null;
   // Join cliente-side, porque o embed é impossível (ver lib/api/deals.ts).
   const owner = members.find((m) => m.id === deal.owner_id) ?? null;
 
+  // Só as etapas deste funil, em ordem, para a trilha.
+  const etapasEmTrilha = etapasEmOrdem(pipelineStages);
+  const identidade = identidadeDoNegocio(deal);
+  const proxima = proximaAtividade(activities);
+  const prob = Number(deal.probability) || 0;
+  const probEtapa = Number(currentStage?.win_probability) || 0;
+
   return (
     <div className="space-y-6">
       {/* Back button */}
-      <button onClick={() => navigate("/deals")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+      <button onClick={() => navigate("/deals")} className="flex min-h-8 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />Voltar para Negócios
       </button>
 
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          {/* Inline title */}
-          <div className="flex items-center gap-2">
-            {editingTitle ? (
-              <div className="flex items-center gap-1">
-                <Input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="text-2xl font-bold h-auto py-0.5" autoFocus onKeyDown={(e) => e.key === "Enter" && saveTitle()} />
-                <button onClick={saveTitle} className="text-success"><Check className="h-5 w-5" /></button>
-                <button onClick={() => { setEditingTitle(false); setTitleDraft(deal.title); }} className="text-muted-foreground"><X className="h-5 w-5" /></button>
-              </div>
-            ) : (
-              <h1 className="vx-titulo-tela group cursor-pointer" onClick={() => { setTitleDraft(deal.title); setEditingTitle(true); }}>
-                {deal.title}
-                <Edit2 className="ml-2 inline h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
-              </h1>
-            )}
-          </div>
+      {/*
+        O RESUMO NO DESENHO DO PAINEL DO V1: identidade, valor, ganho/perda,
+        trilha de etapas, fatos, alerta de atraso e ações rápidas -- as mesmas
+        peças do painel ao lado do quadro (components/negocios), para as duas
+        telas não divergirem.
 
-          {/* Inline value */}
-          <div className="flex items-center gap-3">
-            {editingValue ? (
-              <div className="flex items-center gap-2">
-                <Select value={currencyDraft} onValueChange={setCurrencyDraft}>
-                  <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="BRL">BRL</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input type="number" value={valueDraft} onChange={(e) => setValueDraft(e.target.value)} className="w-32 h-8" autoFocus onKeyDown={(e) => e.key === "Enter" && saveValue()} />
-                <button onClick={saveValue} className="text-success"><Check className="h-4 w-4" /></button>
-                <button onClick={() => setEditingValue(false)} className="text-muted-foreground"><X className="h-4 w-4" /></button>
-              </div>
-            ) : (
-              <span className="text-xl font-bold text-primary cursor-pointer hover:opacity-80" onClick={() => { setValueDraft(String(deal.value || 0)); setCurrencyDraft(deal.currency || "BRL"); setEditingValue(true); }}>
-                {formatarMoeda(Number(deal.value) || 0, deal.currency || "BRL")}
-              </span>
-            )}
-
-            {/* Stage dropdown */}
-            <Select value={deal.stage_id || ""} onValueChange={changeStage}>
-              <SelectTrigger className="w-44 h-8">
-                <div className="flex items-center gap-1.5">
-                  {currentStage?.color && <div className="h-2 w-2 rounded-full" style={{ backgroundColor: currentStage.color }} />}
-                  <SelectValue />
+        A trilha substituiu o select de etapa E a barra de progresso: eram dois
+        controles para a mesma coisa, e a barra clicável não dizia o nome de
+        etapa nenhuma.
+      */}
+      <section aria-label="Resumo do negócio" className="space-y-5 rounded-lg border border-border bg-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <Iniciais nome={identidade.nomeIniciais} forma={identidade.forma} tamanho="lg" />
+            <div className="min-w-0 flex-1 space-y-1">
+              {/* Inline title */}
+              {editingTitle ? (
+                <div className="flex items-center gap-1">
+                  <Input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} className="h-auto py-0.5 text-2xl font-bold" autoFocus onKeyDown={(e) => e.key === "Enter" && saveTitle()} />
+                  <Button variant="ghost" size="icon" onClick={saveTitle} aria-label="Salvar título" className="text-success"><Check className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => { setEditingTitle(false); setTitleDraft(deal.title); }} aria-label="Cancelar" className="text-muted-foreground"><X className="h-5 w-5" /></Button>
                 </div>
-              </SelectTrigger>
-              <SelectContent>
-                {pipelineStages.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-
-            {/* Health */}
-            <div className="flex items-center gap-1.5">
-              <div className={`h-2 w-2 rounded-full ${healthColor}`} />
-              <span className="text-xs text-muted-foreground">{healthLabel}</span>
+              ) : (
+                <h1 className="vx-titulo-tela group cursor-pointer" onClick={() => { setTitleDraft(deal.title); setEditingTitle(true); }}>
+                  {deal.title}
+                  <Edit2 className="ml-2 inline h-4 w-4 opacity-0 transition-opacity group-hover:opacity-50" />
+                </h1>
+              )}
+              <p className="truncate text-xs text-muted-foreground">
+                {[company?.name, identidade.nomeContato].filter(Boolean).join(" · ") || "Sem empresa ou contato"}
+              </p>
             </div>
+          </div>
 
-            {/* Status badge */}
-            {deal.status !== "open" && (
-              <SeloDeNegocio status={deal.status} />
+          <div className="flex shrink-0 items-center gap-2">
+            {deal.status === "open" && (
+              <>
+                <Button onClick={markAsWon} className="bg-success text-success-foreground hover:bg-success/90">
+                  Marcar ganho
+                </Button>
+                <Button variant="outline" onClick={() => setLossModalOpen(true)} className="border-destructive/40 text-destructive hover:bg-destructive-soft">
+                  Perdido
+                </Button>
+              </>
             )}
+            {/* Excluir existe para negócio fechado também: é justamente o
+                duplicado ou o de teste que se quer tirar do caminho. */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={pedirExclusao}
+              aria-label="Excluir negócio"
+              title="Excluir negócio"
+              className="text-muted-foreground hover:bg-destructive-soft hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
-        {/* Quick actions */}
-        <div className="flex gap-2">
-          {deal.status === "open" && (
-            <>
-              <Button variant="outline" onClick={markAsWon} className="text-success border-success/30 hover:bg-success/10">
-                <Trophy className="mr-2 h-4 w-4" />Ganho
-              </Button>
-              <Button variant="outline" onClick={() => setLossModalOpen(true)} className="text-destructive border-destructive/30 hover:bg-destructive/10">
-                <XCircle className="mr-2 h-4 w-4" />Perdido
-              </Button>
-            </>
+        {/* Inline value */}
+        <div className="flex flex-wrap items-center gap-3">
+          {editingValue ? (
+            <div className="flex items-center gap-2">
+              <Select value={currencyDraft} onValueChange={setCurrencyDraft}>
+                <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BRL">BRL</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input type="number" value={valueDraft} onChange={(e) => setValueDraft(e.target.value)} className="h-8 w-32" autoFocus onKeyDown={(e) => e.key === "Enter" && saveValue()} />
+              <Button variant="ghost" size="icon" onClick={saveValue} aria-label="Salvar valor" className="text-success"><Check className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => setEditingValue(false)} aria-label="Cancelar" className="text-muted-foreground"><X className="h-4 w-4" /></Button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              title="Editar valor"
+              className="text-2xl font-bold tabular-nums tracking-tight text-foreground hover:text-primary"
+              onClick={() => { setValueDraft(String(deal.value || 0)); setCurrencyDraft(deal.currency || "BRL"); setEditingValue(true); }}
+            >
+              {formatarMoeda(Number(deal.value) || 0, deal.currency || "BRL")}
+            </button>
           )}
-          {/* Excluir existe para negócio fechado também: é justamente o
-              duplicado ou o de teste que se quer tirar do caminho. */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={pedirExclusao}
-            aria-label="Excluir negócio"
-            title="Excluir negócio"
-            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+
+          {/* Status badge */}
+          {deal.status !== "open" && <SeloDeNegocio status={deal.status} />}
+
+          {/* Health */}
+          <div className="flex items-center gap-1.5" title="Pela última atividade registrada">
+            <div className={`h-2 w-2 rounded-full ${healthColor}`} />
+            <span className="text-xs text-muted-foreground">{healthLabel}</span>
+          </div>
         </div>
-      </div>
 
-      {/* Progresso no funil deste negócio */}
-      <div className="flex gap-1">
-        {pipelineStages.map((s, i) => (
-          <div
-            key={s.id}
-            className={`h-2 flex-1 rounded-full transition-colors cursor-pointer ${
-              i <= currentStageIndex
-                ? deal.status === "won" ? "bg-success" : deal.status === "lost" ? "bg-destructive" : "bg-primary"
-                : "bg-muted"
-            }`}
-            onClick={() => deal.status === "open" && changeStage(s.id)}
-            title={s.name}
+        {etapasEmTrilha.length > 0 && (
+          <TrilhaDeEtapas
+            etapas={etapasEmTrilha}
+            atualId={deal.stage_id}
+            status={deal.status}
+            onEscolher={changeStage}
           />
-        ))}
-      </div>
+        )}
 
-      <div className="grid grid-cols-3 gap-6">
+        <div className="grid gap-5 border-t border-border pt-5 lg:grid-cols-2">
+          <FatosDoNegocio fatos={[
+            // Join cliente-side do responsável: não existe FK deals->profiles.
+            { rotulo: "Responsável", valor: owner?.name || "Sem responsável" },
+            { rotulo: "Previsão de fechamento", valor: deal.close_date ? formatarData(deal.close_date) : "—" },
+            { rotulo: "Origem", valor: identidade.origem ?? "—" },
+            // A do negócio quando alguém a definiu; senão a da etapa, dita como tal.
+            { rotulo: "Probabilidade", valor: prob > 0 ? `${prob}%` : probEtapa > 0 ? `${probEtapa}% (da etapa)` : "—" },
+          ]} />
+          <div className="space-y-3">
+            {proxima?.atrasada && (
+              <AlertaDeAtraso proxima={proxima} onReagendar={() => setParaReagendar(proxima.atividade)} />
+            )}
+            <AcoesRapidas acoes={montarAcoesRapidas({
+              deal,
+              registrar,
+              escreverEmail: () => setEscrevendoEmail(true),
+            })} />
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* Main content: Timeline */}
-        <div className="col-span-2 space-y-4">
+        <div className="space-y-4 lg:col-span-2">
           {/* Add activity form */}
           <Card>
             <CardHeader>
@@ -432,10 +545,27 @@ export default function DealDetail() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Input className="h-8 text-sm" placeholder="Título" value={activityForm.title} onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })} />
+                <Input ref={tituloDaAtividade} className="h-8 text-sm" placeholder="Título" value={activityForm.title} onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })} />
               </div>
+              {tipoAgendavel && (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="atividade-quando" className="text-xs text-muted-foreground">Quando</Label>
+                  <Input
+                    id="atividade-quando"
+                    type="datetime-local"
+                    className="h-8 w-52 text-xs"
+                    value={activityForm.quando}
+                    onChange={(e) => setActivityForm({ ...activityForm, quando: e.target.value })}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {activityForm.quando
+                      ? "Fica pendente até ser concluída"
+                      : activityForm.type === "task" ? "Sem prazo" : "Vazio: registra como já realizada"}
+                  </span>
+                </div>
+              )}
               <Textarea placeholder="Descrição (opcional)" value={activityForm.body} onChange={(e) => setActivityForm({ ...activityForm, body: e.target.value })} rows={2} className="text-sm" />
-              <Button size="sm" onClick={addActivity} disabled={!activityForm.title}>Adicionar</Button>
+              <Button size="sm" onClick={addActivity} disabled={!activityForm.title || createActivity.isPending}>Adicionar</Button>
             </CardContent>
           </Card>
 
@@ -444,7 +574,13 @@ export default function DealDetail() {
             {activities.map((a) => {
               const Icon = activityIcons[a.type];
               return (
-                <div key={a.id} className="flex gap-3 rounded-lg border border-border p-3">
+                <div key={a.id} className="flex items-start gap-3 rounded-lg border border-border p-3">
+                  <Checkbox
+                    className="mt-2"
+                    aria-label={a.completed_at ? "Reabrir atividade" : "Marcar como concluída"}
+                    checked={!!a.completed_at}
+                    onCheckedChange={() => alternarConclusao(a)}
+                  />
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
                     <Icon className="h-4 w-4 text-muted-foreground" />
                   </div>
@@ -455,9 +591,30 @@ export default function DealDetail() {
                         {formatarDataHoraCurta(a.created_at!)}
                       </span>
                     </div>
-                    <p className="text-sm font-medium">{a.title}</p>
+                    <p className={`text-sm font-medium ${a.completed_at ? "text-muted-foreground line-through" : ""}`}>{a.title}</p>
+                    {a.due_date && (
+                      <p className={`text-xs ${!a.completed_at && new Date(a.due_date) < new Date() ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+                        Para {formatarDataHoraCurta(a.due_date)}
+                      </p>
+                    )}
                     {a.body && <p className="mt-1 text-sm text-muted-foreground">{a.body}</p>}
                   </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Ações da atividade"
+                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setAtividadeParaExcluir({ id: a.id, title: a.title })} className="text-destructive">
+                        <Trash2 className="mr-2 h-3.5 w-3.5" />Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               );
             })}
@@ -528,50 +685,21 @@ export default function DealDetail() {
             </CardContent>
           </Card>
 
-          {/* Owner */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 font-medium text-muted-foreground">
-                <User className="h-4 w-4" />Responsável
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {owner ? (
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={owner.avatar_url || ""} />
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                      {owner.name?.charAt(0)?.toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <p className="text-sm font-medium">{owner.name}</p>
-                </div>
-              ) : <p className="text-sm text-muted-foreground">Sem responsável</p>}
-            </CardContent>
-          </Card>
-
-          {/* Details */}
+          {/* Responsável, fechamento e probabilidade subiram para os fatos do
+              resumo, no topo. Aqui fica o que só interessa de vez em quando. */}
           <Card>
             <CardHeader>
               <CardTitle className="font-medium text-muted-foreground">Detalhes</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-muted-foreground"><Calendar className="h-3.5 w-3.5" />Fechamento</span>
-                <span>{deal.close_date ? formatarData(deal.close_date) : "—"}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-muted-foreground"><Percent className="h-3.5 w-3.5" />Probabilidade</span>
-                <span>{deal.probability || 0}%</span>
-              </div>
-              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Criado em</span>
                 <span>{deal.created_at ? formatarData(deal.created_at) : "—"}</span>
               </div>
               {deal.loss_reason && (
-                <div className="mt-2 rounded-md bg-destructive/10 p-2">
+                <div className="mt-2 rounded-md bg-destructive-soft p-2">
                   <p className="text-xs font-medium text-destructive">Motivo da perda:</p>
-                  <p className="text-xs text-destructive/80">{deal.loss_reason}</p>
+                  <p className="text-xs text-destructive">{deal.loss_reason}</p>
                 </div>
               )}
             </CardContent>
@@ -626,6 +754,41 @@ export default function DealDetail() {
         }}
         companies={companies}
       />
+
+      {/* E-mail das ações rápidas: o compositor do CRM, amarrado à pessoa e ao
+          negócio, então o envio entra na linha do tempo abaixo. */}
+      <EmailComposeModal
+        open={escrevendoEmail}
+        onOpenChange={setEscrevendoEmail}
+        defaultTo={contact?.email || ""}
+        defaultContactId={deal.contact_id || undefined}
+        defaultDealId={deal.id}
+        onSent={() => {
+          setEscrevendoEmail(false);
+          qc.invalidateQueries({ queryKey: activitiesKeys.byDeal(deal.id) });
+          qc.invalidateQueries({ queryKey: ["deals"] });
+        }}
+      />
+
+      <ReagendarAtividade atividade={paraReagendar} onFechar={() => setParaReagendar(null)} />
+
+      <Dialog open={!!atividadeParaExcluir} onOpenChange={(o) => !o && setAtividadeParaExcluir(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir esta atividade?</DialogTitle>
+            <DialogDescription>
+              “{atividadeParaExcluir?.title}” deixa de existir no histórico do negócio. Isto não pode ser desfeito.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAtividadeParaExcluir(null)}>Cancelar</Button>
+            <Button variant="destructive" disabled={deleteActivities.isPending} onClick={excluirAtividade}>
+              {deleteActivities.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmação nomeando o que será apagado.
           Sem transação no PostgREST: as atividades vão antes do negócio, e se o

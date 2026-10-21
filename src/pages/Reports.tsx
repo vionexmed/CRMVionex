@@ -1,5 +1,14 @@
+/**
+ * Relatórios: vendas, atividades, previsão, contatos e o montador próprio.
+ *
+ * VISUAL 01: os filtros saíram da faixa abaixo do título e foram para a
+ * direita dele, como o seletor de período do painel -- são poucos e valem para
+ * todas as abas. Cada aba abre com a faixa de números e segue em cartões. Aba e
+ * período moram na URL: o link mandado a um colega abre o mesmo relatório.
+ */
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { PageShell } from "@/components/layout/PageShell";
+import { useAbaNaUrl } from "@/hooks/useAbaNaUrl";
 
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PageTabs } from "@/components/layout/PageTabs";
@@ -9,7 +18,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/hooks/useOrg";
 import {
-  TrendingUp, Activity, FileText, BarChart3, Users,
+  TrendingUp, Activity, FileText, BarChart3, Users, CalendarDays,
 } from "lucide-react";
 import {
   Deal, Stage, Pipeline, Profile, ActivityRow, Contact, Company,
@@ -22,6 +31,9 @@ import { ContactsReport } from "@/components/reports/ContactsReport";
 import { CustomReportBuilder } from "@/components/reports/CustomReportBuilder";
 import { LoadingState, ErrorState } from "@/components/layout/EstadoDaLista";
 import { SemOrganizacao } from "@/components/layout/SemOrganizacao";
+
+const ABAS = ["sales", "activities", "forecast", "contacts", "custom"] as const;
+const PERIODOS: PeriodFilter[] = ["all", "this_month", "last_month", "this_quarter", "this_year"];
 
 export default function Reports() {
   const { orgId } = useOrg();
@@ -39,8 +51,10 @@ export default function Reports() {
   const [carregando, setCarregando] = useState(true);
   const [falhou, setFalhou] = useState(false);
 
-  // Global filters
-  const [period, setPeriod] = useState<PeriodFilter>("this_month");
+  // Filtros globais. O período vai na URL; responsável e funil não, porque a
+  // lista válida só existe depois da consulta.
+  const [aba, setAba] = useAbaNaUrl("aba", "sales", ABAS);
+  const [period, setPeriod] = useAbaNaUrl<PeriodFilter>("periodo", "this_month", PERIODOS);
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [pipelineFilter, setPipelineFilter] = useState("all");
 
@@ -122,11 +136,14 @@ export default function Reports() {
   return (
     <PageShell
       title="Relatórios"
-      description="Análises completas de vendas, atividades e previsão"
+      description="Vendas, atividades, previsão e contatos"
       actions={
-        <>
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtros dos relatórios">
           <Select value={period} onValueChange={(v) => setPeriod(v as PeriodFilter)}>
-            <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label="Período" className="w-auto gap-2 font-semibold">
+              <CalendarDays aria-hidden className="h-4 w-4 shrink-0 text-primary" />
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todo período</SelectItem>
               <SelectItem value="this_month">Este mês</SelectItem>
@@ -136,22 +153,22 @@ export default function Reports() {
             </SelectContent>
           </Select>
           <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-            <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label="Responsável" className="w-auto min-w-36 gap-2"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os donos</SelectItem>
+              <SelectItem value="all">Todos os responsáveis</SelectItem>
               {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name || m.email}</SelectItem>)}
             </SelectContent>
           </Select>
           {pipelines.length > 1 && (
             <Select value={pipelineFilter} onValueChange={setPipelineFilter}>
-              <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Funil" className="w-auto min-w-36 gap-2"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos pipelines</SelectItem>
+                <SelectItem value="all">Todos os funis</SelectItem>
                 {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           )}
-        </>
+        </div>
       }
     >
 
@@ -167,7 +184,7 @@ export default function Reports() {
           onTentarNovamente={() => fetchAll()}
         />
       ) : (
-      <Tabs defaultValue="sales" className="w-full">
+      <Tabs value={aba} onValueChange={setAba} className="w-full">
         <PageTabs
           abas={[
             { valor: "sales", rotulo: "Vendas", icone: BarChart3 },
@@ -180,23 +197,23 @@ export default function Reports() {
           ]}
         />
 
-        <TabsContent value="sales">
+        <TabsContent value="sales" className="mt-4">
           <SalesReport deals={filteredDeals} stages={stages} members={members} companies={companies} />
         </TabsContent>
 
-        <TabsContent value="activities">
+        <TabsContent value="activities" className="mt-4">
           <ActivitiesReport activities={filteredActivities} members={members} />
         </TabsContent>
 
-        <TabsContent value="forecast">
+        <TabsContent value="forecast" className="mt-4">
           <ForecastReport deals={deals} stages={stages} ownerFilter={ownerFilter} pipelineFilter={pipelineFilter} />
         </TabsContent>
 
-        <TabsContent value="contacts">
+        <TabsContent value="contacts" className="mt-4">
           <ContactsReport contacts={filteredContacts} members={members} />
         </TabsContent>
 
-        <TabsContent value="custom">
+        <TabsContent value="custom" className="mt-4">
           <CustomReportBuilder deals={deals} contacts={contacts} activities={activities} stages={stages} members={members} orgId={orgId} />
         </TabsContent>
       </Tabs>

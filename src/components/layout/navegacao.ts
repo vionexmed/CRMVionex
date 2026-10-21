@@ -1,8 +1,8 @@
 import type { ElementType } from "react";
 import {
-  Activity, AlertTriangle, BarChart3, Building2, FileText, Handshake,
+  Activity, AlertTriangle, BarChart3, Building2, Handshake,
   Inbox, Instagram, LayoutDashboard, Mail, Megaphone, MessageSquare,
-  Package, Plug, Receipt, Settings, Shield, Target, TrendingUp, Users, UsersRound, Zap,
+  Package, Plug, Receipt, Settings, Shield, Users, UsersRound,
 } from "lucide-react";
 
 export type NavItem = {
@@ -41,15 +41,10 @@ export const NAV_SECTIONS: NavSection[] = [
     { label: "WhatsApp", path: "/comunicacao/whatsapp", icon: MessageSquare, aliases: ["/conversations", "/comunicacao"] },
     { label: "Instagram", path: "/comunicacao/instagram", icon: Instagram, aliases: ["/instagram"] },
     { label: "E-mail", path: "/comunicacao/email", icon: Inbox, aliases: ["/inbox"] },
-    { label: "Templates", path: "/email-templates", icon: FileText, adminOnly: true },
-    { label: "Sequências", path: "/email-sequences", icon: Zap, adminOnly: true },
   ] },
   { id: "analise", label: "Análise", icon: BarChart3, entryPath: "/reports", items: [
     { label: "Relatórios", path: "/reports", icon: BarChart3 },
-    { label: "Metas", path: "/sales-goals", icon: Target },
     { label: "Marketing", path: "/marketing/visao-geral", icon: Megaphone, adminOnly: true, aliases: ["/marketing"] },
-    { label: "Lead Scoring", path: "/lead-scoring", icon: TrendingUp, adminOnly: true },
-    { label: "Automações", path: "/automations", icon: Zap, adminOnly: true },
   ] },
 ];
 

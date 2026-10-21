@@ -96,15 +96,10 @@ const Activities       = lazyChunk(() => import("./pages/Activities"));
 const Inbox            = lazyChunk(() => import("./pages/Inbox"));
 const MyEmail          = lazyChunk(() => import("./pages/MyEmail"));
 const Conversations    = lazyChunk(() => import("./pages/Conversations"));
-const EmailTemplates   = lazyChunk(() => import("./pages/EmailTemplates"));
-const EmailSequences   = lazyChunk(() => import("./pages/EmailSequences"));
-const LeadScoring      = lazyChunk(() => import("./pages/LeadScoring"));
 const Reports          = lazyChunk(() => import("./pages/Reports"));
-const Automations      = lazyChunk(() => import("./pages/Automations"));
 const Settings         = lazyChunk(() => import("./pages/Settings"));
 const Integrations     = lazyChunk(() => import("./pages/Integrations"));
 const SecuritySettings = lazyChunk(() => import("./pages/SecuritySettings"));
-const SalesGoals       = lazyChunk(() => import("./pages/SalesGoals"));
 const Team             = lazyChunk(() => import("./pages/Team"));
 const Marketing        = lazyChunk(() => import("./pages/Marketing"));
 const MarketingOverview = lazyChunk(() => import("./pages/marketing/Overview"));
@@ -199,7 +194,6 @@ const App = () => (
                     lugar. `replace` para o botão Voltar não cair de novo aqui. */}
                 <Route path="/tasks" element={<Navigate to="/activities?tipo=task" replace />} />
                 <Route path="/reports" element={<SuspenseRoute><Reports /></SuspenseRoute>} />
-                <Route path="/sales-goals" element={<SuspenseRoute><SalesGoals /></SuspenseRoute>} />
 
                 {/* Cada pessoa CONECTA a própria conta -- a credencial e a
                     conexão seguem privadas. As mensagens, não: desde
@@ -214,10 +208,6 @@ const App = () => (
                   <Route path="/comunicacao/whatsapp" element={<SuspenseRoute><Conversations key="whatsapp" canal="whatsapp" /></SuspenseRoute>} />
                   <Route path="/comunicacao/instagram" element={<SuspenseRoute><Conversations key="instagram" canal="instagram" /></SuspenseRoute>} />
                   <Route path="/comunicacao/email" element={<SuspenseRoute><Inbox /></SuspenseRoute>} />
-                  <Route element={<RequireAdmin />}>
-                    <Route path="/email-templates" element={<SuspenseRoute><EmailTemplates /></SuspenseRoute>} />
-                    <Route path="/email-sequences" element={<SuspenseRoute><EmailSequences /></SuspenseRoute>} />
-                  </Route>
                 </Route>
 
                 {/* Todo mundo vê quem é da equipe. As ações (trocar papel, remover,
@@ -229,8 +219,6 @@ const App = () => (
 
                 {/* Rotas restritas a owner/admin — Comercial é redirecionado */}
                 <Route element={<RequireAdmin />}>
-                  <Route path="/lead-scoring" element={<SuspenseRoute><LeadScoring /></SuspenseRoute>} />
-                  <Route path="/automations" element={<SuspenseRoute><Automations /></SuspenseRoute>} />
                   {/* Marketing continua ACESSÍVEL, só saiu da navegação: seis
                       cartões dela não têm fonte de dado e o painel do Google
                       está zerado no código. Uma tela que mostra zeros sem

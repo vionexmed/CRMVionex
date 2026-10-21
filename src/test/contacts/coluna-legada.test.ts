@@ -23,7 +23,6 @@ const MIGRADOS = [
   "src/components/reports/ContactsReport.tsx",
   "src/components/reports/CustomReportBuilder.tsx",
   "src/components/crm/ContactsKanbanByOwner.tsx",
-  "src/pages/LeadScoring.tsx",
   "src/components/crm/CSVImportModal.tsx",
 ];
 
@@ -43,19 +42,6 @@ describe("nenhuma tela de contato lê a coluna legada", () => {
     expect(suspeitas, `ainda lê contacts.status\n${suspeitas.join("\n")}`).toEqual([]);
   });
 
-  /**
-   * A única leitura de `status` que fica é a do FILTRO SALVO -- que é uma chave
-   * de JSON no banco, não a coluna do contato. Ela existe para que segmento
-   * criado antes desta migração continue filtrando, e o teste abaixo cobre o
-   * comportamento dela.
-   */
-  it("a única leitura remanescente é a do filtro salvo", () => {
-    const src = semComentarios(readFileSync("src/pages/LeadScoring.tsx", "utf8"));
-    const linhas = src.split("\n").filter((l) => /\bf\.status\b/.test(l));
-    expect(linhas).toHaveLength(1);
-    expect(linhas[0]).toContain("ESTAGIOS_DO_STATUS_LEGADO");
-  });
-
   it("o tipo Contact dos relatórios não expõe status", () => {
     // Enquanto o campo existir no tipo, alguém volta a ler.
     const src = readFileSync("src/components/reports/types.ts", "utf8");
@@ -65,7 +51,7 @@ describe("nenhuma tela de contato lê a coluna legada", () => {
   });
 
   it("as consultas trazem a coluna certa", () => {
-    for (const arquivo of ["src/pages/Reports.tsx", "src/pages/LeadScoring.tsx"]) {
+    for (const arquivo of ["src/pages/Reports.tsx"]) {
       const src = semComentarios(readFileSync(arquivo, "utf8"));
       const sel = src.slice(src.indexOf('from("contacts")'));
       expect(sel.slice(0, 400), arquivo).toContain("lifecycle_stage");
@@ -99,32 +85,6 @@ describe("a importação de CSV não grava status", () => {
   it("prospect legado entra como qualificado, não como em negociação", () => {
     // `prospect` cobria os dois; afirmar o mais avançado seria inventar.
     expect(src).toMatch(/prospect: "qualified"/);
-  });
-});
-
-describe("o filtro de segmento salvo continua filtrando", () => {
-  const src = readFileSync("src/pages/LeadScoring.tsx", "utf8");
-
-  /**
-   * Segmento é gravado como JSON no banco, então a chave antiga sobrevive a
-   * qualquer refactor. Renomear `status` para `lifecycleStage` sem ler as duas
-   * faria todo segmento já salvo parar de filtrar EM SILÊNCIO -- sem erro de
-   * tipo, sem erro em tela, só um segmento que de repente inclui todo mundo.
-   */
-  it("lê a chave antiga além da nova", () => {
-    expect(src).toContain("f.lifecycleStage");
-    expect(src).toContain("f.status");
-  });
-
-  it("o status legado abre nos DOIS estágios que ele cobria", () => {
-    // `status='lead'` valia para quem está em `lead` OU em `contacted`.
-    // Devolver só um dos dois encolheria o segmento sem avisar.
-    expect(src).toMatch(/lead: \["lead", "contacted"\]/);
-    expect(src).toMatch(/prospect: \["qualified", "opportunity"\]/);
-  });
-
-  it("grava com a chave nova", () => {
-    expect(src).toMatch(/lifecycleStage: segFilters\.estagio/);
   });
 });
 

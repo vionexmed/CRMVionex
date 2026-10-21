@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { Iniciais } from "@/components/layout/ListaV1";
+import { EstagioSelo } from "@/components/clientes/CelulasDeCliente";
 import { GripVertical, UserX } from "lucide-react";
 import {
   DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent,
@@ -11,7 +11,7 @@ import {
 } from "@dnd-kit/core";
 import type { Database } from "@/integrations/supabase/types";
 import { indexarPorId } from "@/lib/utils";
-import { LIFECYCLE_COLORS, LIFECYCLE_LABELS, type LifecycleStage } from "@/lib/contact-options";
+import { type LifecycleStage } from "@/lib/contact-options";
 
 type Contact = Database["public"]["Tables"]["contacts"]["Row"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -48,7 +48,7 @@ function ContactCardVisual({
       className={
         arrastando
           ? "cursor-grabbing border-primary bg-card shadow-lg"
-          : "border-border bg-card transition-all hover:border-primary/40"
+          : "border-border bg-card transition-colors hover:border-primary/40"
       }
     >
       <CardContent className="p-3">
@@ -63,12 +63,8 @@ function ContactCardVisual({
           />
           <div className="flex-1 overflow-hidden space-y-1">
             <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6 shrink-0">
-                <AvatarFallback className="bg-primary/10 text-primary text-label">
-                  {contact.first_name?.[0] || "?"}{contact.last_name?.[0] || ""}
-                </AvatarFallback>
-              </Avatar>
-              <p className="truncate text-sm font-medium">{contact.first_name} {contact.last_name}</p>
+              <Iniciais nome={`${contact.first_name} ${contact.last_name ?? ""}`} tamanho="sm" />
+              <p className="truncate text-sm font-semibold">{contact.first_name} {contact.last_name}</p>
             </div>
             {company && (
               <p className="truncate text-xs text-muted-foreground">{company.name}</p>
@@ -76,13 +72,7 @@ function ContactCardVisual({
             {contact.email && (
               <p className="truncate text-xs text-muted-foreground">{contact.email}</p>
             )}
-            <Badge variant="secondary" className="gap-1.5 text-label">
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: LIFECYCLE_COLORS[estagio] }}
-              />
-              {LIFECYCLE_LABELS[estagio]}
-            </Badge>
+            <EstagioSelo stage={estagio} />
           </div>
         </div>
       </CardContent>
@@ -155,28 +145,23 @@ function OwnerColumn({
     <div
       ref={setNodeRef}
       className={`flex w-[260px] sm:w-[280px] shrink-0 flex-col rounded-lg border border-border transition-colors ${
-        isOver ? "bg-primary/5 border-primary/30" : "bg-muted/20"
+        isOver ? "bg-accent border-primary/30" : "bg-muted"
       }`}
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
         <div className="flex items-center gap-2">
           {owner ? (
-            <Avatar className="h-6 w-6">
-              <AvatarImage src={owner.avatar_url || ""} />
-              <AvatarFallback className="bg-primary/10 text-primary text-label">
-                {owner.name?.charAt(0)?.toUpperCase() || "?"}
-              </AvatarFallback>
-            </Avatar>
+            <Iniciais nome={owner.name} tamanho="sm" destaque />
           ) : (
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary">
               <UserX className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
           )}
           <h3 className="vx-titulo-secao truncate max-w-[140px]">
             {owner?.name || "Sem responsável"}
           </h3>
-          <span className="rounded-full bg-muted px-1.5 py-0.5 text-label font-medium text-muted-foreground">
+          <span className="rounded-full bg-card px-1.5 py-0.5 text-label font-medium text-muted-foreground">
             {contacts.length}
           </span>
         </div>

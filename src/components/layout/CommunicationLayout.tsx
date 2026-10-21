@@ -11,7 +11,7 @@ export function AreaNavigation({ sectionId }: { sectionId: string }) {
   const activeItem = getActiveNavItem(pathname);
   if (!section || section.items.length < 2) return null;
   return (
-    <nav aria-label={`Módulos de ${section.label}`} className="min-w-0 shrink-0 overflow-x-auto border-b border-border">
+    <nav aria-label={`Módulos de ${section.label}`} className="min-w-0 shrink-0 overflow-x-auto border-b border-border bg-card">
       <ul className="flex min-w-max gap-5 px-4 md:px-6">
         {section.items.map((item) => <li key={item.path}>
           <Link to={item.path} aria-current={activeItem?.path === item.path ? "page" : undefined}

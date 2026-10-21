@@ -81,7 +81,7 @@ export function EmailSignatureTab({ orgId }: { orgId: string | null }) {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Assinatura padrão da empresa</CardTitle>
+          <CardTitle className="vx-titulo-secao">Assinatura padrão da empresa</CardTitle>
           {/* A descrição dizia "usada automaticamente nos e-mails enviados",
               como se sempre valesse. Não vale: `gmail-send` resolve na ordem
               pessoal → empresa → legado, então quem montou a própria assinatura
@@ -133,15 +133,17 @@ export function EmailSignatureTab({ orgId }: { orgId: string | null }) {
             </div>
           </div>
 
-          <Button size="sm" className="h-8 text-xs" onClick={save} disabled={saving}>
-            {saving ? "Salvando..." : "Salvar Assinatura"}
-          </Button>
+          <div className="flex justify-end">
+            <Button size="sm" className="h-8 text-xs" onClick={save} disabled={saving}>
+              {saving ? "Salvando..." : "Salvar Assinatura"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Pré-visualização</CardTitle>
+          <CardTitle className="vx-titulo-secao">Pré-visualização</CardTitle>
           <CardDescription>Como sua assinatura aparecerá nos e-mails</CardDescription>
         </CardHeader>
         <CardContent>

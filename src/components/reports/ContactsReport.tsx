@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FaixaDeIndicadores, Indicador } from "@/components/layout/ListaV1";
+import { CartaoDeRelatorio, GradeDeRelatorio, VazioDoBloco } from "@/components/reports/CartaoDeRelatorio";
 import { Button } from "@/components/ui/button";
 import { AreaSeries } from "@/components/dashboard/svg/AreaSeries";
 import { RoscaComLegenda } from "@/components/dashboard/svg/RoscaComLegenda";
@@ -91,66 +92,64 @@ export function ContactsReport({ contacts, members }: { contacts: Contact[]; mem
   };
 
   return (
-    <div className="space-y-4 mt-4">
-      <div className="grid gap-3 grid-cols-3">
-        <Card><CardContent className="p-3 text-center"><p className="text-2xl font-bold">{contacts.length}</p><p className="text-label text-muted-foreground uppercase">Total Contatos</p></CardContent></Card>
-        <Card><CardContent className="p-3 text-center"><p className="text-2xl font-bold text-success">{totalCustomers}</p><p className="text-label text-muted-foreground uppercase">Clientes</p></CardContent></Card>
-        <Card><CardContent className="p-3 text-center"><p className="text-2xl font-bold text-primary">{conversionRate}%</p><p className="text-label text-muted-foreground uppercase">Lead → Cliente</p></CardContent></Card>
-      </div>
+    <div className="min-w-0 space-y-4">
+      {/* Esta aba não segue o período: crescimento mensal já é uma linha do
+          tempo, e a distribuição é a foto da base hoje. Dizer isso evita ler
+          "Total de contatos" como "contatos criados neste mês". */}
+      <FaixaDeIndicadores>
+        <Indicador rotulo="Total de contatos" valor={formatarNumero(contacts.length)} apoio="toda a base" />
+        <Indicador rotulo="Clientes" valor={formatarNumero(totalCustomers)} apoio="no ciclo de vida" tom={totalCustomers > 0 ? "sucesso" : undefined} />
+        <Indicador rotulo="Lead → cliente" valor={`${conversionRate}%`} apoio="clientes sobre o total" />
+      </FaixaDeIndicadores>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Crescimento Mensal</CardTitle>
-              <Button variant="outline" size="sm" className="h-8 text-label" onClick={exportCSV}><Download className="h-3 w-3 mr-1" />CSV</Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* A série "Novos" NUNCA foi desenhada.
-                Era um `<Bar>` dentro de um `<AreaChart>`, e o recharts descarta
-                filhos que o tipo do gráfico não conhece -- só `ComposedChart`
-                aceita barra e área juntas. A legenda mostrava "Novos" e a linha
-                não existia. Agora as duas séries aparecem. */}
-            <AreaSeries
-              formatar={formatarNumero}
-              rotulos={monthlyGrowth.map((m) => m.month)}
-              series={[
-                { nome: "Cumulativo", cor: CHART_COLORS[0], pontos: monthlyGrowth.map((m) => m.total), preencher: true },
-                { nome: "Novos no mês", cor: CHART_COLORS[1], pontos: monthlyGrowth.map((m) => m.novos) },
-              ]}
-            />
-          </CardContent>
-        </Card>
+      <GradeDeRelatorio>
+        <CartaoDeRelatorio
+          titulo="Crescimento mensal"
+          descricao="Últimos 12 meses"
+          acoes={<Button variant="outline" size="sm" onClick={exportCSV}><Download aria-hidden />Exportar CSV</Button>}
+        >
+          {/* A série "Novos" NUNCA foi desenhada.
+              Era um `<Bar>` dentro de um `<AreaChart>`, e o recharts descarta
+              filhos que o tipo do gráfico não conhece -- só `ComposedChart`
+              aceita barra e área juntas. A legenda mostrava "Novos" e a linha
+              não existia. Agora as duas séries aparecem. */}
+          <AreaSeries
+            formatar={formatarNumero}
+            rotulos={monthlyGrowth.map((m) => m.month)}
+            series={[
+              { nome: "Cumulativo", cor: CHART_COLORS[0], pontos: monthlyGrowth.map((m) => m.total), preencher: true },
+              { nome: "Novos no mês", cor: CHART_COLORS[1], pontos: monthlyGrowth.map((m) => m.novos) },
+            ]}
+          />
+        </CartaoDeRelatorio>
 
-        <Card>
-          <CardHeader><CardTitle>Distribuição por ciclo de vida</CardTitle></CardHeader>
-          <CardContent>
+        <CartaoDeRelatorio titulo="Distribuição por ciclo de vida">
+          {byStatus.length > 0 ? (
             <RoscaComLegenda
               formatar={formatarNumero}
+              tamanho={140}
               fatias={byStatus.map((b, i) => ({
                 nome: b.name,
                 valor: b.value,
                 cor: CHART_COLORS[i % CHART_COLORS.length],
               }))}
             />
-          </CardContent>
-        </Card>
-      </div>
+          ) : (
+            <VazioDoBloco>Nenhum contato cadastrado.</VazioDoBloco>
+          )}
+        </CartaoDeRelatorio>
+      </GradeDeRelatorio>
 
       {byOwner.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle>Contatos por Dono</CardTitle></CardHeader>
-          <CardContent>
-            <BarrasAgrupadas
-              linhas={byOwner}
-              rotulo={(o) => o.name}
-              formatar={formatarNumero}
-              vazio="Nenhum contato com dono definido"
-              series={[{ nome: "Contatos", cor: CHART_COLORS[0], valor: (o) => o.count }]}
-            />
-          </CardContent>
-        </Card>
+        <CartaoDeRelatorio titulo="Contatos por responsável">
+          <BarrasAgrupadas
+            linhas={byOwner}
+            rotulo={(o) => o.name}
+            formatar={formatarNumero}
+            vazio="Nenhum contato com responsável definido"
+            series={[{ nome: "Contatos", cor: CHART_COLORS[0], valor: (o) => o.count }]}
+          />
+        </CartaoDeRelatorio>
       )}
     </div>
   );

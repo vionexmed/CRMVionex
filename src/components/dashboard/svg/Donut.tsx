@@ -44,7 +44,9 @@ export function Donut({
             key={a.nome}
             cx="50" cy="50" r={r}
             fill="none"
-            stroke={a.cor}
+            // Cor em `style`, não em atributo: a paleta é `hsl(var(--chart-N))`, e
+            // `var()` em atributo de apresentação SVG não é garantido.
+            style={{ stroke: a.cor }}
             strokeWidth={espessura / (tamanho / 100)}
             // 1px de folga entre fatias, para elas se distinguirem sem borda.
             strokeDasharray={`${Math.max(0, a.fracao * circ - 0.6)} ${circ}`}

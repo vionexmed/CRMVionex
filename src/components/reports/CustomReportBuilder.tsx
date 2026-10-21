@@ -1,6 +1,4 @@
 import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,12 +11,16 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Download } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CartaoDeRelatorio } from "@/components/reports/CartaoDeRelatorio";
 import { LIFECYCLE_LABELS, type LifecycleStage } from "@/lib/contact-options";
 import { ATIVIDADE_ROTULO, type ActivityType } from "@/lib/atividade-tipos";
 import {
   Deal, Contact, ActivityRow, Stage, Profile,
   fmt, downloadCSV,
 } from "@/components/reports/types";
+
+const STATUS_DO_NEGOCIO: Record<string, string> = { open: "Em aberto", won: "Ganho", lost: "Perdido" };
 
 export function CustomReportBuilder({ deals, contacts, activities, stages, members, orgId }: {
   deals: Deal[]; contacts: Contact[]; activities: ActivityRow[]; stages: Stage[]; members: Profile[]; orgId: string;
@@ -75,7 +77,8 @@ export function CustomReportBuilder({ deals, contacts, activities, stages, membe
   const tableData = useMemo(() => {
     if (entity === "deals") {
       return deals.map((d) => ({
-        title: d.title, value: fmt(Number(d.value) || 0), status: d.status || "—",
+        // O valor cru ("won", "lost") vazava em inglês para a prévia e o CSV.
+        title: d.title, value: fmt(Number(d.value) || 0), status: STATUS_DO_NEGOCIO[d.status ?? ""] ?? d.status ?? "—",
         stage: stages.find((s) => s.id === d.stage_id)?.name || "—",
         owner: members.find((m) => m.id === d.owner_id)?.name || "—",
         probability: `${d.probability || 0}%`, close_date: d.close_date || "—",
@@ -129,92 +132,103 @@ export function CustomReportBuilder({ deals, contacts, activities, stages, membe
   };
 
   return (
-    <div className="space-y-4 mt-4">
-      <div className="flex flex-wrap gap-3 items-end">
-        <div>
-          <Label className="text-label">Entidade</Label>
-          <Select value={entity} onValueChange={(v) => setEntity(v as any)}>
-            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="deals">Negócios</SelectItem>
-              <SelectItem value="contacts">Contatos</SelectItem>
-              <SelectItem value="activities">Atividades</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label className="text-label">Campos</Label>
-          <div className="flex flex-wrap gap-1 mt-1">
-            {fieldOptions[entity].map((f) => (
-              <Badge
-                key={f.key}
-                variant={selectedFields.includes(f.key) ? "default" : "outline"}
-                className="cursor-pointer text-label"
-                onClick={() => toggleField(f.key)}
-              >
-                {f.label}
-              </Badge>
-            ))}
+    <div className="grid min-w-0 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <Card className="min-w-0 self-start">
+        <CardHeader>
+          <CardTitle>Montar relatório</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-1.5">
+            <Label htmlFor="relatorio-entidade" className="text-xs">Entidade</Label>
+            <Select value={entity} onValueChange={(v) => setEntity(v as typeof entity)}>
+              <SelectTrigger id="relatorio-entidade" className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="deals">Negócios</SelectItem>
+                <SelectItem value="contacts">Contatos</SelectItem>
+                <SelectItem value="activities">Atividades</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
 
-        <div className="flex gap-1 items-end ml-auto">
-          <Input
-            placeholder="Nome do relatório"
-            value={reportName}
-            onChange={(e) => setReportName(e.target.value)}
-            className="h-8 w-40 text-xs"
-          />
-          <Button size="sm" className="h-8 text-xs" onClick={saveReport}>Salvar</Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={exportCSV}>
-            <Download className="h-3 w-3 mr-1" />CSV
-          </Button>
-        </div>
-      </div>
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium">Campos</p>
+            <div className="flex flex-wrap gap-1.5">
+              {fieldOptions[entity].map((f) => (
+                <Button
+                  type="button" size="sm" aria-pressed={selectedFields.includes(f.key)}
+                  key={f.key}
+                  variant={selectedFields.includes(f.key) ? "default" : "outline"}
+                  className="h-auto min-h-8 whitespace-normal text-left"
+                  onClick={() => toggleField(f.key)}
+                >
+                  {f.label}
+                </Button>
+              ))}
+            </div>
+          </div>
 
-      {/* Saved reports */}
-      {savedReports.length > 0 && (
-        <div className="flex gap-1 flex-wrap">
-          <span className="text-label text-muted-foreground mr-1">Salvos:</span>
-          {savedReports.map((r) => (
-            <Badge key={r.id} variant="secondary" className="cursor-pointer text-label" onClick={() => loadReport(r)}>
-              {r.name}
-            </Badge>
-          ))}
-        </div>
-      )}
+          <div className="space-y-2 border-t border-border pt-4">
+            <Input
+              aria-label="Nome do relatório"
+              placeholder="Nome do relatório"
+              value={reportName}
+              onChange={(e) => setReportName(e.target.value)}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={saveReport}>Salvar</Button>
+              <Button variant="outline" size="sm" onClick={exportCSV}>
+                <Download aria-hidden />Exportar CSV
+              </Button>
+            </div>
+          </div>
 
-      {/* Results table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="vx-table max-h-[500px]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {selectedFields.map((f) => (
-                    <TableHead key={f} className="text-label whitespace-nowrap">
-                      {fieldOptions[entity].find((fo) => fo.key === f)?.label || f}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tableData.slice(0, 100).map((row, i) => (
-                  <TableRow key={i}>
-                    {selectedFields.map((f) => (
-                      <TableCell key={f} className="text-xs whitespace-nowrap">{(row as any)[f]}</TableCell>
-                    ))}
-                  </TableRow>
+          {savedReports.length > 0 && (
+            <div className="space-y-1.5 border-t border-border pt-4">
+              <p className="text-xs font-medium text-muted-foreground">Salvos</p>
+              <div className="flex flex-wrap gap-1">
+                {savedReports.map((r) => (
+                  <Button type="button" size="sm" key={r.id} variant="ghost" className="h-auto min-h-8 whitespace-normal text-left" onClick={() => loadReport(r)}>
+                    {r.name}
+                  </Button>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
-          {tableData.length > 100 && (
-            <p className="text-label text-muted-foreground text-center py-2">Mostrando 100 de {tableData.length} registros. Exporte CSV para ver todos.</p>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      <CartaoDeRelatorio
+        titulo="Prévia do relatório"
+        descricao={`${tableData.length} registros · ${selectedFields.length} campos selecionados`}
+        rente
+      >
+        <div className="vx-table max-h-[500px] rounded-none border-x-0 border-b-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {selectedFields.map((f) => (
+                  <TableHead key={f} className="whitespace-nowrap">
+                    {fieldOptions[entity].find((fo) => fo.key === f)?.label || f}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tableData.length === 0 && <TableRow><TableCell colSpan={Math.max(1, selectedFields.length)} className="text-xs text-muted-foreground">Nenhum registro para esta entidade.</TableCell></TableRow>}
+              {tableData.slice(0, 100).map((row, i) => (
+                <TableRow key={i}>
+                  {selectedFields.map((f) => (
+                    <TableCell key={f} className="whitespace-nowrap text-xs">{(row as any)[f]}</TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        {tableData.length > 100 && (
+          <p className="border-t border-border py-2 text-center text-xs text-muted-foreground">Mostrando 100 de {tableData.length} registros. Exporte o CSV para ver todos.</p>
+        )}
+      </CartaoDeRelatorio>
     </div>
   );
 }

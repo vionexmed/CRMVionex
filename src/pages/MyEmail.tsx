@@ -18,7 +18,7 @@ import { emailsKeys } from "@/hooks/queries/useEmails";
 import { MinhaAssinatura } from "@/components/settings/MinhaAssinatura";
 import { PageShell } from "@/components/layout/PageShell";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { SeloComPonto } from "@/components/layout/ListaV1";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -256,7 +256,7 @@ export default function MyEmail() {
           <CardHeader>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <CardTitle>{conexao.email_address}</CardTitle>
+                <CardTitle className="vx-titulo-secao">{conexao.email_address}</CardTitle>
                 <CardDescription>
                   {conexao.last_synced_at
                     ? `Última sincronização ${formatarDataHora(conexao.last_synced_at)}`
@@ -264,9 +264,9 @@ export default function MyEmail() {
                 </CardDescription>
               </div>
               {conexao.invalid_since ? (
-                <Badge variant="destructive" className="shrink-0 text-label">Precisa reconectar</Badge>
+                <SeloComPonto tom="perigo" variante="suave">Precisa reconectar</SeloComPonto>
               ) : (
-                <Badge className="shrink-0 text-label">Conectada</Badge>
+                <SeloComPonto tom="sucesso" variante="suave">Conectada</SeloComPonto>
               )}
             </div>
           </CardHeader>
@@ -327,13 +327,13 @@ export default function MyEmail() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="border-dashed">
+        <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
               <Plug className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="font-heading text-base font-semibold">Nenhuma conta conectada</p>
+              <p className="vx-titulo-secao">Nenhuma conta conectada</p>
               <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
                 Ao conectar, os e-mails trocados com seus contatos aparecem na ficha deles, e o que
                 você enviar pelo CRM sai do seu próprio endereço.

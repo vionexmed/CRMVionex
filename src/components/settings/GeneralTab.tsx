@@ -90,7 +90,7 @@ export function GeneralTab({ orgId, userId, profile }: { orgId: string | null; u
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Perfil Pessoal</CardTitle>
+          <CardTitle className="vx-titulo-secao">Perfil Pessoal</CardTitle>
           <CardDescription>Suas informações pessoais</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -110,13 +110,13 @@ export function GeneralTab({ orgId, userId, profile }: { orgId: string | null; u
               </SelectContent>
             </Select>
           </div>
-          <Button size="sm" className="h-8 text-xs" onClick={saveProfile}>Salvar Perfil</Button>
+          <div className="flex justify-end"><Button size="sm" className="h-8 text-xs" onClick={saveProfile}>Salvar Perfil</Button></div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Organização</CardTitle>
+          <CardTitle className="vx-titulo-secao">Organização</CardTitle>
           <CardDescription>Configurações gerais da organização</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -147,13 +147,13 @@ export function GeneralTab({ orgId, userId, profile }: { orgId: string | null; u
               </Select>
             </div>
           </div>
-          <Button size="sm" className="h-8 text-xs" onClick={saveOrg}>Salvar Organização</Button>
+          <div className="flex justify-end"><Button size="sm" className="h-8 text-xs" onClick={saveOrg}>Salvar Organização</Button></div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Indústrias</CardTitle>
+          <CardTitle className="vx-titulo-secao">Indústrias</CardTitle>
           <CardDescription>Personalize as opções de indústria disponíveis ao cadastrar empresas</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

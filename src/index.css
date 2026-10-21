@@ -4,50 +4,51 @@
 
 @layer base {
   :root {
-    /* === VIONEX OFFICIAL PALETTE === */
-    /* Surfaces */
-    /* Cinza claro, e é ele que faz o cartão branco LEVANTAR.
-       
-       Cheguei a clarear para quase branco, na direção "editorial", e ali o
-       cartão só existia pela borda. No estilo escolhido -- painel de comando --
-       o cartão é um plano acima do fundo, e um plano precisa de algo de onde se
-       levantar. */
-    --background: 220 14% 97%;
-    --foreground: 213 41% 10%;         /* #0F1923 text-1 */
+    /*
+     * VISUAL 01 · ESSENCIAL.
+     *
+     * Barra lateral navy, área de trabalho clara e densa, UMA cor de marca por
+     * tela. Verde fica reservado para o que fechou (o fim da escala do funil);
+     * vermelho, âmbar e azul-info são estado, não identidade.
+     *
+     * A cor de marca é trocável em tempo de execução: `ThemeContext` reescreve
+     * `--primary`, `--ring` e `--sidebar-primary`. Por isso nada aqui crava o
+     * azul -- tudo o que é "cor de destaque" deriva destes três tokens.
+     */
+    /* Superfícies. A página é um degrau ACIMA da coluna (`--muted`) e o cartão é
+       branco: página, coluna e cartão têm três valores, senão o kanban de coluna
+       cinza com cartão branco some (ver CLAUDE.md). */
+    --background: 220 33% 96%;         /* #F3F5F9 */
+    --foreground: 220 43% 11%;         /* #101828 */
     --card: 0 0% 100%;
-    --card-foreground: 213 41% 10%;
+    --card-foreground: 220 43% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 213 41% 10%;
-    /* Brand */
-    --primary: 187 100% 25%;           /* #007B8A teal */
+    --popover-foreground: 220 43% 11%;
+    /* Faixa de cabeçalho de tabela, hover de linha, bloco secundário. */
+    --surface-2: 220 23% 97%;          /* #F7F8FA */
+    /* Marca */
+    --primary: 226 82% 55%;            /* #2F5BEA */
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 97%;
-    --secondary-foreground: 213 41% 10%;
-    /* Um degrau ABAIXO do fundo, não igual a ele.
-       
-       Os dois eram `220 14% 97%` -- idênticos -- e o truque padrão de kanban,
-       coluna cinza sobre página, era invisível. Está no CLAUDE.md como
-       armadilha. Ao voltar o fundo para 97%, o muted teve de descer junto. */
-    --muted: 220 13% 93%;
-    /* 43%, não 65%. O valor antigo dava #9CA3B0, que sobre o branco do cartão
-       rende 2,54:1 -- a WCAG AA exige 4,5:1 para texto normal. O subtítulo de
-       TODAS as telas falhava, e é o motivo de a linha embaixo do título parecer
-       apagada. 43% dá #626A7A: 5,44:1 sobre o cartão e 4,50:1 sobre --muted,
-       que é o fundo mais escuro em que este token é usado.
-       O tema escuro fica em 65% porque lá o mesmo cinza rende 7,1:1. */
-    --muted-foreground: 218 11% 43%;   /* #626A7A text-3 */
-    --accent: 188 38% 94%;             /* #EAF5F7 teal-bg */
-    --accent-foreground: 187 100% 27%;
-    --destructive: 0 70% 41%;          /* #B02020 */
+    --secondary: 216 17% 94%;          /* #EEF0F3 */
+    --secondary-foreground: 220 43% 11%;
+    /* A coluna do quadro e o fundo de campo desativado. Um degrau abaixo da
+       página, nunca igual a ela. */
+    --muted: 214 26% 95%;              /* #EEF1F5 */
+    /* #5D6679: o #667085 do Visual 01 escurecido dois passos. Sobre a coluna
+       (`--muted`) ele dava 4,2:1, abaixo do mínimo AA de 4,5:1 para texto. */
+    --muted-foreground: 221 13% 42%;
+    /* Seleção suave: fundo azul-info e texto no azul escuro. */
+    --accent: 219 91% 96%;             /* #EAF1FE */
+    --accent-foreground: 221 73% 42%;  /* #1D4FB8 */
+    --destructive: 4 76% 40%;          /* #B42318 */
     --destructive-foreground: 0 0% 100%;
-    /* Mais clara: com o fundo branco, a borda antiga ficava pesada demais
-       para o papel que passa a ter -- separar, não emoldurar. */
-    --border: 220 13% 93%;
-    --input: 220 12% 91%;
-    --ring: 187 100% 25%;
-    /* Cantos discretos: superfícies 6px, controles 4px. */
-    --radius: 0.375rem;
-    --radius-control: 0.25rem;
+    --border: 218 17% 91%;             /* #E4E7EC */
+    /* Borda de CAMPO: um passo mais forte que a divisória. */
+    --input: 217 16% 84%;              /* #D0D5DD */
+    --ring: 226 82% 55%;
+    /* Cantos: cartão 8px, controle 6px, selo 4px. */
+    --radius: 0.5rem;
+    --radius-control: 0.375rem;
     --motion-ease: cubic-bezier(.2,.8,.2,1);
 
     /*
@@ -56,114 +57,126 @@
      * `--respiro` é o padding padrão do cartão e das superfícies. Ele existe
      * para a densidade deixar de ser controle morto: `ThemeContext` escreve
      * `data-density` na raiz e estes três blocos respondem.
-     *
-     * `normal` é o novo padrão, mais arejado que o CRM antigo. `compact`
-     * devolve a densidade de antes para quem prefere ver mais linha por tela.
      */
     --respiro: 1rem;         /* 16px */
-    /* Sidebar — Vionex navy */
-    /* O navy da marca, #0A1E3D.
-       
-       Cheguei a clareá-la inteira. A lateral escura contra conteúdo claro é o
-       formato de "painel de comando": ela ancora a tela pela esquerda e a luz
-       fica onde o trabalho está. Foi a escolha, e é a identidade do Vionex. */
+    /* Medidas do sistema: altura de controle e de linha de tabela. */
+    --control-h: 34px;
+    --row-h: 40px;
+
     /*
-     * A LATERAL VIROU CARTÃO CLARO FLUTUANTE.
+     * LATERAL NAVY, de ponta a ponta.
      *
-     * Era navy (`217 72% 14%`) encostado na borda, com divisória. A referência
-     * pedida é um cartão branco com respiro em volta, sobre o cinza da página --
-     * e é o `--background` (220 14% 97%) que dá esse cinza, então o branco puro
-     * do cartão se destaca sem precisar de sombra pesada.
-     *
-     * O ATIVO É CINZA, NÃO TEAL. Na referência o item selecionado é uma pílula
-     * neutra com texto quase preto. O teal continua sendo a cor da marca e
-     * aparece onde é decisão -- botão primário, gráfico --, não em "você está
-     * aqui", que é orientação e não ação.
+     * O item ativo é preenchido com a cor de marca e texto branco; o hover é um
+     * degrau acima do navy. `--sidebar-primary` é o que a troca de cor de
+     * destaque reescreve, então o item ativo acompanha a escolha do usuário.
      */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 9% 36%;
-    --sidebar-primary: 187 100% 25%;
+    --sidebar-background: 218 65% 12%;       /* #0B1A33 */
+    --sidebar-foreground: 219 37% 85%;       /* #C9D3E6 */
+    --sidebar-muted: 220 20% 59%;            /* #8391AC: ícone, grupo, atalho */
+    --sidebar-primary: 226 82% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    /* A pílula do item ativo e do hover. */
-    --sidebar-accent: 220 14% 95%;
-    --sidebar-accent-foreground: 222 22% 16%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 187 100% 35%;
-    /* Semantic */
-    --success: 152 82% 22%;            /* #0A6640 */
+    --sidebar-accent: 219 43% 18%;           /* hover */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 218 43% 19%;
+    --sidebar-ring: 226 82% 55%;
+    /* Estado. Cada um tem o texto e o fundo suave do selo. */
+    --success: 155 82% 22%;            /* #0A6640 */
     --success-foreground: 0 0% 100%;
-    --warning: 35 87% 30%;             /* #92610A */
+    --success-soft: 148 45% 94%;       /* #E7F6EE */
+    --warning: 38 92% 28%;             /* #8A5A06 */
     --warning-foreground: 0 0% 100%;
-    /* Vionex extras (direct hex tokens for components) */
+    --warning-soft: 39 94% 93%;        /* #FEF3DE */
+    --destructive-soft: 357 82% 96%;   /* #FDEBEC */
+    --info: 221 73% 42%;               /* #1D4FB8 */
+    --info-foreground: 0 0% 100%;
+    --info-soft: 219 91% 96%;          /* #EAF1FE */
+    --neutral: 216 18% 34%;            /* #475467: "em aberto" */
+    --neutral-soft: 216 17% 94%;       /* #EEF0F3 */
+    /* Gráfico: a marca primeiro, depois categorias que não competem com ela. */
+    --chart-1: var(--primary);
+    --chart-2: 176 80% 37%;            /* #13A89E */
+    --chart-3: 36 88% 59%;             /* #F2A93B */
+    --chart-4: 220 17% 61%;            /* #8C97AD */
+    /* Escala do funil: da marca ao verde de venda, em seis passos. O começo é
+       `--primary`, então ela muda junto com a cor de destaque. */
+    --stage-end: #0B7F4F;
+    --stage-1: hsl(var(--primary));
+    --stage-2: color-mix(in oklab, hsl(var(--primary)) 80%, var(--stage-end));
+    --stage-3: color-mix(in oklab, hsl(var(--primary)) 60%, var(--stage-end));
+    --stage-4: color-mix(in oklab, hsl(var(--primary)) 40%, var(--stage-end));
+    --stage-5: color-mix(in oklab, hsl(var(--primary)) 20%, var(--stage-end));
+    --stage-6: var(--stage-end);
+    /* Identidade de terceiros: não seguem tema nem cor de destaque. */
     --vx-purple: #5B21B6;
     --vx-meta: #1877F2;
     --vx-meta-bg: #EEF4FF;
     --vx-google: #EA4335;
     --vx-google-bg: #FDE8E8;
-    /* Shadow tokens */
-    --shadow-xs: 0 1px 2px rgba(15, 25, 35, 0.06);
-    --shadow-sm: 0 1px 4px rgba(15, 25, 35, 0.08), 0 1px 2px rgba(15, 25, 35, 0.04);
-    --shadow-md: 0 4px 12px rgba(15, 25, 35, 0.10), 0 2px 4px rgba(15, 25, 35, 0.06);
-    --shadow-lg: 0 8px 24px rgba(15, 25, 35, 0.12), 0 4px 8px rgba(15, 25, 35, 0.06);
+    /* Sombras. O cartão NÃO leva sombra (a borda de 1px resolve); sombra é para
+       o que flutua: menu, arraste, janela. */
+    --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.06);
+    --shadow-md: 0 12px 24px -6px rgba(16, 24, 40, 0.16), 0 4px 8px -4px rgba(16, 24, 40, 0.06);
+    --shadow-lg: 0 20px 40px -12px rgba(16, 24, 40, 0.22);
   }
 
   .dark {
-    --background: 217 50% 7%;
-    --foreground: 0 0% 96%;
-    --card: 217 45% 10%;
-    --card-foreground: 0 0% 96%;
-    --popover: 217 45% 10%;
-    --popover-foreground: 0 0% 96%;
-    --primary: 187 100% 35%;
-    --primary-foreground: 217 72% 8%;
-    --secondary: 217 35% 14%;
-    --secondary-foreground: 0 0% 96%;
-    --muted: 217 35% 14%;
-    --muted-foreground: 218 11% 65%;
-    --accent: 187 60% 14%;
-    --accent-foreground: 0 0% 96%;
-    --destructive: 0 63% 45%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 217 30% 18%;
-    --input: 217 30% 18%;
-    --ring: 187 100% 35%;
-    /* No escuro a lateral é mais ESCURA que o conteúdo, não mais clara: mantém
-       o mesmo papel de âncora que tem no tema claro. */
-    /*
-     * No escuro o cartão é MAIS CLARO que a página, não mais escuro: é assim que
-     * um objeto flutua sobre um fundo escuro. A página é `217 50% 7%`; o cartão
-     * sobe para 11%.
-     */
-    --sidebar-background: 217 33% 11%;
-    --sidebar-foreground: 215 16% 66%;
-    --sidebar-primary: 187 100% 35%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 26% 18%;
+    /* Escuro: não é inversão. Página mais funda que o cartão, e o cartão sobe
+       em luz para se levantar do fundo. */
+    --background: 218 61% 7%;          /* #070F1D */
+    --foreground: 216 24% 96%;         /* #F2F4F7 */
+    --card: 218 50% 12%;               /* #0F1A2D */
+    --card-foreground: 216 24% 96%;
+    --popover: 218 50% 12%;
+    --popover-foreground: 216 24% 96%;
+    --surface-2: 219 49% 15%;          /* #132038 */
+    --primary: 225 100% 74%;           /* #7B9BFF */
+    --primary-foreground: 211 68% 7%;  /* #06121F */
+    --secondary: 219 34% 17%;          /* #1C2639 */
+    --secondary-foreground: 216 24% 96%;
+    --muted: 218 55% 10%;              /* #0B1526 */
+    --muted-foreground: 218 15% 65%;   /* #98A2B3 */
+    --accent: 219 53% 16%;             /* #13223D */
+    --accent-foreground: 217 89% 75%;  /* #84B0F8 */
+    --destructive: 0 91% 73%;          /* #F97B7B */
+    --destructive-foreground: 354 42% 14%;
+    --border: 219 37% 21%;             /* #22304A */
+    --input: 220 32% 27%;              /* #2E3D5A */
+    --ring: 225 100% 74%;
+    /* A lateral continua a mais funda da tela, como no claro. */
+    --sidebar-background: 219 70% 6%;        /* #050D1C */
+    --sidebar-foreground: 219 37% 85%;
+    --sidebar-muted: 220 20% 59%;
+    --sidebar-primary: 225 100% 74%;
+    --sidebar-primary-foreground: 211 68% 7%;
+    --sidebar-accent: 220 47% 15%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 217 35% 20%;
-    --sidebar-ring: 187 100% 35%;
-    --success: 152 60% 35%;
-    --success-foreground: 0 0% 98%;
-    --warning: 35 87% 45%;
-    --warning-foreground: 0 0% 98%;
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.20);
-    --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.30), 0 2px 4px rgba(0, 0, 0, 0.18);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.35), 0 4px 8px rgba(0, 0, 0, 0.20);
+    --sidebar-border: 221 49% 15%;
+    --sidebar-ring: 225 100% 74%;
+    /* No escuro o texto de estado clareia e o fundo vira um tom saturado e
+       profundo do mesmo matiz; o texto SOBRE o preenchimento passa a ser escuro. */
+    --success: 153 64% 58%;            /* #4FD99A */
+    --success-foreground: 157 53% 11%;
+    --success-soft: 157 53% 11%;       /* #0D2A1F */
+    --warning: 39 90% 63%;             /* #F5B84A */
+    --warning-foreground: 39 53% 12%;
+    --warning-soft: 39 53% 12%;        /* #2D220E */
+    --destructive-soft: 354 42% 14%;   /* #341518 */
+    --info: 217 89% 75%;               /* #84B0F8 */
+    --info-foreground: 219 53% 16%;
+    --info-soft: 219 53% 16%;          /* #13223D */
+    --neutral: 216 15% 75%;            /* #B4BCC8 */
+    --neutral-soft: 219 34% 17%;       /* #1C2639 */
+    --chart-2: 175 57% 51%;            /* #3CC9BE */
+    --chart-3: 38 88% 66%;             /* #F5BD5E */
+    --chart-4: 222 17% 56%;            /* #7C88A3 */
+    --stage-end: #34C77B;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.40);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+    --shadow-md: 0 14px 28px rgba(0, 0, 0, 0.50);
+    --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.60);
 
-    /* Os tokens --vx-* no tema escuro.
-     *
-     * Eles não tinham variante aqui, e o efeito era grande: a página de
-     * Marketing os consome 115 vezes e é a ÚNICA que os usa, então ela ignorava
-     * o tema escuro por inteiro. --vx-navy é #0A1E3D, quase preto: título
-     * invisível sobre fundo escuro.
-     *
-     * Duas regras nas conversões abaixo. Cor de TEXTO clareia, para manter
-     * contraste sobre fundo escuro. Cor de FUNDO (-bg) escurece muito e vira um
-     * tom saturado do próprio matiz, em vez do pastel claro -- pastel sobre
-     * escuro fica com aparência de erro de renderização.
-     *
-     * Corrigir aqui conserta as 115 chamadas sem tocar em nenhuma delas. */
+    /* Os tokens --vx-* no tema escuro: texto clareia, fundo vira tom profundo. */
     --vx-purple: #A78BFA;
     --vx-meta: #5B9CF8;
     --vx-meta-bg: #14203A;
@@ -205,7 +218,11 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    /* Fonte do SISTEMA: SF Pro no Mac, Segoe UI no Windows. Nada a baixar, e
+       é a família que o usuário já lê o dia inteiro. O espaçamento levemente
+       negativo é o que a SF pede em corpo pequeno. */
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Inter, system-ui, sans-serif;
+    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-size: 13px;
@@ -221,8 +238,8 @@
    * O par claro/escuro já existe em --foreground -- a regra .dark deixou de ser
    * necessária. */
   h1, h2, h3, h4 {
-    font-family: 'Roboto', -apple-system, sans-serif;
-    letter-spacing: -0.02em;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Inter, system-ui, sans-serif;
+    letter-spacing: -0.015em;
     color: hsl(var(--foreground));
   }
 
@@ -276,28 +293,31 @@
 
   /* ── Tabelas Estilo Linear ────────────────────────────── */
   .vx-table table { border-collapse: separate; border-spacing: 0; }
-  .vx-table thead tr { border-bottom: 1px solid hsl(var(--border)); }
+  /* Cabeçalho em faixa sobre a superfície 2, em caixa NORMAL: caixa alta em
+     cada coluna grita mais que o dado embaixo dela. Linha de 40px e divisória
+     mais clara que a borda da moldura. */
   .vx-table thead th {
-    /* 11px é o degrau `meta`. Cravado aqui, ele ficava de fora da escala e
-     * não acompanharia uma mudança nela. */
+    height: 36px;
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 500;
     text-transform: none;
     letter-spacing: 0;
     color: hsl(var(--muted-foreground));
-    padding: 8px 12px;
-    background: transparent;
+    padding: 0 12px;
+    background: hsl(var(--surface-2));
+    border-bottom: 1px solid hsl(var(--border));
   }
   .vx-table tbody td {
-    padding: 12px;
-    border-bottom: 1px solid hsl(var(--border)/60%);
+    height: var(--row-h);
+    padding: 8px 12px;
+    border-bottom: 1px solid hsl(var(--border) / 70%);
     vertical-align: middle;
   }
   .vx-table tbody tr:last-child td { border-bottom: none; }
   .vx-table tbody tr {
     transition: background 0.12s ease;
   }
-  .vx-table tbody tr:hover td { background: hsl(var(--primary)/4%); }
+  .vx-table tbody tr:hover td { background: hsl(var(--surface-2)); }
   /* A moldura fica na PRÓPRIA classe, não num filho.
    *
    * Era `.vx-table > div { border… }`, que exigia exatamente um `<div>` como
@@ -307,6 +327,7 @@
   .vx-table {
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
+    background: hsl(var(--card));
     overflow-x: auto;
   }
 
@@ -326,29 +347,24 @@
    * de destaque, sem traço. É o padrão do estilo escolhido. */
   .vx-nav-active {
     /*
-     * PÍLULA NEUTRA, não teal.
+     * PREENCHIDO NA COR DE MARCA, texto branco.
      *
-     * Era `--sidebar-primary / 18%` com texto teal. A referência marca o item
-     * selecionado com um cinza suave e texto quase preto -- e o argumento é
-     * bom: "você está aqui" é ORIENTAÇÃO, não ação. Gastar a cor da marca nisso
-     * a esvazia justamente onde ela deveria significar decisão: botão primário,
-     * série de gráfico, valor em destaque.
-     *
-     * `--sidebar-accent` também é o hover, então ativo e hover são o mesmo
-     * cinza; o que separa os dois é o PESO do texto e o `--sidebar-accent-
-     * foreground`, que só o ativo recebe.
+     * Contra o navy, uma pílula neutra quase não aparece; o item ativo é a
+     * única coisa saturada da lateral e se lê de longe. Deriva de
+     * `--sidebar-primary`, que a troca de cor de destaque reescreve.
      */
-    background: hsl(var(--sidebar-accent)) !important;
-    color: hsl(var(--sidebar-accent-foreground)) !important;
+    background: hsl(var(--sidebar-primary)) !important;
+    color: hsl(var(--sidebar-primary-foreground)) !important;
     font-weight: 600;
   }
-  .vx-nav-active svg { color: hsl(var(--sidebar-accent-foreground)) !important; }
+  .vx-nav-active svg { color: hsl(var(--sidebar-primary-foreground)) !important; }
   .vx-nav-item {
     transition: background 0.15s ease, color 0.15s ease;
   }
   /* Era `rgba(255,255,255,0.06)`: branco fixo, que assume barra lateral
    * escura. No tema claro o realce simplesmente não aparecia. */
-  .vx-nav-item:hover { background: hsl(var(--sidebar-accent) / 70%) !important; }
+  .vx-nav-item:hover { background: hsl(var(--sidebar-accent)) !important; color: hsl(var(--sidebar-accent-foreground)); }
+  .vx-nav-item svg { color: hsl(var(--sidebar-muted)); }
 
   /* ── KPI Card Variants ────────────────────────────────── */
 
@@ -399,14 +415,13 @@
        a linha divisória parava 2px antes do canto de baixo. */
     padding: 14px;
     cursor: pointer;
-    transition: box-shadow 0.15s ease, transform 0.1s ease;
-    box-shadow: var(--shadow-xs);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    box-shadow: none;
   }
   .vx-deal-card:hover {
+    border-color: hsl(var(--input));
     box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
   }
-  .vx-deal-card:active { transform: translateY(0); }
   /* Marcado na seleção em lote. Borda de destaque e não fundo colorido: o card
      tem quatro linhas de texto por cima, e tingir o fundo baixaria o contraste
      de todas elas de uma vez. */
@@ -414,6 +429,17 @@
     border-color: hsl(var(--primary));
     box-shadow: 0 0 0 1px hsl(var(--primary));
   }
+
+  /* ── Campo: foco do Visual 01 ─────────────────────────── */
+  /* Borda na cor de marca e halo suave de 3px, em vez do anel com recuo. Vale
+     para input, select e textarea pela classe `.vx-campo`. */
+  .vx-campo:focus, .vx-campo:focus-visible {
+    outline: none;
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.18);
+  }
+  .vx-campo[aria-invalid="true"] { border-color: hsl(var(--destructive)); }
+  .vx-campo[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px hsl(var(--destructive) / 0.18); }
 
   /* ── Input refinado ───────────────────────────────────── */
   input[type="text"], input[type="email"], input[type="number"], input[type="date"],
@@ -592,36 +618,6 @@
 /* Áreas contínuas de leitura do painel. */
 .vx-metrics-strip { overflow: hidden; border-block: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
 .vx-metrics-strip > div { background: transparent; }
-.vx-charts-grid { gap: 0; border-bottom: 1px solid hsl(var(--border)); }
-.vx-charts-grid > div { border: 0; border-top: 1px solid hsl(var(--border)); border-radius: 0; background: transparent; box-shadow: none; }
-@media (min-width: 1024px) {
-  .vx-charts-grid > div:nth-child(even) { border-left: 1px solid hsl(var(--border)); }
-}
-
-/* Entrada: formulário direto, marca em um plano independente. */
-.vx-login { min-height: 100dvh; display: grid; background: hsl(var(--card)); }
-.vx-login-brand { display: flex; flex-direction: column; justify-content: space-between; gap: 3rem; padding: 2rem; background: #102c3a; color: #fff; }
-.vx-login-brand img { width: 148px; height: auto; }
-.vx-login-story h2 { color: #fff; max-width: 520px; font-size: clamp(2rem, 3.5vw, 3.6rem); font-weight: 500; line-height: 1.12; letter-spacing: -0.04em; }
-.vx-login-story p { margin-top: 1.5rem; max-width: 380px; color: #b9cbd2; font-size: 15px; line-height: 1.7; }
-.vx-login-brand footer { color: #b9cbd2; font-size: 12px; }
-.vx-login-form { display: flex; align-items: center; justify-content: center; padding: 2.5rem 1.5rem; }
-.vx-login-form > div { width: 100%; max-width: 380px; }
-.vx-login-form h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.035em; }
-.vx-login-form input { height: 46px; background: hsl(var(--card)); }
-.vx-login-form [role=tablist] { margin: 1.5rem 0; background: transparent; border-bottom: 1px solid hsl(var(--border)); border-radius: 0; padding: 0; gap: 0; }
-.vx-login-form [role=tab] { border-radius: 0; border-bottom: 2px solid transparent; padding: 12px 4px; box-shadow: none; }
-.vx-login-form [role=tab][data-state=active] { color: hsl(var(--primary)); border-bottom-color: hsl(var(--primary)); background: transparent; box-shadow: none; }
-@media (min-width: 1024px) {
-  .vx-login { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .vx-login-brand { padding: 3.5rem; }
-}
-@media (max-width: 1023px) {
-  .vx-login-brand { padding: 1.5rem; gap: 0; }
-  .vx-login-story, .vx-login-brand footer { display: none; }
-  .vx-login { grid-template-rows: auto 1fr; }
-  .vx-login-form { align-items: flex-start; padding-top: 3rem; }
-}
 
 /* ── Hierarquia de texto ──────────────────────────────────────────────────
  *
@@ -645,7 +641,7 @@
  * nome da página, e aí a hierarquia some junto com a divergência.
  */
 .vx-titulo-tela {
-  @apply font-heading text-xl sm:text-2xl font-semibold tracking-tight leading-tight;
+  @apply font-heading text-2xl font-bold tracking-tight leading-tight;
 }
 
 .vx-titulo-painel {
@@ -653,7 +649,7 @@
 }
 
 .vx-titulo-secao {
-  @apply text-base font-semibold leading-snug tracking-tight;
+  @apply text-sm font-semibold leading-snug tracking-tight;
 }
 
 /* Os subtítulos, um por nível de título.

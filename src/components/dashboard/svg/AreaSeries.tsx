@@ -102,8 +102,8 @@ export function AreaSeries({
             <defs>
               {series.map((s, i) => (
                 <linearGradient key={s.nome} id={`g-${idGrad}-${i}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={s.cor} stopOpacity={0.28} />
-                  <stop offset="100%" stopColor={s.cor} stopOpacity={0} />
+                  <stop offset="0%" style={{ stopColor: s.cor, stopOpacity: 0.28 }} />
+                  <stop offset="100%" style={{ stopColor: s.cor, stopOpacity: 0 }} />
                 </linearGradient>
               ))}
             </defs>
@@ -125,7 +125,7 @@ export function AreaSeries({
                 )}
                 <path
                   d={caminho(s.pontos, escalaDe(s), false)}
-                  fill="none" stroke={s.cor} strokeWidth="2"
+                  fill="none" style={{ stroke: s.cor }} strokeWidth="2"
                   strokeLinecap="round" strokeLinejoin="round"
                   vectorEffect="non-scaling-stroke"
                 />

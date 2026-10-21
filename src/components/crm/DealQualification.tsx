@@ -94,7 +94,7 @@ export function DealQualification({ dealId, qualification, onUpdate }: Props) {
           <div className="flex items-center gap-2">
             <span className={`text-lg font-bold ${getScoreColor(score)}`}>{score}%</span>
             {!editing && (
-              <Button variant="ghost" size="sm" className="h-6 text-label" onClick={() => setEditing(true)}>Editar</Button>
+              <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Editar</Button>
             )}
           </div>
         </div>
@@ -111,7 +111,7 @@ export function DealQualification({ dealId, qualification, onUpdate }: Props) {
             const val = bant[key] as boolean | null;
             const notesKey = `${key}_notes` as keyof BANTData;
             return (
-              <div key={key} className={`rounded-md border border-border p-2.5 transition-colors ${val === true ? "bg-success/5 border-success/30" : val === false ? "bg-destructive/5 border-destructive/30" : ""}`}>
+              <div key={key} className={`rounded-md border border-border p-2.5 transition-colors ${val === true ? "border-success/30 bg-success-soft" : val === false ? "border-destructive/30 bg-destructive-soft" : ""}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm">{icon}</span>
@@ -121,7 +121,7 @@ export function DealQualification({ dealId, qualification, onUpdate }: Props) {
                     </div>
                   </div>
                   {editing ? (
-                    <button onClick={() => toggleCriteria(key)} className="rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-accent">
+                    <button onClick={() => toggleCriteria(key)} className="min-h-8 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-accent">
                       {val === true ? (
                         <span className="flex items-center gap-1 text-success"><CheckCircle2 className="h-3.5 w-3.5" />Sim</span>
                       ) : val === false ? (

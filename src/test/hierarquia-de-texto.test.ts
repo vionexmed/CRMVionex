@@ -54,14 +54,19 @@ describe("os níveis existem em um lugar só", () => {
     expect(bloco).toContain("font-heading");
   });
 
-  it("a tela tem destaque e seções/painéis usam 16 px", () => {
+  /**
+   * Visual 01: tela 20px, painel 16px, seção 14px -- o mesmo tamanho do título
+   * de cartão. Seção e painel iguais (16px) faziam o nome de um bloco competir
+   * com o nome do registro aberto na gaveta.
+   */
+  it("a tela tem destaque, painel usa 16 px e seção usa 14 px", () => {
     const tamanho = (classe: string) => {
       const i = CSS.indexOf(`.${classe} {`);
       return CSS.slice(i, CSS.indexOf("}", i)).match(/text-(xl|base|sm|meta|corpo|2xl)/)?.[1];
     };
-    expect(tamanho("vx-titulo-tela")).toBe("xl");
+    expect(tamanho("vx-titulo-tela")).toBe("2xl");
     expect(tamanho("vx-titulo-painel")).toBe("base");
-    expect(tamanho("vx-titulo-secao")).toBe("base");
+    expect(tamanho("vx-titulo-secao")).toBe("sm");
   });
 });
 
@@ -91,7 +96,7 @@ describe("o primitivo de cartão tem o default certo", () => {
 
   it("CardTitle nasce no tamanho de seção", () => {
     // Era `text-2xl`, e 81 dos 86 usos sobrescreviam.
-    expect(CARD).toMatch(/CardTitle[\s\S]*?text-base font-semibold/);
+    expect(CARD).toMatch(/CardTitle[\s\S]*?text-sm font-semibold/);
     expect(CARD).not.toMatch(/CardTitle[\s\S]*?cn\("text-2xl/);
   });
 

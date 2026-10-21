@@ -28,16 +28,15 @@ describe("catálogo da navegação aprovada", () => {
     const admin = navigation.getVisibleNavigation(true).flatMap((section) => section.items);
     expect(member.some((item) => item.adminOnly)).toBe(false);
     expect(admin.filter((item) => item.adminOnly).map((item) => item.path)).toEqual(expect.arrayContaining([
-      "/email-templates", "/email-sequences", "/marketing/visao-geral", "/lead-scoring", "/automations",
+      "/marketing/visao-geral",
     ]));
-    expect(member.map((item) => item.path)).toContain("/sales-goals");
   });
 
   it.each([
     ["/deals/registro-id", "negocios"], ["/produtos", "negocios"], ["/orcamentos", "negocios"],
     ["/companies", "clientes"], ["/leads", "clientes"], ["/tasks", "atividades"],
     ["/conversations", "comunicacao"], ["/instagram", "comunicacao"], ["/inbox", "comunicacao"],
-    ["/comunicacao/instagram", "comunicacao"], ["/email-templates", "comunicacao"],
+    ["/comunicacao/instagram", "comunicacao"],
     ["/marketing/visao-geral", "analise"],
   ])("%s seleciona %s ao abrir um link direto", (path, section) => {
     expect(navigation.getActiveSection(path)).toBe(section);
@@ -62,34 +61,41 @@ describe("catálogo da navegação aprovada", () => {
   });
 });
 
-function sidebar(path: string, onOpenSearch = vi.fn(), defaultOpen = true) {
+function sidebar(path: string, defaultOpen = true) {
   render(<MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
     <TooltipProvider><SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar onOpenSearch={onOpenSearch} />
+      <AppSidebar />
     </SidebarProvider></TooltipProvider>
   </MemoryRouter>);
-  return onOpenSearch;
 }
 
+/** Os links de ÁREA, sem os módulos que abrem abaixo da área ativa. */
+const linksDeArea = (nav: HTMLElement) =>
+  within(nav).getAllByRole("link").filter((link) => !link.closest('[aria-label^="Módulos de"]'));
+
 describe("sidebar primária e acionador compartilhado", () => {
-  it("mostra só seis áreas e marca Negócios em detalhe ou catálogo", () => {
+  it("mostra só seis áreas e abre os módulos da área ativa abaixo dela", () => {
     sidebar("/produtos");
     const nav = screen.getByRole("navigation", { name: "Navegação principal" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(6);
-    expect(within(nav).getByRole("link", { name: "Negócios" })).toHaveAttribute("aria-current", "page");
+    expect(linksDeArea(nav)).toHaveLength(6);
+    expect(within(nav).getByRole("link", { name: "Negócios" })).toHaveAttribute("aria-current", "true");
+    const modulos = screen.getByRole("list", { name: "Módulos de Negócios" });
+    expect(within(modulos).getByRole("link", { name: "Produtos" })).toHaveAttribute("aria-current", "page");
+    // Só a área ativa abre: Comunicação não expõe os canais aqui.
     expect(within(nav).queryByRole("link", { name: "Instagram" })).toBeNull();
   });
 
-  it("abre a mesma busca pelo botão abaixo da marca", () => {
-    const open = sidebar("/dashboard");
-    fireEvent.click(screen.getByRole("button", { name: /Buscar no CRM/ }));
+  it("a busca mora na barra superior e abre a busca compartilhada", () => {
+    const open = vi.fn();
+    render(<MemoryRouter initialEntries={["/dashboard"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={open} /></SidebarProvider></MemoryRouter>);
+    fireEvent.click(screen.getAllByRole("button", { name: /Buscar no CRM/ })[0]);
     expect(open).toHaveBeenCalledTimes(1);
   });
 
   it("mantém nomes acessíveis e seleção quando recolhida", () => {
-    sidebar("/instagram", vi.fn(), false);
+    sidebar("/instagram", false);
     expect(screen.getByRole("link", { name: "Comunicação" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("button", { name: /Buscar no CRM/ })).toBeVisible();
+    expect(screen.queryByRole("list", { name: /Módulos de/ })).toBeNull();
   });
 });
 
@@ -129,14 +135,6 @@ describe("breadcrumbs e navegação interna", () => {
     expect(screen.getByText("Mensagens Instagram")).toBeVisible();
     expect(screen.queryByText("Mensagens WhatsApp")).toBeNull();
     expect(within(nav).getByRole("link", { name: "Instagram" })).toHaveAttribute("aria-current", "page");
-  });
-
-  it("oferece Templates e Sequências somente a administradores", async () => {
-    const { CommunicationLayout } = await vi.importActual<typeof import("@/components/layout/CommunicationLayout")>("@/components/layout/CommunicationLayout");
-    auth.isAdmin = true;
-    render(<MemoryRouter initialEntries={["/email-templates"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><CommunicationLayout /></MemoryRouter>);
-    expect(screen.getByRole("link", { name: "Templates" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Sequências" })).toHaveAttribute("href", "/email-sequences");
   });
 });
 
@@ -192,7 +190,8 @@ describe("casca, preferência e busca compartilhada", () => {
   it("leitura de preferência bloqueada não impede acessar módulos", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("Storage indisponível"); });
     appShell();
-    expect(screen.getByRole("navigation", { name: "Módulos de Clientes" })).toBeVisible();
+    // Com a lateral aberta, os módulos ficam nela, abaixo da área ativa.
+    expect(screen.getByRole("list", { name: "Módulos de Clientes" })).toBeVisible();
   });
 
   it("sidebar, header mobile e Ctrl+K compartilham a paleta", async () => {
@@ -212,8 +211,6 @@ describe("casca, preferência e busca compartilhada", () => {
 // Removing a registered alias or the RequireAdmin boundary fails these tests.
 vi.mock("@/pages/Conversations", () => ({ default: ({ canal }: { canal: string }) => <p>Conteúdo do canal {canal}</p> }));
 vi.mock("@/pages/Inbox", () => ({ default: () => <p>Conteúdo do e-mail</p> }));
-vi.mock("@/pages/EmailTemplates", () => ({ default: () => <p>Biblioteca administrativa</p> }));
-vi.mock("@/pages/EmailSequences", () => ({ default: () => <p>Sequências administrativas</p> }));
 vi.mock("@/pages/MyEmail", () => ({ default: () => <p>Conexão pessoal do Gmail</p> }));
 vi.mock("@/pages/Dashboard", () => ({ default: () => <p>Painel autorizado</p> }));
 vi.mock("@/components/onboarding/OnboardingModal", () => ({ OnboardingModal: (): null => null }));
@@ -231,21 +228,6 @@ describe("rotas registradas no App", () => {
     expect(window.location.pathname).toBe(target);
     expect(window.location.search).toBe("?thread=123");
     expect(window.location.hash).toBe("#mensagem");
-    expect(screen.getByRole("navigation", { name: "Módulos de Comunicação" })).toBeVisible();
-  });
-
-  it.each(["/email-templates", "/email-sequences"])("%s continua barrando membro mesmo com link direto", async (path) => {
-    window.history.replaceState({}, "", path);
-    render(<App />);
-    expect(await screen.findByText("Painel autorizado")).toBeVisible();
-    expect(window.location.pathname).toBe("/dashboard");
-  });
-
-  it("admin abre Templates no shell de Comunicação", async () => {
-    auth.isAdmin = true;
-    window.history.replaceState({}, "", "/email-templates");
-    render(<App />);
-    expect(await screen.findByText("Biblioteca administrativa")).toBeVisible();
     expect(screen.getByRole("navigation", { name: "Módulos de Comunicação" })).toBeVisible();
   });
 

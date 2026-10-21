@@ -253,7 +253,7 @@ fetch("${endpoint}", {
       {/* Response format */}
       <Card>
         <CardHeader>
-          <CardTitle>Resposta</CardTitle>
+          <CardTitle className="vx-titulo-secao">Resposta</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-3">
@@ -344,7 +344,7 @@ fetch("${endpoint}", {
       {pipelines.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>IDs dos seus funis</CardTitle>
+            <CardTitle className="vx-titulo-secao">IDs dos seus funis</CardTitle>
             <CardDescription>Use estes IDs no campo pipeline_id</CardDescription>
           </CardHeader>
           <CardContent>

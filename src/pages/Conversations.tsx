@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Iniciais } from "@/components/layout/ListaV1";
 import { PageHeader } from "@/components/layout/PageHeader";
 import {
   Search, Send, Loader2, CheckCheck, Phone, AlertCircle, AtSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { formatarDataCurta, formatarHora } from "@/lib/formato";
 import { mensagemErro } from "@/lib/erro-supabase";
 import { formatarTelefone } from "@/lib/contato-formato";
@@ -109,13 +109,6 @@ function rotuloDaThread(t: Thread): string {
   return formatarTelefone(t.identidade);
 }
 
-function initials(nome: string) {
-  const termos = nome.replace(/^@/, "").trim().split(/\s+/).filter(Boolean);
-  if (termos.length === 0) return "?";
-  if (termos.length === 1) return termos[0].slice(0, 2).toUpperCase();
-  return (termos[0][0] + termos[termos.length - 1][0]).toUpperCase();
-}
-
 /**
  * Estado da janela de resposta, por canal.
  *
@@ -168,11 +161,29 @@ export default function Conversations({ canal }: { canal: Canal }) {
   const [temInstagram, setTemInstagram] = useState<boolean | null>(null);
   const [allMessages, setAllMessages] = useState<Mensagem[]>([]);
   const [contactsMap, setContactsMap] = useState<Record<string, Contato>>({});
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  /*
+   * Conversa aberta e busca moram na URL (`?thread=` e `?q=`), com replace:
+   * F5 não tira a pessoa da conversa e o link vai para o colega. `thread` é a
+   * chave da thread (`whatsapp:<contact_id>`); a forma curta (só o id/telefone)
+   * também vale, para link escrito à mão e para os aliases antigos
+   * (`/conversations?thread=123` redireciona preservando a query).
+   */
+  const [params, setParams] = useSearchParams();
+  const threadNaUrl = params.get("thread");
+  const search = params.get("q") ?? "";
+  const mudarParam = (chave: string, valor: string | null) => {
+    setParams((atual) => {
+      const proximo = new URLSearchParams(atual);
+      if (valor) proximo.set(chave, valor);
+      else proximo.delete(chave);
+      return proximo;
+    }, { replace: true });
+  };
+  const setSearch = (v: string) => mudarParam("q", v);
+  const setSelectedKey = (k: string) => mudarParam("thread", k);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
-  const [search, setSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // ---------- que canais existem ----------
@@ -355,7 +366,14 @@ export default function Conversations({ canal }: { canal: Canal }) {
     );
   }, [threads, search]);
 
-  const selected = threads.find((t) => t.key === selectedKey) || null;
+  // Enquanto as mensagens carregam não há thread para casar; a URL é mantida
+  // (não limpar!) e a seleção aparece quando a lista chega.
+  const selected = threadNaUrl
+    ? threads.find((t) => t.key === threadNaUrl)
+      || threads.find((t) => t.key === `${canal}:${threadNaUrl}`)
+      || null
+    : null;
+  const selectedKey = selected?.key ?? null;
 
   const selectedMessages = useMemo(() => {
     if (!selected) return [];
@@ -434,7 +452,7 @@ export default function Conversations({ canal }: { canal: Canal }) {
       />
 
       {canalDesconectado && (
-        <div className="m-4 flex items-center gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm">
+        <div className="m-4 flex items-center gap-3 rounded-lg border border-transparent bg-warning-soft p-3 text-sm">
           <AlertCircle className="h-4 w-4 shrink-0 text-warning" />
           <div className="flex-1">
             {ROTULO_CANAL[canal]} ainda não está conectado.{" "}
@@ -443,11 +461,11 @@ export default function Conversations({ canal }: { canal: Canal }) {
         </div>
       )}
 
-      <div className="grid flex-1 grid-cols-[320px_1fr] overflow-hidden border-t">
-        <aside className="flex flex-col border-r bg-card">
-          <div className="border-b p-3">
+      <div className="grid flex-1 grid-cols-[320px_1fr] overflow-hidden border-t border-border">
+        <aside className="flex flex-col border-r border-border bg-card">
+          <div className="border-b border-border p-3">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search aria-hidden="true" className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar..." className="pl-8" />
             </div>
@@ -462,28 +480,24 @@ export default function Conversations({ canal }: { canal: Canal }) {
                 {search.trim() ? "Nada encontrado." : "Nenhuma conversa ainda."}
               </div>
             ) : (
-              <ul className="divide-y">
+              <ul className="divide-y divide-border">
                 {filtered.map((t) => {
                   const nome = rotuloDaThread(t);
                   return (
                     <li key={t.key}>
                       <button onClick={() => setSelectedKey(t.key)}
                         className={cn(
-                          "flex w-full items-start gap-3 p-3 text-left transition-colors hover:bg-accent/50",
-                          selectedKey === t.key && "bg-accent",
+                          "flex min-h-14 w-full items-start gap-3 p-3 text-left transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                          selectedKey === t.key && "bg-accent hover:bg-accent",
                         )}>
                         {/* Sem selo de canal: ele existia para desambiguar lista
                             misturada, e agora a tela inteira é de um canal só --
                             o título da página e a barra lateral já dizem qual. */}
-                        <Avatar className="h-9 w-9 shrink-0">
-                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                            {initials(nome)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <Iniciais nome={nome.replace(/^@/, "")} tamanho="lg" destaque={selectedKey === t.key} />
                         <div className="flex flex-1 flex-col overflow-hidden">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm font-medium">{nome}</span>
-                            <span className="shrink-0 text-label text-muted-foreground">
+                            <span className="truncate text-sm font-semibold">{nome}</span>
+                            <span className="shrink-0 text-label tabular-nums text-muted-foreground">
                               {formatTime(t.last_at)}
                             </span>
                           </div>
@@ -507,15 +521,11 @@ export default function Conversations({ canal }: { canal: Canal }) {
             </div>
           ) : (
             <>
-              <header className="flex items-center justify-between gap-3 border-b bg-card p-3">
+              <header className="flex items-center justify-between gap-3 border-b border-border bg-card p-3">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                      {initials(rotuloDaThread(selected))}
-                    </AvatarFallback>
-                  </Avatar>
+                  <Iniciais nome={rotuloDaThread(selected).replace(/^@/, "")} tamanho="lg" destaque />
                   <div>
-                    <div className="text-sm font-medium">{rotuloDaThread(selected)}</div>
+                    <div className="text-sm font-semibold">{rotuloDaThread(selected)}</div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       {selected.canal === "instagram" ? (
                         <>
@@ -534,7 +544,7 @@ export default function Conversations({ canal }: { canal: Canal }) {
                   </div>
                 </div>
                 {selected.contact_id && (
-                  <Button variant="outline" size="sm" className="h-8 text-label" asChild>
+                  <Button variant="outline" size="sm" asChild>
                     <Link to={`/contacts?id=${selected.contact_id}`}>Ver contato</Link>
                   </Button>
                 )}
@@ -547,8 +557,8 @@ export default function Conversations({ canal }: { canal: Canal }) {
                     return (
                       <li key={m.id} className={cn("flex", isOut ? "justify-end" : "justify-start")}>
                         <div className={cn(
-                          "max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm",
-                          isOut ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
+                          "max-w-[75%] rounded-lg px-3 py-2 text-sm",
+                          isOut ? "bg-primary text-primary-foreground" : "border border-border bg-card text-foreground",
                         )}>
                           <div className="whitespace-pre-wrap break-words">
                             {/* Mensagem sem texto é anexo. Sem esta linha a bolha
@@ -571,19 +581,21 @@ export default function Conversations({ canal }: { canal: Canal }) {
                 </ul>
               </div>
 
-              <footer className="border-t bg-card p-3">
+              <footer className="border-t border-border bg-background p-3">
                 {janela.aviso && (
                   <div className={cn(
-                    "mb-2 rounded-md border px-2 py-1.5 text-label",
+                    "mb-2 rounded-md border px-2 py-1.5 text-xs",
                     janela.podeEnviar
                       // Aviso que não bloqueia é informação, não alarme.
-                      ? "border-border bg-muted text-muted-foreground"
-                      : "border-warning/30 bg-warning/10 text-warning",
+                      ? "border-border bg-surface-2 text-muted-foreground"
+                      : "border-transparent bg-warning-soft text-warning",
                   )}>
                     {janela.aviso}
                   </div>
                 )}
-                <div className="flex gap-2">
+                {/* O campo e o botão moram num cartão só: o envio é parte da
+                    caixa de texto, não um controle solto ao lado. */}
+                <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2 focus-within:ring-2 focus-within:ring-ring">
                   <Textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
@@ -593,9 +605,9 @@ export default function Conversations({ canal }: { canal: Canal }) {
                     placeholder={janela.podeEnviar ? "Digite uma mensagem..." : "Janela de resposta fechada"}
                     disabled={!janela.podeEnviar || sending}
                     rows={2}
-                    className="resize-none"
+                    className="min-h-0 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
                   />
-                  <Button onClick={() => void handleSend()}
+                  <Button onClick={() => void handleSend()} aria-label="Enviar mensagem"
                     disabled={!draft.trim() || sending || !janela.podeEnviar}>
                     {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </Button>

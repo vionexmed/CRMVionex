@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FaixaDeIndicadores, Indicador, Iniciais } from "@/components/layout/ListaV1";
+import { CartaoDeRelatorio, GradeDeRelatorio, VazioDoBloco } from "@/components/reports/CartaoDeRelatorio";
 import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -46,102 +47,95 @@ export function ActivitiesReport({ activities, members }: { activities: Activity
 
   const exportCSV = () => {
     downloadCSV(userActivity.map((u) => ({
-      Vendedor: u.name, Total: u.total,
-      Ligações: u.call, Emails: u.email, Reuniões: u.meeting, Notas: u.note, Tarefas: u.task,
+      Responsável: u.name, Total: u.total,
+      Ligações: u.call, "E-mails": u.email, Reuniões: u.meeting, Notas: u.note, Tarefas: u.task,
     })), "relatorio-atividades");
   };
 
   return (
-    <div className="space-y-4 mt-4">
-      <div className="grid gap-3 grid-cols-3">
-        <Card><CardContent className="p-3 text-center"><p className="text-2xl font-bold">{activities.length}</p><p className="text-label text-muted-foreground uppercase">Total Atividades</p></CardContent></Card>
-        <Card><CardContent className="p-3 text-center"><p className="text-2xl font-bold text-success">{completed}</p><p className="text-label text-muted-foreground uppercase">Concluídas</p></CardContent></Card>
-        <Card><CardContent className="p-3 text-center"><p className="text-2xl font-bold text-primary">{completionRate}%</p><p className="text-label text-muted-foreground uppercase">Taxa Conclusão</p></CardContent></Card>
-      </div>
+    <div className="min-w-0 space-y-4">
+      <FaixaDeIndicadores>
+        <Indicador rotulo="Atividades no período" valor={formatarNumero(activities.length)} apoio="pela data de criação" />
+        <Indicador rotulo="Concluídas" valor={formatarNumero(completed)} apoio="com conclusão registrada" tom={completed > 0 ? "sucesso" : undefined} />
+        <Indicador rotulo="Taxa de conclusão" valor={`${completionRate}%`} apoio="concluídas sobre o total" />
+      </FaixaDeIndicadores>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle>Atividades por Tipo</CardTitle></CardHeader>
-          <CardContent>
-            {byType.length > 0 ? (
-              <RoscaComLegenda
-                formatar={formatarNumero}
-                fatias={byType.map((t, i) => ({
-                  nome: t.name,
-                  valor: t.value,
-                  cor: CHART_COLORS[i % CHART_COLORS.length],
-                }))}
-              />
-            ) : (
-              <div className="flex h-[220px] items-center justify-center text-xs text-muted-foreground">
-                Nenhuma atividade no período
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Atividades por Vendedor</CardTitle></CardHeader>
-          <CardContent>
-            {/* Barras horizontais em vez do gráfico vertical do recharts: o
-                nome de cada vendedor era rótulo do eixo X, e com mais de quatro
-                nomes o recharts os rotacionava ou cortava. */}
-            <BarrasAgrupadas
-              linhas={userActivity}
-              rotulo={(u) => u.name}
-              formatar={formatarNumero}
-              vazio="Nenhuma atividade registrada por vendedor"
-              series={[
-                { nome: "Ligação", cor: CHART_COLORS[0], valor: (u) => u.call },
-                { nome: "E-mail", cor: CHART_COLORS[1], valor: (u) => u.email },
-                { nome: "Reunião", cor: CHART_COLORS[2], valor: (u) => u.meeting },
-                { nome: "Nota", cor: CHART_COLORS[3], valor: (u) => u.note },
-                { nome: "Tarefa", cor: CHART_COLORS[4], valor: (u) => u.task },
-              ]}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Comparativo por Vendedor</CardTitle>
-            <Button variant="outline" size="sm" className="h-8 text-label" onClick={exportCSV}><Download className="h-3 w-3 mr-1" />CSV</Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="vx-table">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-label">Vendedor</TableHead>
-                  <TableHead className="text-label text-center">Ligações</TableHead>
-                  <TableHead className="text-label text-center">Emails</TableHead>
-                  <TableHead className="text-label text-center">Reuniões</TableHead>
-                  <TableHead className="text-label text-center">Notas</TableHead>
-                  <TableHead className="text-label text-center">Tarefas</TableHead>
-                  <TableHead className="text-label text-center">Total</TableHead>
+      <CartaoDeRelatorio
+        titulo="Comparativo por responsável"
+        rente
+        acoes={<Button variant="outline" size="sm" onClick={exportCSV}><Download aria-hidden />Exportar CSV</Button>}
+      >
+        <div className="vx-table rounded-none border-x-0 border-b-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Responsável</TableHead>
+                <TableHead className="text-right">Ligações</TableHead>
+                <TableHead className="text-right">E-mails</TableHead>
+                <TableHead className="text-right">Reuniões</TableHead>
+                <TableHead className="text-right">Notas</TableHead>
+                <TableHead className="text-right">Tarefas</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {userActivity.length === 0 && (
+                <TableRow><TableCell colSpan={7} className="text-xs text-muted-foreground">Nenhuma atividade registrada no período.</TableCell></TableRow>
+              )}
+              {userActivity.map((u) => (
+                <TableRow key={u.name}>
+                  <TableCell className="text-xs">
+                    <span className="flex items-center gap-2 font-medium"><Iniciais nome={u.name} tamanho="sm" />{u.name}</span>
+                  </TableCell>
+                  <TableCell className="text-right text-xs">{u.call}</TableCell>
+                  <TableCell className="text-right text-xs">{u.email}</TableCell>
+                  <TableCell className="text-right text-xs">{u.meeting}</TableCell>
+                  <TableCell className="text-right text-xs">{u.note}</TableCell>
+                  <TableCell className="text-right text-xs">{u.task}</TableCell>
+                  <TableCell className="text-right text-xs font-semibold">{u.total}</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {userActivity.map((u) => (
-                  <TableRow key={u.name}>
-                    <TableCell className="text-xs font-medium">{u.name}</TableCell>
-                    <TableCell className="text-xs text-center">{u.call}</TableCell>
-                    <TableCell className="text-xs text-center">{u.email}</TableCell>
-                    <TableCell className="text-xs text-center">{u.meeting}</TableCell>
-                    <TableCell className="text-xs text-center">{u.note}</TableCell>
-                    <TableCell className="text-xs text-center">{u.task}</TableCell>
-                    <TableCell className="text-xs text-center font-bold">{u.total}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CartaoDeRelatorio>
+
+      <GradeDeRelatorio>
+        <CartaoDeRelatorio titulo="Atividades por responsável" descricao="Por tipo">
+          {/* Barras horizontais em vez do gráfico vertical do recharts: o nome
+              de cada pessoa era rótulo do eixo X, e com mais de quatro nomes o
+              recharts os rotacionava ou cortava. */}
+          <BarrasAgrupadas
+            linhas={userActivity}
+            rotulo={(u) => u.name}
+            formatar={formatarNumero}
+            vazio="Nenhuma atividade registrada por responsável"
+            series={[
+              { nome: "Ligação", cor: CHART_COLORS[0], valor: (u) => u.call },
+              { nome: "E-mail", cor: CHART_COLORS[1], valor: (u) => u.email },
+              { nome: "Reunião", cor: CHART_COLORS[2], valor: (u) => u.meeting },
+              { nome: "Nota", cor: CHART_COLORS[3], valor: (u) => u.note },
+              { nome: "Tarefa", cor: CHART_COLORS[4], valor: (u) => u.task },
+            ]}
+          />
+        </CartaoDeRelatorio>
+
+        <CartaoDeRelatorio titulo="Atividades por tipo">
+          {byType.length > 0 ? (
+            <RoscaComLegenda
+              formatar={formatarNumero}
+              tamanho={140}
+              fatias={byType.map((t, i) => ({
+                nome: t.name,
+                valor: t.value,
+                cor: CHART_COLORS[i % CHART_COLORS.length],
+              }))}
+            />
+          ) : (
+            <VazioDoBloco>Nenhuma atividade no período.</VazioDoBloco>
+          )}
+        </CartaoDeRelatorio>
+      </GradeDeRelatorio>
     </div>
   );
 }

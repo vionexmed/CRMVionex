@@ -3,7 +3,6 @@ import { PageShell } from "@/components/layout/PageShell";
 import { SegmentedControl } from "@/components/layout/SegmentedControl";
 import { LoadingState, ErrorState, EmptyState } from "@/components/layout/EstadoDaLista";
 import { formatarData } from "@/lib/formato";
-import { initials } from "@/lib/utils";
 import { Users as UsersIcon } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,15 +19,21 @@ import { useCompanies } from "@/hooks/queries/useCompanies";
 import { useMembers } from "@/hooks/queries/useMembers";
 import { PAGE_SIZE } from "@/lib/api/contacts";
 import {
-  getContactOrigin, ORIGIN_OPTIONS, PAISES,
-  LIFECYCLE_LABELS, LIFECYCLE_COLORS, type LifecycleStage,
+  ORIGIN_OPTIONS, PAISES,
+  LIFECYCLE_LABELS, type LifecycleStage,
 } from "@/lib/contact-options";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  ChipAdicionarFiltro, ChipDeFiltro, Iniciais, LinhaDeFiltros, VisoesDaLista, type Visao,
+} from "@/components/layout/ListaV1";
+import {
+  EstagioSelo, OrigemSelo, ResponsavelCelula, UltimoContato,
+} from "@/components/clientes/CelulasDeCliente";
+import { useContagensDeContatos } from "@/components/clientes/useContagensDeContatos";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -39,7 +44,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Plus, Search, LayoutGrid, List, Filter, Upload, Download,
+  Plus, Search, LayoutGrid, List, Upload, Download,
   Trash2, X, AlertTriangle, Users, Loader2,
 } from "lucide-react";
 import { ContactsKanbanByOwner } from "@/components/crm/ContactsKanbanByOwner";
@@ -101,28 +106,12 @@ interface ContactFilters {
  * vocabulários dependendo da tela em que você a olhasse.
  */
 function LifecycleBadge({ stage }: { stage: LifecycleStage | null }) {
-  const e = stage ?? "lead";
-  return (
-    <span className="flex items-center gap-1.5 text-xs">
-      <span
-        aria-hidden
-        className="h-2 w-2 shrink-0 rounded-full"
-        style={{ backgroundColor: LIFECYCLE_COLORS[e] }}
-      />
-      <span className="truncate">{LIFECYCLE_LABELS[e]}</span>
-    </span>
-  );
+  return <EstagioSelo stage={stage} />;
 }
 
-/** Selo colorido indicando a origem do contato (de onde veio) */
+/** Selo da origem do contato (de onde veio). */
 function OriginBadge({ metadata }: { metadata: unknown }) {
-  const o = getContactOrigin(metadata as Record<string, unknown> | null);
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2 py-0.5 text-label font-medium text-muted-foreground whitespace-nowrap">
-      <span className="h-2 w-2 rounded-full shrink-0" style={{ background: o.color }} />
-      {o.label}
-    </span>
-  );
+  return <OrigemSelo metadata={metadata} />;
 }
 
 export default function Contacts() {
@@ -277,6 +266,42 @@ export default function Contacts() {
     invalidarPainel(qc, orgId);
   };
 
+  const { data: contagens } = useContagensDeContatos(orgId, user?.id);
+
+  /**
+   * Único caminho para mudar filtro. Além do estado, mantém `?estagio=` em
+   * sincronia: o efeito acima reaplica o parâmetro a cada mudança de URL (abrir
+   * a ficha mexe em `?id=`), então um filtro de estágio removido só no estado
+   * voltaria sozinho.
+   */
+  const aplicarFiltros = (patch: Partial<ContactFilters>) => {
+    setFilters((f) => ({ ...f, ...patch }));
+    if ("lifecycleStage" in patch) {
+      setSearchParams((previous) => {
+        const next = new URLSearchParams(previous);
+        if (patch.lifecycleStage === "lead") next.set("estagio", "lead");
+        else next.delete("estagio");
+        return next;
+      }, { replace: true });
+    }
+  };
+
+  /** A aba ativa é deduzida dos filtros; combinação sem aba não marca nenhuma. */
+  const visaoAtiva = (() => {
+    const { lifecycleStage: e, ownerId: o } = filters;
+    if (!e && !o) return "todos";
+    if (e === "lead" && !o) return "leads";
+    if (e === "customer" && !o) return "clientes";
+    if (!e && o && o === user?.id) return "meus";
+    return "personalizada";
+  })();
+  const escolherVisao = (v: string) => {
+    if (v === "todos") aplicarFiltros({ lifecycleStage: undefined, ownerId: undefined });
+    else if (v === "leads") aplicarFiltros({ lifecycleStage: "lead", ownerId: undefined });
+    else if (v === "clientes") aplicarFiltros({ lifecycleStage: "customer", ownerId: undefined });
+    else if (v === "meus") aplicarFiltros({ lifecycleStage: undefined, ownerId: user?.id });
+  };
+
   const getInactivityDays = (contactId: string, createdAt: string | null) => {
     const lastAct = lastActivityMap.get(contactId);
     const ref = lastAct || (createdAt ? new Date(createdAt) : null);
@@ -394,6 +419,27 @@ export default function Contacts() {
 
   if (!orgId) return <SemOrganizacao />;
 
+  const limparEstagio = () => aplicarFiltros({ lifecycleStage: undefined });
+  const nomeDoMembro = (id?: string) => {
+    const m = members.find((x) => x.id === id);
+    return m?.name || m?.email || "—";
+  };
+  const rotuloDaOrigem = (o: string) => {
+    if (o.startsWith(PREFIXO_ORIGEM_EXATA)) return o.slice(PREFIXO_ORIGEM_EXATA.length);
+    return ORIGIN_OPTIONS.find((x) => x.value === o)?.label ?? o;
+  };
+  const periodo = [filters.createdFrom, filters.createdTo].some(Boolean)
+    ? `${filters.createdFrom ? formatarData(filters.createdFrom) : "…"} – ${filters.createdTo ? formatarData(filters.createdTo) : "…"}`
+    : null;
+  const algumFiltro = Object.values(filters).some(Boolean);
+
+  const visoes: Visao<string>[] = [
+    { valor: "todos", rotulo: "Todos", contagem: contagens?.todos },
+    { valor: "leads", rotulo: "Leads novos", contagem: contagens?.leads },
+    { valor: "meus", rotulo: "Meus contatos", contagem: contagens?.meus },
+    { valor: "clientes", rotulo: "Clientes", contagem: contagens?.clientes },
+  ];
+
   return (
     <PageShell
       title="Contatos"
@@ -415,19 +461,11 @@ export default function Contacts() {
               { valor: "owner" as const, rotulo: "Vendedor", icone: Users },
             ]}
           />
-          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
-            <Filter className="mr-1 h-3.5 w-3.5" /><span className="hidden sm:inline">Filtros</span>
+          <Button variant="outline" onClick={() => setCsvOpen(true)} className="hidden sm:flex">
+            <Upload className="mr-1.5 h-3.5 w-3.5" />Importar CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setCsvOpen(true)} className="hidden sm:flex">
-            <Upload className="mr-1.5 h-3.5 w-3.5" />Importar
-          </Button>
-          {isAdmin && (
-            <Button variant="outline" size="sm" onClick={exportCSV} disabled={exporting} className="hidden sm:flex">
-              {exporting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}Exportar
-            </Button>
-          )}
           <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1 sm:mr-2 h-4 w-4" /><span className="hidden sm:inline">Novo Contato</span><span className="sm:hidden">Novo</span>
+            <Plus className="mr-1 sm:mr-2 h-4 w-4" /><span className="hidden sm:inline">Novo contato</span><span className="sm:hidden">Novo</span>
           </Button>
         </>
       }
@@ -444,27 +482,24 @@ export default function Contacts() {
         </div>
       )}
 
+      {/* As visões SÃO filtros: cada aba escreve em `filters` (e em ?estagio=),
+          e a aba ativa é deduzida dele. Estado paralelo faria a aba dizer
+          "Todos" com um chip de estágio ligado ao lado. */}
+      <VisoesDaLista
+        visoes={visoes}
+        valor={visaoAtiva}
+        onChange={escolherVisao}
+      />
 
-
-      <div className="relative">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar por nome, email..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-        {isFetching && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
-      </div>
-
-      {showFilters && (
-        <BarraDeFiltros>
-          {/* ORDENAÇÃO EM SELETOR, e não só nos cabeçalhos.
-              Ao juntar nove colunas em seis, "Email" e "Especialidade"
-              perderam o cabeçalho clicável -- e com ele a única forma de
-              ordenar por eles. A API continuava sabendo; faltava como pedir.
-              Uma célula compartilhada só consegue ordenar por um campo, então
-              o seletor cobre os cinco. Os cabeçalhos que sobraram continuam
-              clicáveis: quem já sabia não perde o atalho. */}
-          <div className="space-y-1">
-            <Label className="text-xs">Ordenar por</Label>
+      <LinhaDeFiltros
+        direita={
+          <>
+            {/* ORDENAÇÃO EM SELETOR, e não só nos cabeçalhos.
+                Ao juntar colunas, "Email" e "Especialidade" perderam o
+                cabeçalho clicável -- e com ele a única forma de ordenar por
+                eles. A API continuava sabendo; faltava como pedir. */}
             <Select value={sortKey} onValueChange={(v) => toggleSort(v as SortKey)}>
-              <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-label="Ordenar por" className="h-8 w-auto gap-2 text-xs bg-card"><span className="text-muted-foreground">Ordenar:</span><SelectValue /></SelectTrigger>
               <SelectContent>
                 {([
                   ["name", "Nome"],
@@ -477,7 +512,61 @@ export default function Contacts() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={exportCSV} disabled={exporting}>
+                {exporting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}Exportar
+              </Button>
+            )}
+          </>
+        }
+      >
+        <div className="relative">
+          <Search aria-hidden="true" className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+          <Input aria-label="Buscar contatos" placeholder="Buscar por nome, e-mail…" className="h-8 w-56 pl-8 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+          {isFetching && <Loader2 className="absolute right-2.5 top-2 h-4 w-4 animate-spin text-muted-foreground" />}
+        </div>
+        {filters.lifecycleStage && (
+          <ChipDeFiltro ativo onRemover={limparEstagio} rotuloRemover="Remover filtro de estágio">
+            Estágio: {LIFECYCLE_LABELS[filters.lifecycleStage as LifecycleStage] ?? filters.lifecycleStage}
+          </ChipDeFiltro>
+        )}
+        {filters.ownerId && (
+          <ChipDeFiltro ativo onRemover={() => aplicarFiltros({ ownerId: undefined })} rotuloRemover="Remover filtro de responsável">
+            Responsável: {nomeDoMembro(filters.ownerId)}
+          </ChipDeFiltro>
+        )}
+        {filters.companyId && (
+          <ChipDeFiltro ativo onRemover={() => aplicarFiltros({ companyId: undefined })} rotuloRemover="Remover filtro de empresa">
+            Empresa: {empresaPorId.get(filters.companyId)?.name ?? "—"}
+          </ChipDeFiltro>
+        )}
+        {filters.origin && (
+          <ChipDeFiltro ativo onRemover={() => aplicarFiltros({ origin: undefined })} rotuloRemover="Remover filtro de origem">
+            Origem: {rotuloDaOrigem(filters.origin)}
+          </ChipDeFiltro>
+        )}
+        {([["country", "País"], ["city", "Cidade"]] as const).map(([key, label]) => filters[key] && (
+          <ChipDeFiltro key={key} ativo onRemover={() => aplicarFiltros({ [key]: undefined })} rotuloRemover={`Remover filtro de ${label.toLowerCase()}`}>
+            {label}: {filters[key]}
+          </ChipDeFiltro>
+        ))}
+        {periodo && (
+          <ChipDeFiltro ativo onRemover={() => aplicarFiltros({ createdFrom: undefined, createdTo: undefined })} rotuloRemover="Remover filtro de período">
+            Período: {periodo}
+          </ChipDeFiltro>
+        )}
+        <ChipAdicionarFiltro onClick={() => setShowFilters(!showFilters)} />
+        {algumFiltro && (
+          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => aplicarFiltros({ lifecycleStage: undefined, ownerId: undefined, companyId: undefined, origin: undefined, country: undefined, city: undefined, createdFrom: undefined, createdTo: undefined })}>
+            <X className="mr-1 h-3 w-3" />Limpar
+          </Button>
+        )}
+      </LinhaDeFiltros>
+
+      {/* O painel completo: o chip "+ Filtro" abre isto. Os chips acima só
+          mostram o que está ligado; para ligar algo novo, é aqui. */}
+      {showFilters && (
+        <BarraDeFiltros>
           <div className="space-y-1">
             <Label className="text-xs">Ciclo de vida</Label>
             {/* Os seis estágios, na ordem do avanço. O seletor antigo era por
@@ -486,7 +575,7 @@ export default function Contacts() {
                 conseguia isolar. */}
             <Select
               value={filters.lifecycleStage || "all"}
-              onValueChange={(v) => setFilters({ ...filters, lifecycleStage: v === "all" ? undefined : v })}
+              onValueChange={(v) => aplicarFiltros({ lifecycleStage: v === "all" ? undefined : v })}
             >
               <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -501,7 +590,7 @@ export default function Contacts() {
               depois que a base passou a ser da organização inteira. */}
           <div className="space-y-1">
             <Label className="text-xs">Responsável</Label>
-            <Select value={filters.ownerId || "all"} onValueChange={(v) => setFilters({ ...filters, ownerId: v === "all" ? undefined : v })}>
+            <Select value={filters.ownerId || "all"} onValueChange={(v) => aplicarFiltros({ ownerId: v === "all" ? undefined : v })}>
               <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
@@ -511,7 +600,7 @@ export default function Contacts() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Empresa</Label>
-            <Select value={filters.companyId || "all"} onValueChange={(v) => setFilters({ ...filters, companyId: v === "all" ? undefined : v })}>
+            <Select value={filters.companyId || "all"} onValueChange={(v) => aplicarFiltros({ companyId: v === "all" ? undefined : v })}>
               <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
@@ -521,7 +610,7 @@ export default function Contacts() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Origem</Label>
-            <Select value={filters.origin || "all"} onValueChange={(v) => setFilters({ ...filters, origin: v === "all" ? undefined : v })}>
+            <Select value={filters.origin || "all"} onValueChange={(v) => aplicarFiltros({ origin: v === "all" ? undefined : v })}>
               <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
@@ -545,7 +634,7 @@ export default function Contacts() {
           </div>
           <div className="space-y-1">
             <Label htmlFor="contact-country" className="text-xs">País</Label>
-            <Select value={filters.country || "all"} onValueChange={(v) => setFilters({ ...filters, country: v === "all" ? undefined : v })}>
+            <Select value={filters.country || "all"} onValueChange={(v) => aplicarFiltros({ country: v === "all" ? undefined : v })}>
               <SelectTrigger id="contact-country" className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os países</SelectItem>
@@ -555,34 +644,19 @@ export default function Contacts() {
           </div>
           <div className="space-y-1">
             <Label htmlFor="contact-city" className="text-xs">Cidade</Label>
-            <Input id="contact-city" placeholder="Ex.: Campinas" className="w-44 h-8 text-xs" value={filters.city ?? ""} onChange={(e) => setFilters({ ...filters, city: e.target.value || undefined })} />
+            <Input id="contact-city" placeholder="Ex.: Campinas" className="w-44 h-8 text-xs" value={filters.city ?? ""} onChange={(e) => aplicarFiltros({ city: e.target.value || undefined })} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Criado de</Label>
-            <Input type="date" className="w-36 h-8 text-xs" value={filters.createdFrom ?? ""} onChange={(e) => setFilters({ ...filters, createdFrom: e.target.value || undefined })} />
+            <Input type="date" className="w-36 h-8 text-xs" value={filters.createdFrom ?? ""} onChange={(e) => aplicarFiltros({ createdFrom: e.target.value || undefined })} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">até</Label>
-            <Input type="date" className="w-36 h-8 text-xs" value={filters.createdTo ?? ""} onChange={(e) => setFilters({ ...filters, createdTo: e.target.value || undefined })} />
+            <Input type="date" className="w-36 h-8 text-xs" value={filters.createdTo ?? ""} onChange={(e) => aplicarFiltros({ createdTo: e.target.value || undefined })} />
           </div>
-          {Object.values(filters).some(Boolean) && (
-            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setFilters({})}>
-              <X className="mr-1 h-3 w-3" />Limpar
-            </Button>
-          )}
         </BarraDeFiltros>
       )}
 
-      {(filters.country || filters.city) && (
-        <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Filtros de localização ativos">
-          <span className="text-muted-foreground">Localização:</span>
-          {([['country', 'País'], ['city', 'Cidade']] as const).map(([key, label]) => filters[key] && (
-            <Button key={key} variant="outline" size="sm" className="h-8 text-xs" aria-label={`Remover filtro de ${label.toLowerCase()}`} onClick={() => setFilters({ ...filters, [key]: undefined })}>
-              {label}: {filters[key]} <X className="h-3 w-3" />
-            </Button>
-          ))}
-        </div>
-      )}
 
       {selectedContacts.size > 0 && (
         <BarraDeSelecao
@@ -593,7 +667,7 @@ export default function Contacts() {
         >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline">Mudar Status</Button>
+              <Button size="sm" variant="outline">Mudar estágio</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {/* "Novo lead" fica por último e nomeado pelo efeito: é o único
@@ -624,35 +698,35 @@ export default function Contacts() {
           <Table>
             <TableHeader>
               <TableRow>
-                {/* OITO colunas, não nove -- e o espaço vem de outro lugar.
-                    A rolagem lateral foi resolvida tirando o AVATAR (44px por
-                    linha, decorativo: iniciais de quem não tem foto não
-                    informam nada) e movendo o e-mail para baixo do nome, o que
-                    eliminou uma coluna inteira.
-                    Empresa, Especialidade e Origem voltaram a ser colunas
-                    próprias: são três perguntas diferentes, e juntá-las obrigava
-                    a ler a célula inteira para achar uma. */}
+                {/* OITO colunas. Telefone e especialidade não têm coluna: o
+                    telefone vai sob o nome, a especialidade sob a empresa, e as
+                    duas continuam ordenáveis pelo seletor "Ordenar". */}
                 <TableHead className="w-10"><Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" /></TableHead>
-                <TableHead><SortHeader rotulo="Contato" campo="name" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
+                <TableHead><SortHeader rotulo="Nome" campo="name" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
+                <TableHead className="w-[150px]"><SortHeader rotulo="Estágio" campo="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
                 <TableHead className="hidden sm:table-cell">Empresa</TableHead>
-                <TableHead className="hidden md:table-cell"><SortHeader rotulo="Especialidade" campo="title" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
-                <TableHead className="hidden md:table-cell w-[140px]">Telefone</TableHead>
-                <TableHead className="w-[130px]"><SortHeader rotulo="Situação" campo="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
-                <TableHead className="hidden lg:table-cell w-[150px]">Origem</TableHead>
+                <TableHead className="hidden lg:table-cell w-[160px]">Origem</TableHead>
+                <TableHead className="hidden md:table-cell w-[140px]">Responsável</TableHead>
+                <TableHead className="hidden md:table-cell w-[130px]">Último contato</TableHead>
                 <TableHead className="hidden lg:table-cell w-[110px]"><SortHeader rotulo="Criado em" campo="created_at" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {contacts.map((c) => (
-                <TableRow key={c.id} className="cursor-pointer" onClick={() => setDrawerContact(c)}>
+              {contacts.map((c) => {
+                const comp = empresaPorId.get((c as Record<string, unknown>).company_id as string);
+                const meta = (c as Record<string, unknown>).metadata as Record<string, string> | null;
+                const nomeEmpresa = comp?.name || meta?.empresa_manual || "";
+                return (
+                <TableRow key={c.id} data-state={selectedContacts.has(c.id) ? "selected" : undefined} className={`cursor-pointer ${selectedContacts.has(c.id) ? "bg-accent/40" : ""}`} onClick={() => setDrawerContact(c)}>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <Checkbox checked={selectedContacts.has(c.id)} onCheckedChange={() => toggleOne(c.id)} aria-label={`Selecionar ${c.first_name}`} />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
+                      <Iniciais nome={nomeDoContato(c.first_name, c.last_name)} />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-medium truncate">{nomeDoContato(c.first_name, c.last_name)}</span>
+                          <span className="font-semibold truncate">{nomeDoContato(c.first_name, c.last_name)}</span>
                           {(() => {
                             const days = getInactivityDays(c.id, c.created_at);
                             if (days === null || days < 14) return null;
@@ -660,7 +734,7 @@ export default function Contacts() {
                             return (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <span className={`inline-flex items-center gap-0.5 text-label font-semibold px-1 py-0.5 rounded ${isHigh ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"}`}>
+                                    <span className={`inline-flex items-center gap-0.5 text-label font-semibold px-1 py-0.5 rounded ${isHigh ? "bg-destructive-soft text-destructive" : "bg-warning-soft text-warning"}`}>
                                       <AlertTriangle className="h-2.5 w-2.5" />{days}d
                                     </span>
                                   </TooltipTrigger>
@@ -672,31 +746,47 @@ export default function Contacts() {
                         {/* Sempre visível, não só no celular: é o que permitiu
                             a coluna de e-mail sair. */}
                         <span className="block truncate text-xs text-muted-foreground">{formatarEmail(c.email)}</span>
+                        {c.phone && <span className="block truncate text-xs tabular-nums text-muted-foreground">{formatarTelefone(c.phone)}</span>}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
-                    {(() => {
-                      const comp = empresaPorId.get((c as Record<string, unknown>).company_id as string);
-                      if (comp) return comp.name;
-                      const meta = (c as Record<string, unknown>).metadata as Record<string, string> | null;
-                      return meta?.empresa_manual || "—";
-                    })()}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">{c.title || "—"}</TableCell>
-                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground tabular-nums">{formatarTelefone(c.phone)}</TableCell>
                   <TableCell><LifecycleBadge stage={c.lifecycle_stage} /></TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    {nomeEmpresa ? (
+                      <div className="flex items-center gap-2">
+                        <Iniciais nome={nomeEmpresa} forma="empresa" tamanho="sm" />
+                        <div className="min-w-0">
+                          <span className="block truncate text-xs">{nomeEmpresa}</span>
+                          {c.title && <span className="block truncate text-label text-muted-foreground">{c.title}</span>}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">{c.title || "—"}</span>
+                    )}
+                  </TableCell>
                   <TableCell className="hidden lg:table-cell">
                     <OriginBadge metadata={(c as Record<string, unknown>).metadata} />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
+                    <ResponsavelCelula
+                      ownerId={c.owner_id}
+                      membros={members}
+                      onChange={(novo) => handleOwnerChange(c.id, novo)}
+                      rotuloDe={`Responsável por ${nomeDoContato(c.first_name, c.last_name)}`}
+                    />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <UltimoContato data={lastActivityMap.get(c.id)} />
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs hidden lg:table-cell">
                     {formatarData(c.created_at)}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
               {contacts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="p-0">
+                  <TableCell colSpan={8} className="p-0">
                     {/* Carregando, falhou e vazio pediam a MESMA frase antes.
                         Falha de consulta virava "nenhum contato encontrado" --
                         afirmação que a tela não tinha como sustentar. */}
@@ -709,7 +799,7 @@ export default function Contacts() {
                         icone={UsersIcon}
                         titulo="Nenhum contato encontrado"
                         descricao={
-                          debouncedSearch || Object.values(filters).some(Boolean)
+                          debouncedSearch || algumFiltro
                             ? "Nenhum resultado para a busca e os filtros atuais."
                             : "Cadastre o primeiro contato ou importe uma planilha."
                         }
@@ -727,21 +817,17 @@ export default function Contacts() {
       {viewMode === "cards" && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
           {contacts.map((c) => (
-            <Card key={c.id} className="cursor-pointer transition-colors hover:border-primary/40 hover:bg-muted/40" onClick={() => setDrawerContact(c)}>
-              <CardContent className="space-y-2">
+            <Card key={c.id} className="cursor-pointer transition-colors hover:border-primary/40" onClick={() => setDrawerContact(c)}>
+              <CardContent className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                      {initials(nomeDoContato(c.first_name, c.last_name))}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="overflow-hidden">
-                    <p className="font-medium truncate">{nomeDoContato(c.first_name, c.last_name)}</p>
+                  <Iniciais nome={nomeDoContato(c.first_name, c.last_name)} tamanho="lg" />
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">{nomeDoContato(c.first_name, c.last_name)}</p>
                     {c.title && <p className="text-xs text-muted-foreground truncate">{c.title}</p>}
                   </div>
                 </div>
                 {c.email && <p className="text-xs text-muted-foreground truncate">{formatarEmail(c.email)}</p>}
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-2">
                   <LifecycleBadge stage={c.lifecycle_stage} />
                   <OriginBadge metadata={(c as Record<string, unknown>).metadata} />
                 </div>
@@ -759,7 +845,7 @@ export default function Contacts() {
                   icone={UsersIcon}
                   titulo="Nenhum contato encontrado"
                   descricao={
-                    debouncedSearch || Object.values(filters).some(Boolean)
+                    debouncedSearch || algumFiltro
                       ? "Nenhum resultado para a busca e os filtros atuais."
                       : "Cadastre o primeiro contato ou importe uma planilha."
                   }

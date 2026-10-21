@@ -100,7 +100,7 @@ export function AppLayout() {
   }
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={onSidebarOpenChange} style={{ "--sidebar-width": "232px", "--sidebar-width-icon": "64px" } as CSSProperties}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={onSidebarOpenChange} style={{ "--sidebar-width": "240px", "--sidebar-width-icon": "64px" } as CSSProperties}>
       {/*
         A CASCA É FIXA; quem rola é o CONTEÚDO.
 
@@ -117,11 +117,14 @@ export function AppLayout() {
         conteúdo em vez de rolar -- a correção não vale nada sem ele.
       */}
       <div className="flex h-dvh w-full overflow-hidden">
-        <AppSidebar onOpenSearch={onOpenSearch} />
+        <AppSidebar />
         <div className="flex min-h-0 flex-1 flex-col min-w-0">
           <AppHeader onOpenSearch={onOpenSearch} />
-          {activeSection && !communication && <AreaNavigation sectionId={activeSection} />}
-          <main className={cn("vx-page min-h-0 min-w-0 flex-1 overflow-y-auto", communication ? "p-0" : "p-4 md:p-6", "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6")}>
+          {/* Os módulos da área abrem DENTRO da lateral. A faixa de abas só
+              aparece quando a lateral não pode mostrá-los: no celular, onde ela
+              vive escondida, e com a lateral recolhida em ícones. */}
+          {activeSection && !communication && (isMobile || !sidebarOpen) && <AreaNavigation sectionId={activeSection} />}
+          <main className={cn("vx-page min-h-0 min-w-0 flex-1 overflow-y-auto bg-background", communication ? "p-0" : "p-4 md:p-6", "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6")}>
             <Outlet />
           </main>
         </div>

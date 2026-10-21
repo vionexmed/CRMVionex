@@ -137,12 +137,17 @@ describe("o card do quadro segue a referência", () => {
     expect(kanban).not.toMatch(/className="num[^"]*"[^>]*>\s*\{formatarMoeda/);
   });
 
-  it("são quatro botões, e o e-mail apaga sem endereço", () => {
-    for (const chave of ['chave: "abrir"', 'chave: "editar"', 'chave: "email"', 'chave: "agenda"']) {
-      expect(kanban).toContain(chave);
+  /**
+   * No Visual 01 os quatro botões redondos viraram o menu `…` do card -- a
+   * referência não tem fileira de ações. As QUATRO AÇÕES continuam: sumir com
+   * elas levaria embora a única porta para editar o negócio pelo quadro.
+   */
+  it("as quatro ações seguem no menu, e o e-mail apaga sem endereço", () => {
+    for (const rotulo of ["Abrir negócio", "Editar", "Escrever e-mail", "Agendar atividade"]) {
+      expect(kanban).toContain(rotulo);
     }
     // Sem endereço não há para onde mandar; sem compositor não há como mandar.
-    expect(kanban).toContain("desabilitado: !email || !onComposeEmail");
+    expect(kanban).toContain("disabled={!email || !onComposeEmail}");
   });
 
   /**
@@ -159,7 +164,7 @@ describe("o card do quadro segue a referência", () => {
    */
   it("o envelope não volta a ser mailto:", () => {
     expect(kanban).not.toContain("mailto:");
-    expect(kanban).toContain("aoClicar: () => onComposeEmail?.(deal)");
+    expect(kanban).toContain("onSelect={() => onComposeEmail?.(deal)}");
   });
 
   it("a página abre o compositor amarrado ao negócio", () => {
@@ -197,9 +202,13 @@ describe("o card do quadro segue a referência", () => {
 
   it("a largura do clone acompanha a da coluna", () => {
     // Já esteve dessincronizado: o clone tinha w-[220px] fixo enquanto a coluna
-    // ia a sm:w-[240px].
-    expect((kanban.match(/w-\[264px\]/g) ?? []).length).toBeGreaterThanOrEqual(2);
-    expect((kanban.match(/w-\[288px\]/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    // ia a sm:w-[240px]. Lê as larguras DA COLUNA e exige as mesmas no clone,
+    // em vez de cravar números que o próximo ajuste de layout mudaria.
+    const coluna = kanban.slice(kanban.indexOf("function StageColumn"), kanban.indexOf("function CollapsibleStatusColumn"));
+    const larguras = coluna.match(/(?:sm:)?w-\[\d+px\]/g) ?? [];
+    expect(larguras.length).toBeGreaterThanOrEqual(2);
+    const clone = kanban.slice(kanban.indexOf("<DragOverlay>"), kanban.indexOf("</DragOverlay>"));
+    for (const w of larguras) expect(clone).toContain(w);
   });
 });
 
@@ -216,7 +225,8 @@ describe("registrar atividade grava quando aconteceu", () => {
   ] as const;
 
   it.each(telas)("%s grava completed_at", (_nome, src) => {
-    expect(src).toMatch(/completed_at: ATIVIDADE_JA_ACONTECEU\.includes\(activityForm\.type\)/);
+    // `(!comPrazo && )?`: no DealDetail, preencher "Quando" torna o item agendamento.
+    expect(src).toMatch(/completed_at: (!comPrazo && )?ATIVIDADE_JA_ACONTECEU\.includes\(activityForm\.type\)/);
   });
 
   it("tarefa fica pendente: é o que falta fazer", () => {

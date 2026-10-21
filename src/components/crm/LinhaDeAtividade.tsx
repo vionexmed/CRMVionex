@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { mensagemErro } from "@/lib/erro-supabase";
 import { formatarDataHoraCurta } from "@/lib/formato";
-import { ATIVIDADE_ICONE, ATIVIDADE_ROTULO, type ActivityType } from "@/lib/atividade-tipos";
+import { ATIVIDADE_ROTULO, type ActivityType } from "@/lib/atividade-tipos";
+import { TipoDeAtividade } from "@/components/atividades/TipoDeAtividade";
 
 /**
  * Uma linha do histórico, com o que faltava: corrigir e apagar.
@@ -37,8 +38,6 @@ export function LinhaDeAtividade({
   const [ocupado, setOcupado] = useState(false);
   const [titulo, setTitulo] = useState(atividade.title ?? "");
   const [corpo, setCorpo] = useState(atividade.body ?? "");
-
-  const Icone = ATIVIDADE_ICONE[atividade.type];
 
   const salvar = async () => {
     const limpo = titulo.trim();
@@ -78,17 +77,13 @@ export function LinhaDeAtividade({
   };
 
   return (
-    <div className="flex gap-3 rounded-lg border border-border p-3">
-      {mostrarTipo && (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
-          <Icone className="h-3.5 w-3.5 text-muted-foreground" />
-        </div>
-      )}
+    <div className="flex gap-3 rounded-lg border border-border bg-card p-3">
+      {mostrarTipo && <TipoDeAtividade tipo={atividade.type} />}
 
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-2">
           {mostrarTipo && (
-            <span className="text-label font-medium uppercase text-muted-foreground">
+            <span className="text-label font-semibold uppercase tracking-wide text-muted-foreground">
               {ATIVIDADE_ROTULO[atividade.type]}
             </span>
           )}
@@ -114,18 +109,18 @@ export function LinhaDeAtividade({
               aria-label="Descrição da atividade"
             />
             <div className="flex gap-2">
-              <Button size="sm" className="h-8 text-label" onClick={salvar} disabled={ocupado}>
+              <Button size="sm" onClick={salvar} disabled={ocupado}>
                 {ocupado ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Check className="mr-1 h-3 w-3" />}
                 Salvar
               </Button>
-              <Button size="sm" variant="ghost" className="h-8 text-label" onClick={cancelar} disabled={ocupado}>
+              <Button size="sm" variant="ghost" onClick={cancelar} disabled={ocupado}>
                 <X className="mr-1 h-3 w-3" />Cancelar
               </Button>
             </div>
           </div>
         ) : (
           <>
-            <p className="text-sm font-medium">{atividade.title}</p>
+            <p className="text-sm font-semibold">{atividade.title}</p>
             {atividade.body && <p className="mt-0.5 text-xs text-muted-foreground">{atividade.body}</p>}
           </>
         )}

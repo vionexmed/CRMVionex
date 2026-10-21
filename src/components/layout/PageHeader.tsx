@@ -1,6 +1,4 @@
 import { ReactNode } from "react";
-import { useLocation } from "react-router-dom";
-import { grupoDaRota } from "@/components/layout/navegacao";
 import { formatarNumero, pluralizar } from "@/lib/formato";
 
 /**
@@ -40,55 +38,45 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({
-  kicker,
   title,
   description,
   contagem,
   actions,
   meta,
 }: PageHeaderProps) {
-  const { pathname } = useLocation();
-  const rotulo = kicker ?? grupoDaRota(pathname);
-
   const unidade = contagem
     ? pluralizar(contagem.valor, contagem.unidade, contagem.plural)
     : null;
 
   return (
-    // Sem cartão, sem gradiente, sem ladrilho de ícone: a separação do conteúdo
-    // vem da régua abaixo. Eram 126px antes de qualquer conteúdo, em 19 telas.
-    <header className="shrink-0 border-b border-border pb-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    /*
+     * VISUAL 01: título grande com a contagem AO LADO, em cinza -- "Contatos
+     * 1.284". O rótulo da área saiu daqui porque a trilha da barra superior já
+     * diz onde a pessoa está; repetir em cima do título era a mesma informação
+     * duas vezes no mesmo palmo de tela. Sem régua embaixo: quem vem logo abaixo
+     * (abas de visão, filtros) já desenha a própria linha.
+     */
+    <header className="shrink-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          {rotulo && (
-            <p className="text-xs font-medium text-muted-foreground">
-              {rotulo}
-            </p>
-          )}
-          {/* A classe, não as utilidades soltas: assim o nível existe em UM
-              lugar, e as telas sem casca (entrada, wizard, erro) usam o mesmo. */}
-          <h1 className="vx-titulo-tela break-words">{title}</h1>
+          <h1 className="vx-titulo-tela break-words">
+            {title}
+            {contagem && (
+              // `tabular-nums` porque o número muda sob os olhos -- sem largura
+              // fixa de dígito, o total "pula" a cada filtro aplicado.
+              <span className="ml-2.5 align-baseline text-base font-medium tabular-nums text-muted-foreground">
+                {formatarNumero(contagem.valor)}
+                <span className="sr-only"> {unidade}</span>
+              </span>
+            )}
+          </h1>
           {description && <p className="vx-subtitulo-tela">{description}</p>}
           {meta && <div className="mt-2">{meta}</div>}
         </div>
 
-        <div className="flex min-w-0 flex-wrap items-center gap-4">
-          {contagem && (
-            // `tabular-nums` porque o número muda sob os olhos — sem largura fixa
-            // de dígito, o total "pula" de lugar a cada filtro aplicado.
-            <div className="border-r border-border pr-3 text-right leading-none">
-              <p className="text-base font-semibold tabular-nums text-foreground">
-                {formatarNumero(contagem.valor)}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {unidade}
-              </p>
-            </div>
-          )}
-          {actions && (
-            <div className="flex flex-wrap items-center gap-2">{actions}</div>
-          )}
-        </div>
+        {actions && (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>
+        )}
       </div>
     </header>
   );

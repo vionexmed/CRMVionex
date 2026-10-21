@@ -1,24 +1,29 @@
-import { ImageOff } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Package } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { SeloComPonto } from "@/components/layout/ListaV1";
+import { useAtualizarProduto } from "@/hooks/queries/useProdutos";
+import { useToast } from "@/hooks/use-toast";
+import { mensagemErro } from "@/lib/erro-supabase";
 import { cn } from "@/lib/utils";
 import { formatarMoeda } from "@/lib/formato";
 import type { Produto } from "@/lib/api/produtos";
 
 /**
- * Um produto do catálogo.
+ * Um produto do catálogo, no formato do V1: miniatura, interruptor de ativo,
+ * nome e descrição, preço grande com a unidade ao lado e o rodapé com a
+ * situação.
  *
- * A FOTO É O CARTÃO, e é o que separa este do cartão de integração. Lá o
- * ladrilho de 40px identifica a marca ao lado do nome; aqui a foto ocupa o topo
- * inteiro, porque num catálogo é ela que se reconhece antes de ler.
+ * O INTERRUPTOR é o caminho curto para ativar/desativar -- a referência o põe
+ * no cartão, e o formulário continua tendo o mesmo campo. O clique nele não
+ * pode abrir a edição, por isso para a propagação.
  *
- * SEM BOTÃO no corpo, como pedido. O cartão inteiro é o alvo: um botão
- * "Editar" ao lado de um cartão que também abre a edição daria dois caminhos
- * para a mesma coisa -- foi o motivo de o olho sair do card do kanban.
+ * A miniatura aproveita `foto_url` quando existe; antes a foto era o cartão
+ * inteiro, mas a maior parte do catálogo (planos, serviços) não tem foto, e um
+ * quadrado cinza com ícone ocupava a altura toda sem dizer nada.
  *
- * O PREÇO fica sobre a foto e não embaixo do nome. Embaixo ele disputava a
- * linha com a descrição e, numa grade, os preços apareciam em alturas
- * diferentes conforme o nome quebrasse em uma ou duas linhas. No canto da foto
- * eles formam uma coluna que se compara de cima a baixo.
+ * Não há categoria nem contagem de vendas no banco: o rodapé mostra só o que
+ * existe (SKU e situação).
  */
 export function CartaoDeProduto({
   produto,
@@ -30,64 +35,70 @@ export function CartaoDeProduto({
   className?: string;
 }) {
   const inativo = !produto.ativo;
+  const atualizar = useAtualizarProduto();
+  const { toast } = useToast();
+
+  const alternar = (ativo: boolean) =>
+    atualizar.mutate(
+      { id: produto.id, patch: { ativo } },
+      {
+        onError: (e) =>
+          toast({ title: "Não foi possível alterar o produto", description: mensagemErro(e), variant: "destructive" }),
+      },
+    );
 
   return (
     <Card
       onClick={aoClicar ? () => aoClicar(produto) : undefined}
       className={cn(
-        "flex flex-col overflow-hidden transition-colors",
+        "flex flex-col p-4 transition-colors",
         aoClicar && "cursor-pointer hover:border-primary/40",
         // Desativado continua visível — é o único jeito de reativar. Mas
-        // dessaturado, para não competir com o que está à venda.
-        inativo && "opacity-60 saturate-50",
+        // esmaecido, para não competir com o que está à venda.
+        inativo && "bg-surface-2",
         className,
       )}
     >
-      {/* `aspect-[4/3]` e não altura fixa: a proporção mantém a grade regular
-          qualquer que seja a largura da coluna, e é ela que faz as fotos
-          alinharem entre si. */}
-      <div className="relative aspect-[4/3] w-full shrink-0 bg-muted">
-        {produto.foto_url ? (
-          <img
-            src={produto.foto_url}
-            alt={produto.nome}
-            loading="lazy"
-            /* `object-cover` recorta em vez de distorcer. Foto de produto vem
-               em proporção qualquer, e esticar deforma o que se está vendendo. */
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <ImageOff className="h-6 w-6 text-muted-foreground/40" />
-          </div>
-        )}
-
-        <span className="absolute bottom-2 right-2 rounded-md bg-background/90 px-2 py-1 text-xs font-semibold tabular-nums shadow-[var(--shadow-xs)]">
-          {formatarMoeda(Number(produto.preco), produto.moeda)}
-          <span className="ml-0.5 font-normal text-muted-foreground">/{produto.unidade}</span>
+      <div className="flex items-start justify-between gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-card text-muted-foreground">
+          {produto.foto_url ? (
+            <img src={produto.foto_url} alt="" loading="lazy" className="h-full w-full object-cover" />
+          ) : (
+            <Package aria-hidden="true" className="h-4 w-4" />
+          )}
         </span>
-
-        {inativo && (
-          <span className="absolute left-2 top-2 rounded-full bg-warning/15 px-2 py-0.5 text-label font-semibold uppercase tracking-wide text-warning">
-            Inativo
-          </span>
-        )}
+        {/* O alvo do Switch já tem a altura do controle; o wrapper só barra o clique. */}
+        <span onClick={(e) => e.stopPropagation()} className="flex items-center">
+          <Switch
+            checked={produto.ativo}
+            onCheckedChange={alternar}
+            disabled={atualizar.isPending}
+            aria-label={produto.ativo ? `Desativar ${produto.nome}` : `Ativar ${produto.nome}`}
+          />
+        </span>
       </div>
 
-      {/* `line-clamp-2` na descrição, e `min-h` para segurar a altura: sem os
-          dois, cartão de descrição curta fica mais baixo que o vizinho e a
-          grade desalinha — o mesmo defeito que os gráficos do painel tinham. */}
-      <CardContent className="flex flex-1 flex-col gap-1 p-3">
+      <div className={cn("mt-3 flex flex-1 flex-col", inativo && "opacity-70")}>
         <p className="vx-titulo-secao truncate">{produto.nome}</p>
-        <p className="vx-subtitulo line-clamp-2 min-h-8 leading-relaxed">
+        {/* `min-h` segura a altura: sem ele, descrição curta deixa o cartão mais
+            baixo que o vizinho e o preço sai em alturas diferentes na grade. */}
+        <p className="vx-subtitulo mt-0.5 line-clamp-2 min-h-8 leading-relaxed">
           {produto.descricao || "Sem descrição"}
         </p>
+        <p className="mt-3 flex items-baseline gap-1">
+          <span className="text-xl font-bold tabular-nums tracking-tight">
+            {formatarMoeda(Number(produto.preco), produto.moeda)}
+          </span>
+          <span className="text-xs text-muted-foreground">/{produto.unidade}</span>
+        </p>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+        <SeloComPonto tom={inativo ? "neutro" : "sucesso"}>{inativo ? "Inativo" : "Ativo"}</SeloComPonto>
         {produto.sku && (
-          <p className="mt-auto pt-1 text-label tabular-nums text-muted-foreground/70">
-            {produto.sku}
-          </p>
+          <span className="truncate font-mono text-xs text-muted-foreground">{produto.sku}</span>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }

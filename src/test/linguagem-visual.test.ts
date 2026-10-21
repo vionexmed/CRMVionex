@@ -116,7 +116,7 @@ describe("a cor de destaque continua trocável", () => {
   });
 
   it("violet segue disponível como escolha", () => {
-    expect(TEMA).toMatch(/violet: \{ light: "262 83% 58%"/);
+    expect(TEMA).toMatch(/violet: \{ light: "252 100% 62%"/);
   });
 });
 

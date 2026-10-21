@@ -258,9 +258,13 @@ describe("o cabeçalho não mantém lista própria", () => {
     expect(HEADER).not.toMatch(/const routeLabels/);
   });
 
-  /** `/` é o Login — o mesmo defeito que NotFound e Setup tinham. */
-  it("o primeiro elo do caminho não leva ao login", () => {
-    expect(HEADER).not.toMatch(/label: "VIONEX", href: "\/"/);
-    expect(HEADER).toMatch(/label: "VIONEX", href: "\/dashboard"/);
+  /**
+   * `/` é o Login — o mesmo defeito que NotFound e Setup tinham. No Visual 01 o
+   * caminho começa pela ÁREA (a marca está no topo da lateral), e nenhum elo
+   * pode apontar para a raiz.
+   */
+  it("nenhum elo do caminho leva ao login", () => {
+    expect(HEADER).not.toMatch(/href: "\/"/);
+    expect(HEADER).toContain("href: section.entryPath");
   });
 });

@@ -9,9 +9,10 @@ import { useCompanyFromSearch } from "@/hooks/queries/useGlobalSearch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
+import { ChipAdicionarFiltro, ChipDeFiltro, Iniciais, LinhaDeFiltros } from "@/components/layout/ListaV1";
+import { ResponsavelCelula } from "@/components/clientes/CelulasDeCliente";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -19,8 +20,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, LayoutGrid, List, Filter, Upload, Download,
-  Trash2, X, Building2,
+  Plus, Search, LayoutGrid, List, Upload, Download,
+  Trash2, X,
 } from "lucide-react";
 import { mensagemErro } from "@/lib/erro-supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -199,17 +200,11 @@ export default function Companies() {
               { valor: "cards", rotulo: "Cartões", icone: LayoutGrid },
             ]}
           />
-          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} aria-label="Alternar filtros">
-            <Filter className="mr-1 h-3.5 w-3.5" /><span className="hidden sm:inline">Filtros</span>
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setCsvOpen(true)} aria-label="Importar CSV" className="hidden sm:flex">
-            <Upload className="mr-1.5 h-3.5 w-3.5" />Importar
-          </Button>
-          <Button variant="outline" size="sm" onClick={exportCSV} aria-label="Exportar CSV" className="hidden sm:flex">
-            <Download className="mr-1.5 h-3.5 w-3.5" />Exportar
+          <Button variant="outline" onClick={() => setCsvOpen(true)} aria-label="Importar CSV" className="hidden sm:flex">
+            <Upload className="mr-1.5 h-3.5 w-3.5" />Importar CSV
           </Button>
           <Button onClick={() => setCreateOpen(true)} aria-label="Criar nova empresa">
-            <Plus className="mr-1 sm:mr-2 h-4 w-4" /><span className="hidden sm:inline">Nova Empresa</span><span className="sm:hidden">Nova</span>
+            <Plus className="mr-1 sm:mr-2 h-4 w-4" /><span className="hidden sm:inline">Nova empresa</span><span className="sm:hidden">Nova</span>
           </Button>
         </>
       }
@@ -228,10 +223,34 @@ export default function Companies() {
 
 
 
-      <div className="relative">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar empresas..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
+      <LinhaDeFiltros
+        direita={
+          <Button variant="outline" size="sm" onClick={exportCSV} aria-label="Exportar CSV">
+            <Download className="mr-1.5 h-3.5 w-3.5" />Exportar
+          </Button>
+        }
+      >
+        <div className="relative">
+          <Search aria-hidden="true" className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+          <Input aria-label="Buscar empresas" placeholder="Buscar empresas…" className="h-8 w-56 pl-8 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        {filters.industry && (
+          <ChipDeFiltro ativo onRemover={() => setFilters({ ...filters, industry: undefined })} rotuloRemover="Remover filtro de indústria">
+            Indústria: {filters.industry}
+          </ChipDeFiltro>
+        )}
+        {filters.size && (
+          <ChipDeFiltro ativo onRemover={() => setFilters({ ...filters, size: undefined })} rotuloRemover="Remover filtro de tamanho">
+            Tamanho: {filters.size}
+          </ChipDeFiltro>
+        )}
+        {filters.ownerId && (
+          <ChipDeFiltro ativo onRemover={() => setFilters({ ...filters, ownerId: undefined })} rotuloRemover="Remover filtro de responsável">
+            Responsável: {members.find((m) => m.id === filters.ownerId)?.name || members.find((m) => m.id === filters.ownerId)?.email || "—"}
+          </ChipDeFiltro>
+        )}
+        <ChipAdicionarFiltro onClick={() => setShowFilters(!showFilters)} />
+      </LinhaDeFiltros>
 
       {showFilters && (
         <BarraDeFiltros>
@@ -330,38 +349,29 @@ export default function Companies() {
                 <TableHead className="hidden md:table-cell"><SortHeader rotulo="Indústria" campo="industry" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
                 <TableHead className="hidden lg:table-cell"><SortHeader rotulo="Tamanho" campo="size" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
                 <TableHead className="hidden lg:table-cell"><SortHeader rotulo="Receita" campo="revenue" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
+                <TableHead className="hidden md:table-cell w-[140px]">Responsável</TableHead>
                 <TableHead className="hidden md:table-cell"><SortHeader rotulo="Criado em" campo="created_at" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginated.map((c) => (
-                <TableRow key={c.id} className="cursor-pointer" onClick={() => setDrawerCompany(c)}>
+                <TableRow key={c.id} className={`cursor-pointer ${selectedCompanies.has(c.id) ? "bg-accent/40" : ""}`} onClick={() => setDrawerCompany(c)}>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <Checkbox checked={selectedCompanies.has(c.id)} onCheckedChange={() => toggleOne(c.id)} />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      {c.domain ? (
-                        <img
-                          src={`https://logo.clearbit.com/${c.domain}`}
-                          alt=""
-                          className="h-8 w-8 rounded-md bg-muted object-contain"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                        />
-                      ) : (
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                            <Building2 className="h-4 w-4" />
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                      <span className="font-medium">{c.name}</span>
+                      <Iniciais nome={c.name} forma="empresa" />
+                      <span className="font-semibold">{c.name}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground hidden sm:table-cell">{c.domain}</TableCell>
                   <TableCell className="text-muted-foreground hidden md:table-cell">{c.industry}</TableCell>
                   <TableCell className="text-muted-foreground hidden lg:table-cell">{c.size}</TableCell>
                   <TableCell className="text-muted-foreground hidden lg:table-cell">{formatarMoedaInteira(Number(c.revenue))}</TableCell>
+                  <TableCell className="hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
+                    <ResponsavelCelula ownerId={c.owner_id} membros={members} rotuloDe={`Responsável por ${c.name}`} />
+                  </TableCell>
                   <TableCell className="text-muted-foreground text-xs hidden md:table-cell">
                     {c.created_at ? formatarData(c.created_at) : "—"}
                   </TableCell>
@@ -376,16 +386,12 @@ export default function Companies() {
       {!carregando && !falhou && filtered.length > 0 && viewMode === "cards" && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
           {paginated.map((c) => (
-            <Card key={c.id} className="cursor-pointer transition-colors hover:border-primary/40 hover:bg-muted/40" onClick={() => setDrawerCompany(c)}>
+            <Card key={c.id} className="cursor-pointer transition-colors hover:border-primary/40" onClick={() => setDrawerCompany(c)}>
               <CardContent className="space-y-2">
                 <div className="flex items-center gap-3">
-                  {c.domain ? (
-                    <img src={`https://logo.clearbit.com/${c.domain}`} alt="" className="h-10 w-10 rounded-md bg-muted object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                  ) : (
-                    <Avatar className="h-10 w-10"><AvatarFallback className="bg-primary/10 text-primary"><Building2 className="h-5 w-5" /></AvatarFallback></Avatar>
-                  )}
+                  <Iniciais nome={c.name} forma="empresa" tamanho="lg" />
                   <div className="overflow-hidden">
-                    <p className="font-medium truncate">{c.name}</p>
+                    <p className="font-semibold truncate">{c.name}</p>
                     {c.industry && <p className="text-xs text-muted-foreground truncate">{c.industry}</p>}
                   </div>
                 </div>

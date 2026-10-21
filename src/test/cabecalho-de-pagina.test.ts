@@ -99,14 +99,13 @@ describe("contagem e texto fixo não dividem o mesmo campo", () => {
   /** As nove que contavam precisam ter migrado, não simplesmente perdido o número. */
   const QUE_CONTAM = [
     "Contacts", "Companies", "Deals", "Activities",
-    "Automations", "LeadScoring", "EmailTemplates", "EmailSequences",
   ];
   it.each(QUE_CONTAM)("%s passa contagem", (nome) => {
     expect(readFileSync(`src/pages/${nome}.tsx`, "utf8")).toMatch(/contagem=\{\{/);
   });
 
   /** E as seis que explicam continuam explicando. */
-  const QUE_EXPLICAM = ["Dashboard", "Reports", "SalesGoals", "MyEmail", "Integrations", "SecuritySettings"];
+  const QUE_EXPLICAM = ["Dashboard", "Reports", "MyEmail", "Integrations", "SecuritySettings"];
   it.each(QUE_EXPLICAM)("%s mantém description em texto fixo", (nome) => {
     expect(readFileSync(`src/pages/${nome}.tsx`, "utf8")).toMatch(/description="/);
   });

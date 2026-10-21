@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Users, Building2, Handshake, Search, type LucideIcon } from "lucide-react";
 import { CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
+import { Iniciais } from "@/components/layout/ListaV1";
 import { getVisibleNavigation, ACCOUNT_ITEMS } from "@/components/layout/navegacao";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalSearch } from "@/hooks/queries/useGlobalSearch";
@@ -14,6 +15,8 @@ const categories: { key: SearchCategory; label: string; icon: LucideIcon }[] = [
   { key: "companies", label: "Empresas", icon: Building2 },
   { key: "deals", label: "Negócios", icon: Handshake },
 ];
+/** Título de grupo no V1: caixa-alta pequena, como os rótulos de seção da casca. */
+const GRUPO = "[&_[cmdk-group-heading]]:text-label [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide";
 const normalize = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 function readHistory(key: string | null): string[] {
   if (!key) return [];
@@ -77,29 +80,29 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         {term.length < 2 && <p role="status" className="px-4 py-3 text-xs text-muted-foreground">Digite pelo menos 2 caracteres para buscar registros.</p>}
         {query.isSearching && <p role="status" className="px-4 py-3 text-xs text-muted-foreground">Buscando registros…</p>}
         {query.error && <div role="alert" className="px-4 py-3 text-sm">{mensagemErro(query.error)}<Button variant="ghost" size="sm" onClick={() => void query.refetch()}>Tentar novamente</Button></div>}
-        {query.data && categories.map(({ key: category, label, icon: Icon }) => (
-          <CommandGroup key={category} heading={label}>
+        {query.data && categories.map(({ key: category, label }) => (
+          <CommandGroup key={category} heading={label} className={GRUPO}>
             {query.data?.errors?.[category]
               ? <div role="alert" className="px-2 py-2 text-xs text-muted-foreground">Não foi possível buscar {label.toLocaleLowerCase("pt-BR")}: {query.data.errors[category]}<Button variant="ghost" size="sm" onClick={() => void query.refetch()}>Tentar novamente</Button></div>
               : query.data![category].length === 0
                 ? <p className="px-2 py-2 text-xs text-muted-foreground">Nenhum resultado em {label.toLocaleLowerCase("pt-BR")}.</p>
                 : query.data![category].map((result) => (
                   <CommandItem key={`${result.kind}:${result.id}`} value={`${result.kind}:${result.id}`} onSelect={() => select(result.href)} className="gap-3">
-                    <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0"><span className="block truncate" title={result.title}>{result.title}</span>{result.subtitle && <span className="block truncate text-xs text-muted-foreground" title={result.subtitle}>{result.subtitle}</span>}</span>
+                    <Iniciais nome={result.title} forma={category === "contacts" ? "pessoa" : "empresa"} tamanho="sm" />
+                    <span className="min-w-0"><span className="block truncate font-medium" title={result.title}>{result.title}</span>{result.subtitle && <span className="block truncate text-xs text-muted-foreground" title={result.subtitle}>{result.subtitle}</span>}</span>
                   </CommandItem>
                 ))}
           </CommandGroup>
         ))}
-        {!term && recent.length > 0 && <CommandGroup heading="Buscas recentes">
+        {!term && recent.length > 0 && <CommandGroup heading="Buscas recentes" className={GRUPO}>
           {recent.map((item) => <CommandItem key={item} value={`recent:${item}`} onSelect={() => setSearch(item)} className="gap-3"><Search aria-hidden="true" className="h-4 w-4" /><span className="truncate">{item}</span></CommandItem>)}
           <Button variant="ghost" size="sm" onClick={clearHistory}>Limpar histórico</Button>
         </CommandGroup>}
-        {matchingPages.length > 0 && <CommandGroup heading="Páginas">
+        {matchingPages.length > 0 && <CommandGroup heading="Páginas" className={GRUPO}>
           {matchingPages.map((page) => <CommandItem key={page.path} value={`page:${page.path}`} onSelect={() => select(page.path)} className="gap-3"><page.icon aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />{page.label}</CommandItem>)}
         </CommandGroup>}
       </CommandList>
-      <p className="border-t px-4 py-3 text-xs text-muted-foreground">Até 5 resultados por categoria. ↑↓ navegar · Enter abrir · Esc fechar</p>
+      <p className="border-t border-border bg-surface-2 px-4 py-3 text-xs text-muted-foreground">Até 5 resultados por categoria. ↑↓ navegar · Enter abrir · Esc fechar</p>
     </CommandDialog>
   );
 }

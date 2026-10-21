@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/hooks/useOrg";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import { useMembers } from "@/hooks/queries/useMembers";
+import { Iniciais, SeloComPonto, type Tom } from "@/components/layout/ListaV1";
 import SessionsPanel from "@/components/settings/SessionsPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -65,10 +66,16 @@ function AuditLogTab({ orgId }: { orgId: string | null }) {
     export: "Exportou", import: "Importou", invite: "Convidou",
   };
 
-  const actionColors: Record<string, string> = {
-    create: "bg-emerald-500/10 text-emerald-400", update: "bg-blue-500/10 text-blue-400",
-    delete: "bg-red-500/10 text-red-400", login: "bg-primary/10 text-primary",
-    export: "bg-amber-500/10 text-amber-400",
+  // Gravidade da ação: exclusão é perigo, exportação (dado saindo) é atenção.
+  const actionTons: Record<string, Tom> = {
+    create: "sucesso", update: "info", delete: "perigo", login: "marca", export: "atencao",
+  };
+
+  // Autor resolvido no cliente: audit_logs.user_id aponta para auth.users, que o PostgREST não atravessa.
+  const { data: membros = [] } = useMembers();
+  const nomeDe = (id: string | null) => {
+    const m = membros.find((x) => x.id === id);
+    return m ? (m.name || m.email || "Sem nome") : null;
   };
 
   const filtered = logs.filter((l) => !searchTerm || l.entity_type?.includes(searchTerm) || l.action?.includes(searchTerm));
@@ -104,11 +111,12 @@ function AuditLogTab({ orgId }: { orgId: string | null }) {
         </Button>
       </div>
 
-      <div className="vx-table">
+      <Card><CardContent className="p-0"><div className="vx-table">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Data</TableHead>
+              <TableHead>Autor</TableHead>
               <TableHead>Ação</TableHead>
               <TableHead>Entidade</TableHead>
               <TableHead className="hidden md:table-cell">IP</TableHead>
@@ -117,19 +125,27 @@ function AuditLogTab({ orgId }: { orgId: string | null }) {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum registro encontrado</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum registro encontrado</TableCell></TableRow>
             ) : (
               filtered.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell className="text-xs whitespace-nowrap">
+                  <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
                     {formatarDataHora(log.created_at)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className={actionColors[log.action] || ""}>
+                    {nomeDe(log.user_id) ? (
+                      <div className="flex items-center gap-2">
+                        <Iniciais nome={nomeDe(log.user_id)} tamanho="sm" />
+                        <span className="text-sm">{nomeDe(log.user_id)}</span>
+                      </div>
+                    ) : <span className="text-xs text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    <SeloComPonto tom={actionTons[log.action] || "neutro"}>
                       {actionLabels[log.action] || log.action}
-                    </Badge>
+                    </SeloComPonto>
                   </TableCell>
                   <TableCell className="font-medium text-sm">{log.entity_type}</TableCell>
                   <TableCell className="hidden md:table-cell text-xs text-muted-foreground">{log.ip_address || "—"}</TableCell>
@@ -141,7 +157,7 @@ function AuditLogTab({ orgId }: { orgId: string | null }) {
             )}
           </TableBody>
         </Table>
-      </div>
+      </div></CardContent></Card>
     </div>
   );
 }
@@ -157,9 +173,7 @@ function SessionsTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />Política de senha
-          </CardTitle>
+          <CardTitle className="vx-titulo-secao">Política de senha</CardTitle>
           <CardDescription>O que está de fato em vigor</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

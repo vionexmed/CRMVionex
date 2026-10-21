@@ -11,11 +11,16 @@
  *
  * Os KPIs de vendas que ficavam aqui (receita, win rate, ticket, ciclo, meta,
  * negócios em risco) seguem disponíveis em Relatórios.
+ *
+ * VISUAL 01: um cartão principal com a faixa dos quatro números e, embaixo, a
+ * métrica escolhida dia a dia contra o período anterior; ao lado, o que espera
+ * ação. Aba, período e métrica moram na URL: o link mandado a um colega abre o
+ * mesmo recorte, e F5 não devolve o painel ao padrão.
  */
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { LucideIcon } from "lucide-react";
-import { UserPlus, MessageCircle, Instagram, Globe, Linkedin, Send, CheckCheck, Reply, MessagesSquare, CalendarCheck, Briefcase, Trophy, Sparkles, Timer, Hourglass, UserCheck, RefreshCw, TriangleAlert, LineChart, ListFilter, Bot } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { UserPlus, MessageCircle, Instagram, Globe, Linkedin, Send, CheckCheck, Reply, MessagesSquare, CalendarCheck, Briefcase, Trophy, Sparkles, Timer, Hourglass, UserCheck, RefreshCw, TriangleAlert, LineChart, ListFilter, Bot, CalendarDays, List } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { StatCard, type StatAccent, type StatFormat } from "@/components/dashboard/StatCard";
 import { Button } from "@/components/ui/button";
@@ -23,21 +28,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrg } from "@/hooks/useOrg";
+import { useAbaNaUrl } from "@/hooks/useAbaNaUrl";
 import {
   useSdrMetrics, sdrMetricsKeys, SDR_PERIOD_LABELS,
   type SdrPeriod, type MetricKey,
 } from "@/hooks/useSdrMetrics";
-import { useSdrCharts, sdrChartsKeys } from "@/hooks/useSdrCharts";
+import { useSdrCharts, sdrChartsKeys, type PontoSerie } from "@/hooks/useSdrCharts";
 import { sdrMetricLeadsKeys, type MetricDrilldownKey } from "@/hooks/useSdrMetricLeads";
 import { MetricDrilldown } from "@/components/dashboard/MetricDrilldown";
 import { MetricLeadsSheet } from "@/components/dashboard/MetricLeadsSheet";
-// Import ESTÁTICO: os gráficos agora são SVG puro, sem biblioteca. Não há mais
-// peso a postergar, então carregar sob demanda só adicionava uma espera — os
-// gráficos entram na mesma pintura dos números.
+// Import ESTÁTICO: os gráficos são SVG puro, sem biblioteca. Não há peso a
+// postergar, então carregar sob demanda só adicionava uma espera.
 import SdrChartsPanel from "@/components/dashboard/SdrChartsPanel";
-import { EmBreve } from "@/components/layout/EmBreve";
+import { Pendencias, AtendimentoAgora } from "@/components/dashboard/PainelLateral";
+import { useSerieAnterior } from "@/components/dashboard/useSerieAnterior";
+import { rotulosDoPeriodo } from "@/components/dashboard/periodo-do-painel";
 import { PageTabs } from "@/components/layout/PageTabs";
+import { EmBreve } from "@/components/layout/EmBreve";
 import { formatarHora } from "@/lib/formato";
+import { mensagemErro } from "@/lib/erro-supabase";
 import { Secao } from "@/components/layout/Secao";
 
 type TileConfig = {
@@ -152,49 +161,56 @@ const PERIODS: SdrPeriod[] = ["today", "this_week", "this_month", "last_month", 
 /** Métricas em destaque na faixa superior — o que se olha primeiro. */
 const DESTAQUE: MetricKey[] = ["leadsRecebidos", "abordagens", "taxaResposta", "oportunidades"];
 
-/** De qual coluna da série cada tile tira a própria linha de tendência. */
-const TENDENCIA: Partial<Record<MetricKey, "leads" | "abordagens" | "respostas">> = {
-  leadsRecebidos: "leads",
-  abordagens: "abordagens",
-  conversasIniciadas: "respostas",
-  leadsWhatsapp: "leads",
-  oportunidades: "leads",
+/**
+ * De qual coluna de `sdr_series` cada métrica da faixa tira a série diária.
+ *
+ * Taxa de resposta e oportunidades ficam de fora de propósito. `respostas` na
+ * série conta MENSAGENS recebidas, não leads que responderam sobre os
+ * abordados -- desenhá-la embaixo do card de taxa poria um número sob outro. E
+ * oportunidade (negócio que saiu da etapa de entrada) não tem série por dia.
+ */
+const SERIE_DA_METRICA: Partial<Record<MetricKey, { coluna: keyof Omit<PontoSerie, "dia">; titulo: string; singular: string; plural: string }>> = {
+  leadsRecebidos: { coluna: "leads", titulo: "Leads por dia", singular: "lead", plural: "leads" },
+  abordagens: { coluna: "abordagens", titulo: "Abordagens por dia", singular: "abordagem", plural: "abordagens" },
 };
+
+/** Por que a métrica escolhida não tem gráfico diário. Dito, não escondido. */
+const SEM_SERIE: Partial<Record<MetricKey, string>> = {
+  taxaResposta: "A taxa é calculada sobre o período inteiro: a resposta de hoje pode ser de uma abordagem de outro dia, então ela não se divide por dia.",
+  oportunidades: "Oportunidade é o negócio que saiu da etapa de entrada. O banco conta isso por período e ainda não tem a série por dia.",
+};
+
+const ABAS = ["visao", "indicadores", "assistente"] as const;
+
+/** "AAAA-MM-DD" de hoje no fuso de quem olha, para cortar os dias que não vieram. */
+function hojeLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export default function Dashboard() {
   const { orgId } = useOrg();
   const queryClient = useQueryClient();
-  const [period, setPeriod] = useState<SdrPeriod>("this_month");
+  const [aba, setAba] = useAbaNaUrl("aba", "visao", ABAS);
+  const [period, setPeriodNaUrl] = useAbaNaUrl<SdrPeriod>("periodo", "this_month", PERIODS);
+  const [metricaGrafico, setMetricaGrafico] = useAbaNaUrl<MetricKey>("metrica", "leadsRecebidos", DESTAQUE);
   /** Métrica com o painel lateral aberto. Um painel serve os quatro tiles. */
   const [painelDe, setPainelDe] = useState<MetricDrilldownKey | null>(null);
 
   const { data, isFetching, isLoading, dataUpdatedAt, error } = useSdrMetrics(period);
   const { data: charts, isLoading: loadingCharts } = useSdrCharts(period);
+  const { data: serieAnterior } = useSerieAnterior(period);
   const metrics = data?.metrics;
   const pessoasAbordadas = data?.pessoasAbordadas ?? null;
+  const aguardando = metrics?.aguardandoHumano?.value ?? null;
 
-  const lastRefresh = useMemo(
-    () => (dataUpdatedAt ? new Date(dataUpdatedAt) : null),
-    [dataUpdatedAt],
-  );
-
-  /** A série já carregada alimenta os minigráficos — sem consulta extra. */
-  const tendencias = useMemo(() => {
-    const serie = charts?.serie ?? [];
-    return {
-      leads: serie.map((p) => p.leads),
-      abordagens: serie.map((p) => p.abordagens),
-      respostas: serie.map((p) => p.respostas),
-    };
-  }, [charts?.serie]);
-
-  const trendDe = (key: MetricKey) => {
-    const coluna = TENDENCIA[key];
-    return coluna ? tendencias[coluna] : undefined;
-  };
+  const lastRefresh = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
+  const rotulos = rotulosDoPeriodo(period);
 
   const refresh = () => {
     if (!orgId) return;
+    // Prefixo: alcança também a série anterior e as pendências, que moram sob
+    // as mesmas chaves (ver useSerieAnterior e usePendencias).
     queryClient.invalidateQueries({ queryKey: sdrMetricsKeys.all(orgId) });
     queryClient.invalidateQueries({ queryKey: sdrChartsKeys.all(orgId) });
     queryClient.invalidateQueries({ queryKey: sdrMetricLeadsKeys.all(orgId) });
@@ -204,57 +220,74 @@ export default function Dashboard() {
   const tilesDestaque = DESTAQUE
     .map((k) => tiles.find((t) => t.key === k))
     .filter((t): t is TileConfig => !!t);
+  const tileDoGrafico = tilesDestaque.find((t) => t.key === metricaGrafico) ?? tilesDestaque[0];
+
+  // A série do banco vai até o fim do período, com zero nos dias que ainda não
+  // vieram. Desenhados, eles leriam como queda no fim do mês.
+  const serie = SERIE_DA_METRICA[tileDoGrafico.key];
+  const hoje = hojeLocal();
+  const pontos = serie
+    ? (charts?.serie ?? []).filter((p) => p.dia.slice(0, 10) <= hoje).map((p) => ({ dia: p.dia, valor: p[serie.coluna] }))
+    : [];
+  const anterior = serie && serieAnterior ? serieAnterior.map((p) => p[serie.coluna]) : null;
+
+  const verLista = (tile: TileConfig) =>
+    tile.drilldown ? (
+      <Button variant="ghost" size="sm" onClick={() => setPainelDe(tile.drilldown!)}>
+        <List aria-hidden />Ver lista
+      </Button>
+    ) : null;
+
+  const setPeriod = (p: SdrPeriod) => setPeriodNaUrl(p);
 
   return (
     <PageShell
-      title="Painel de SDR"
+      title="Painel"
       description="Entrada, abordagem, conversão e velocidade de atendimento"
-      meta={
-        lastRefresh ? (
-          <p className="text-label text-muted-foreground">
-            {SDR_PERIOD_LABELS[period]} · atualizado{" "}
-            {formatarHora(lastRefresh)}
-          </p>
-        ) : undefined
-      }
-      actions={
-        <>
-          <Select value={period} onValueChange={(v) => setPeriod(v as SdrPeriod)}>
-            <SelectTrigger className="h-8 w-40 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PERIODS.map((p) => (
-                <SelectItem key={p} value={p}>{SDR_PERIOD_LABELS[p]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      meta={lastRefresh ? <p className="text-xs text-muted-foreground">Atualizado às {formatarHora(lastRefresh)}</p> : undefined}
+      actions={<>
+          {/* Período e comparação num controle só, como na referência. A
+              comparação é sempre com o período imediatamente anterior -- é o que
+              `sdr_metrics` calcula --, então ela é rótulo, não seletor. */}
+          <div className="flex min-w-0 items-stretch rounded-md border border-input bg-card">
+            <Select value={period} onValueChange={(v) => setPeriod(v as SdrPeriod)}>
+              <SelectTrigger aria-label="Período do painel" className="w-auto gap-2 border-0 bg-transparent font-semibold">
+                <CalendarDays aria-hidden className="h-4 w-4 shrink-0 text-primary" />
+                <SelectValue>
+                  {SDR_PERIOD_LABELS[period]}
+                  {rotulos.intervalo && <span className="ml-1.5 font-normal text-muted-foreground">{rotulos.intervalo}</span>}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {PERIODS.map((p) => (
+                  <SelectItem key={p} value={p}>{SDR_PERIOD_LABELS[p]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {rotulos.comparacao && (
+              <span className="hidden items-center whitespace-nowrap border-l border-border px-3 text-sm text-muted-foreground sm:flex">
+                vs. {rotulos.comparacao}
+              </span>
+            )}
+          </div>
           <Button
             variant="outline"
-            size="sm"
-            className="h-8"
+            size="icon"
             onClick={refresh}
             disabled={isFetching}
             aria-label="Atualizar métricas"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+            <RefreshCw className={isFetching ? "animate-spin" : undefined} />
           </Button>
-        </>
-      }
+        </>}
     >
-
       {error && (
-        <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive-soft p-3 text-xs text-destructive">
           <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>Não foi possível carregar as métricas: {(error as Error).message}</span>
+          <span>Não foi possível carregar as métricas: {mensagemErro(error)}</span>
         </div>
       )}
-
-      {/* Três destinos, cada um com um trabalho:
-          ver o movimento, consultar um número, perguntar. Antes tudo isso vinha
-          empilhado na mesma rolagem — e as 4 métricas de destaque ainda
-          apareciam DUAS vezes, na faixa de cima e de novo nos grupos. */}
-      <Tabs defaultValue="visao">
+      <Tabs value={aba} onValueChange={setAba}>
         <PageTabs
           abas={[
             { valor: "visao", rotulo: "Visão geral", icone: LineChart, rotuloCurto: "Visão" },
@@ -262,58 +295,97 @@ export default function Dashboard() {
             { valor: "assistente", rotulo: "Assistente", icone: Bot },
           ]}
         />
-
-        {/* ── Ver o movimento ── */}
-        <TabsContent value="visao" className="mt-4 space-y-4">
-          {/* Indicadores agrupados em uma faixa contínua. */}
-          <div className="vx-metrics-strip">
-          <div className="-ml-px -mt-px grid grid-cols-2 lg:grid-cols-4">
-            {tilesDestaque.map((tile) =>
-              isLoading ? (
-                <Skeleton key={tile.key} className="h-[132px] rounded-lg" />
-              ) : (
-                <StatCard
-                  key={tile.key}
-                  emphasis
-                  emFaixa
-                  label={tile.label}
-                  value={metrics?.[tile.key]?.value ?? null}
-                  previous={metrics?.[tile.key]?.previous ?? null}
-                  format={tile.format}
-                  icon={tile.icon}
-                  accent={tile.accent}
-                  href={tile.href}
-                  hint={tile.hint}
-                  // Toques E pessoas no mesmo card. Só em abordagens: é a única
-                  // métrica onde a diferença entre evento e gente confunde.
-                  secundario={
-                    tile.key === "abordagens"
-                      ? { valor: pessoasAbordadas, rotulo: "pessoas" }
-                      : undefined
-                  }
-                  trend={trendDe(tile.key)}
-                  onCardClick={tile.drilldown ? () => setPainelDe(tile.drilldown!) : undefined}
-                  drilldown={
-                    tile.drilldown
-                      ? (valor) => (
-                          <MetricDrilldown
-                            metric={tile.drilldown!}
-                            period={period}
-                            total={metrics?.[tile.key]?.value ?? null}
-                            onVerTodos={() => setPainelDe(tile.drilldown!)}
-                          >
-                            {valor}
-                          </MetricDrilldown>
-                        )
-                      : undefined
-                  }
-                />
-              ),
-            )}
-          </div>
-          </div>
-
-          <SdrChartsPanel charts={charts} carregando={loadingCharts} />
+        <TabsContent value="visao" className="mt-4">
+          <SdrChartsPanel
+            charts={charts}
+            carregando={loadingCharts}
+            faixa={
+              // `-mt-px`: a borda de cima da faixa fica sob a do cartão (que
+              // recorta com overflow-hidden). Sem isso o topo teria linha dupla.
+              <div className="vx-metrics-strip -mt-px">
+              <div className="-ml-px -mt-px grid grid-cols-2 lg:grid-cols-4">
+                {tilesDestaque.map((tile) =>
+                  isLoading ? (
+                    <div key={tile.key} className="border-l border-t border-border vx-respiro">
+                      <Skeleton className="h-16 rounded-none" />
+                    </div>
+                  ) : (
+                    <StatCard
+                      emFaixa
+                      emphasis
+                      key={tile.key}
+                      ativo={tile.key === tileDoGrafico.key}
+                      label={tile.label}
+                      value={metrics?.[tile.key]?.value ?? null}
+                      previous={metrics?.[tile.key]?.previous ?? null}
+                      format={tile.format}
+                      icon={tile.icon}
+                      hint={tile.hint}
+                      // Toques E pessoas no mesmo card. Só em abordagens: é a
+                      // única métrica onde a diferença entre evento e gente
+                      // confunde.
+                      secundario={
+                        tile.key === "abordagens"
+                          ? { valor: pessoasAbordadas, rotulo: "pessoas" }
+                          : undefined
+                      }
+                      // Clicar escolhe a métrica do gráfico -- a faixa é a barra
+                      // de abas dele. A lista por trás do número continua a um
+                      // passo: prévia no hover do valor e "Ver lista" no gráfico.
+                      onCardClick={() => setMetricaGrafico(tile.key)}
+                      drilldown={
+                        tile.drilldown
+                          ? (valor) => (
+                              <MetricDrilldown
+                                metric={tile.drilldown!}
+                                period={period}
+                                total={metrics?.[tile.key]?.value ?? null}
+                                onVerTodos={() => setPainelDe(tile.drilldown!)}
+                              >
+                                {valor}
+                              </MetricDrilldown>
+                            )
+                          : undefined
+                      }
+                    />
+                  ),
+                )}
+              </div>
+              </div>
+            }
+            evolucao={serie ? {
+              titulo: `${serie.titulo} · ${rotulos.intervaloPorExtenso ?? ""}`,
+              unidade: { singular: serie.singular, plural: serie.plural },
+              pontos,
+              anterior,
+              legendaAtual: rotulos.legendaAtual,
+              legendaAnterior: rotulos.legendaAnterior,
+              rotuloComparacao: rotulos.comparacao,
+              projecao: rotulos.emAndamento && rotulos.diasNoPeriodo
+                ? { diasNoPeriodo: rotulos.diasNoPeriodo, nomeDoPeriodo: rotulos.nomeDoPeriodo }
+                : null,
+              acao: verLista(tileDoGrafico),
+            } : null}
+            semSerie={
+              <div className="vx-respiro">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">{tileDoGrafico.label}</p>
+                  {verLista(tileDoGrafico)}
+                </div>
+                <p className="mt-4 max-w-xl border-l-2 border-border pl-4 text-xs leading-relaxed text-muted-foreground">
+                  {SEM_SERIE[tileDoGrafico.key] ?? "Esta métrica não tem série por dia."}
+                </p>
+              </div>
+            }
+            lateral={<>
+              <Pendencias aguardando={aguardando} carregandoMetricas={isLoading} />
+              <AtendimentoAgora
+                tempoResposta={metrics?.tempoRespostaMin}
+                aguardando={aguardando}
+                carregando={isLoading}
+              />
+            </>}
+          />
 
           <MetricLeadsSheet
             metric={painelDe}
@@ -322,33 +394,18 @@ export default function Dashboard() {
             onClose={() => setPainelDe(null)}
           />
         </TabsContent>
-
-        {/* ── Consultar um número ── */}
         <TabsContent value="indicadores" className="mt-4 space-y-6">
           {GROUPS.map((group) => (
             <Secao key={group.title} titulo={group.title} descricao={group.description}>
-              {/* Aqui a faixa FICA. São dezesseis métricas em grupos de três a
-                  cinco: como cartões soltos seriam dezesseis objetos flutuando,
-                  e a elevação deixaria de significar "isto importa" para
-                  significar "isto é um cartão". A moldura por grupo é o que faz
-                  o grupo se ler como grupo. */}
-              {/* `bg-card` e não `bg-border`: as divisórias são borda de cada
-                  célula (ver `emFaixa` no StatCard), então o fundo é o que
-                  aparece onde NÃO há métrica.
-                  `-mt-px -ml-px` e não `-mb-px -mr-px`: a célula desenha para
-                  cima e para a esquerda, então o que precisa ficar escondido sob
-                  a moldura é a PRIMEIRA linha e a PRIMEIRA coluna. Ver o
-                  comentário de `emFaixa`, que explica por que esse lado importa. */}
               <div className="overflow-hidden rounded-lg border border-border bg-card">
                 <div className="-ml-px -mt-px grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 {group.tiles.map((tile) =>
                   isLoading ? (
                     /* O esqueleto leva as MESMAS bordas da célula real, e é
                        quadrado. Sem isso a grade nascia sem divisória nenhuma e
-                       com dezesseis retângulos arredondados, e ao terminar de
-                       carregar saltava para uma grade de fio de cabelo -- duas
+                       saltava para a grade de fio de cabelo ao carregar -- duas
                        telas diferentes para o mesmo conteúdo. */
-                    <div key={tile.key} className="border-l border-t border-border p-4">
+                    <div key={tile.key} className="border-l border-t border-border vx-respiro">
                       <Skeleton className="h-[72px] rounded-none" />
                     </div>
                   ) : (
@@ -373,26 +430,18 @@ export default function Dashboard() {
             </Secao>
           ))}
 
-          <p className="text-label leading-relaxed text-muted-foreground">
+          <p className="text-xs leading-relaxed text-muted-foreground">
             Métricas marcadas como <strong>sem fonte</strong> não têm dado no banco — não são zero,
             são não medidas. Passe o mouse no ícone de informação para ver o que falta gravar.
           </p>
         </TabsContent>
-
-        {/* ── Perguntar ── */}
         <TabsContent value="assistente" className="mt-4">
-          {/*
-            O ASSISTENTE DEPENDIA DE UMA CHAVE DA LOVABLE que este projeto não
-            usa. A tela inteira aparecia, aceitava a pergunta, e só no envio
-            respondia "LOVABLE_API_KEY is not configured" -- erro que não diz
-            nada para quem só quis perguntar algo.
-
-            Interface que promete e não entrega é pior que interface ausente.
-            Mesmo critério que tirou o olho do card do kanban.
-          */}
+          {/* Era o `DashboardAIChat`, que dependia de uma chave da Lovable que
+              este projeto não usa: aceitava a pergunta e só no envio falhava.
+              Interface que promete e não entrega é pior que interface ausente. */}
           <EmBreve
             titulo="Assistente do painel"
-            descricao="Perguntar em português sobre os números desta tela — quais leads travaram, por que a taxa de resposta caiu, o que priorizar hoje."
+            descricao="Perguntas em linguagem natural sobre estes números ainda não estão conectadas. Use os indicadores e a lista por trás de cada métrica."
           />
         </TabsContent>
       </Tabs>

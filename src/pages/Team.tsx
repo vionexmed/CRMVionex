@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  UserPlus, Shield, Trash2, Plus, Users, Crown, Mail,
+  UserPlus, Trash2, Plus, Users,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Database } from "@/integrations/supabase/types";
@@ -28,6 +28,7 @@ import { mensagemErro } from "@/lib/erro-supabase";
 import { PageTabs } from "@/components/layout/PageTabs";
 import { KeyRound, UserRound, UsersRound } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
+import { Iniciais, SeloComPonto, VisoesDaLista } from "@/components/layout/ListaV1";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -64,6 +65,7 @@ export default function Team() {
 
   const [members, setMembers] = useState<(Profile & { role?: string; receives_leads?: boolean })[]>([]);
   const [invitations, setInvitations] = useState<any[]>([]);
+  const [visao, setVisao] = useState<"ativos" | "convites">("ativos");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
   const [inviting, setInviting] = useState(false);
@@ -286,21 +288,10 @@ export default function Team() {
     fetchAll();
   };
 
-  const roleIcon = (role: string) => {
-    if (role === "owner") return <Crown className="h-3 w-3" />;
-    if (role === "admin") return <Shield className="h-3 w-3" />;
-    return null;
-  };
-
-  const roleColor = (role: string) => {
-    if (role === "owner") return "text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800";
-    if (role === "admin") return "text-primary border-primary/30";
-    return "text-muted-foreground";
-  };
-
   return (
     <PageShell
       title="Equipe"
+      contagem={{ valor: members.length, unidade: "membro" }}
       description={
         isAdmin
           ? "Gerencie membros, convites e permissões"
@@ -322,10 +313,7 @@ export default function Team() {
           {isAdmin && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  Convidar via Magic Link
-                </CardTitle>
+                <CardTitle className="vx-titulo-secao">Convidar via Magic Link</CardTitle>
                 <CardDescription>O convidado receberá um link de acesso por email</CardDescription>
               </CardHeader>
               <CardContent>
@@ -354,111 +342,142 @@ export default function Team() {
             </Card>
           )}
 
-          {/* Pending invitations */}
-          {invitations.length > 0 && (
+          <VisoesDaLista<"ativos" | "convites">
+            rotulo="Membros e convites"
+            valor={visao}
+            onChange={setVisao}
+            visoes={[
+              { valor: "ativos", rotulo: "Ativos", contagem: members.length },
+              { valor: "convites", rotulo: "Convites pendentes", contagem: invitations.length },
+            ]}
+          />
+
+          {visao === "convites" ? (
             <Card>
-              <CardHeader>
-                <CardTitle>Convites Pendentes ({invitations.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {invitations.map((inv: any) => (
-                    <div key={inv.id} className="flex items-center justify-between rounded-md border border-dashed border-border p-2.5">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs">
-                          <Mail className="h-3.5 w-3.5" />
-                        </div>
-                        <div>
-                          <p className="text-sm">{inv.email}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {ROLES.find((r) => r.value === inv.role)?.label || inv.role}
-                          </p>
-                        </div>
-                      </div>
-                      {isAdmin && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => cancelInvite(inv.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+              <CardContent className="p-0">
+                {invitations.length === 0 ? (
+                  <p className="p-6 text-center text-sm text-muted-foreground">Nenhum convite pendente.</p>
+                ) : (
+                  <div className="vx-table">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>E-mail</TableHead>
+                          <TableHead>Papel</TableHead>
+                          <TableHead>Status</TableHead>
+                          {isAdmin && <TableHead className="w-12"><span className="sr-only">Ações</span></TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invitations.map((inv: any) => (
+                          <TableRow key={inv.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Iniciais nome={inv.email} />
+                                <span className="text-sm font-medium">{inv.email}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <SeloComPonto tom="neutro">{ROLES.find((r) => r.value === inv.role)?.label || inv.role}</SeloComPonto>
+                            </TableCell>
+                            <TableCell><SeloComPonto tom="atencao">Convite pendente</SeloComPonto></TableCell>
+                            {isAdmin && (
+                              <TableCell>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Cancelar convite de ${inv.email}`} onClick={() => cancelInvite(inv.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <div className="vx-table">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Membro</TableHead>
+                        <TableHead>Papel</TableHead>
+                        <TableHead>Status</TableHead>
+                        {isOwner && <TableHead>Recebe lead</TableHead>}
+                        {isOwner && <TableHead className="w-12"><span className="sr-only">Ações</span></TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {members.map((m) => (
+                        <TableRow key={m.id}>
+                          <TableCell>
+                            <div className="flex min-w-0 items-center gap-3">
+                              <Iniciais nome={m.name || m.email} destaque={m.id === user?.id} />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold">{m.name || "Sem nome"}</p>
+                                <p className="truncate text-xs text-muted-foreground">{m.email}{m.title ? ` · ${m.title}` : ""}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {isOwner && m.id !== user?.id ? (
+                              <Select value={m.role || "member"} onValueChange={(v) => changeRole(m.id, v)}>
+                                <SelectTrigger className="h-8 w-40 gap-1 text-xs" aria-label={`Papel de ${m.name || m.email}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {currentUserRole === "owner" && <SelectItem value="owner">Proprietário</SelectItem>}
+                                  <SelectItem value="admin">Administrador</SelectItem>
+                                  <SelectItem value="member">Comercial</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <SeloComPonto tom={m.role === "owner" || m.role === "admin" ? "marca" : "neutro"}>
+                                {ROLES.find((r) => r.value === m.role)?.label || "Comercial"}
+                              </SeloComPonto>
+                            )}
+                          </TableCell>
+                          <TableCell><SeloComPonto tom="sucesso">Ativo</SeloComPonto></TableCell>
+                          {/* Rodízio de lead. Desligue para conta funcional que tem
+                              login mas não prospecta (marketing@, financeiro@) —
+                              senão lead novo cai na caixa dela. */}
+                          {isOwner && (
+                            <TableCell>
+                              <Switch
+                                checked={m.receives_leads ?? false}
+                                onCheckedChange={(v) => toggleReceivesLeads(m.id, v)}
+                                aria-label={`${m.name || m.email} recebe lead`}
+                                title="Entra no rodízio de distribuição de lead"
+                              />
+                            </TableCell>
+                          )}
+                          {isOwner && (
+                            <TableCell>
+                              {m.id !== user?.id && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Remover ${m.name || m.email}`} onClick={() => { setRemovendo(m); setHerdeiro(""); }}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>
           )}
-
-          {/* Members list */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Membros ({members.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {members.map((m) => (
-                  <div key={m.id} className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/30">
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={m.avatar_url || ""} />
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
-                        {m.name?.charAt(0)?.toUpperCase() || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{m.name || "Sem nome"}</p>
-                      <p className="text-xs text-muted-foreground truncate">{m.email} {m.title ? `· ${m.title}` : ""}</p>
-                    </div>
-                    {/* Rodízio de lead. Desligue para conta funcional que tem
-                        login mas não prospecta (marketing@, financeiro@) —
-                        senão lead novo cai na caixa dela. */}
-                    {isOwner && (
-                      <label
-                        className="flex shrink-0 items-center gap-1.5"
-                        title="Entra no rodízio de distribuição de lead"
-                      >
-                        <Switch
-                          checked={m.receives_leads ?? false}
-                          onCheckedChange={(v) => toggleReceivesLeads(m.id, v)}
-                          aria-label={`${m.name || m.email} recebe lead`}
-                        />
-                        <span className="hidden text-label uppercase tracking-wider text-muted-foreground lg:inline">
-                          Recebe lead
-                        </span>
-                      </label>
-                    )}
-                    {isOwner && m.id !== user?.id ? (
-                      <Select value={m.role || "member"} onValueChange={(v) => changeRole(m.id, v)}>
-                        <SelectTrigger className={`h-8 text-label w-36 gap-1 ${roleColor(m.role || "member")}`}>
-                          {roleIcon(m.role || "member")}
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {currentUserRole === "owner" && <SelectItem value="owner">Proprietário</SelectItem>}
-                          <SelectItem value="admin">Administrador</SelectItem>
-                          <SelectItem value="member">Comercial</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Badge variant="outline" className={`text-label gap-1 ${roleColor(m.role || "member")}`}>
-                        {roleIcon(m.role || "member")}
-                        {ROLES.find((r) => r.value === m.role)?.label || "Comercial"}
-                      </Badge>
-                    )}
-                    {isOwner && m.id !== user?.id && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => { setRemovendo(m); setHerdeiro(""); }}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* ── Permissions Tab ── */}
         <TabsContent value="permissions" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Controle de Acesso (RBAC)</CardTitle>
+              <CardTitle className="vx-titulo-secao">Controle de Acesso (RBAC)</CardTitle>
               <CardDescription>
                 O que cada papel pode fazer. Essas regras são aplicadas no banco de dados
                 (Row Level Security) — valem para o app, exportações e API.
@@ -514,7 +533,7 @@ export default function Team() {
           {isAdmin && (
             <Card>
               <CardHeader>
-                <CardTitle>Nova Equipe</CardTitle>
+                <CardTitle className="vx-titulo-secao">Nova Equipe</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2">

@@ -27,12 +27,13 @@ export function useDeal(id: string | undefined) {
   });
 }
 
-export function useDeals(params: DealListParams = {}) {
+export function useDeals(params: DealListParams = {}, opcoes: { enabled?: boolean } = {}) {
   const { orgId } = useOrg();
   return useQuery({
     queryKey: dealsKeys.list(orgId ?? "", params),
     queryFn: () => dealsApi.list(orgId!, params),
-    enabled: !!orgId,
+    // `enabled` deixa a tela desligar a consulta que a visão atual não usa.
+    enabled: !!orgId && (opcoes.enabled ?? true),
     placeholderData: keepPreviousData,
   });
 }

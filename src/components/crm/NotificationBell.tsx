@@ -7,6 +7,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { Bell, Clock, Check, UserPlus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 import { formatarDataHoraCurta, formatarTempoRelativo } from "@/lib/formato";
 import { ATIVIDADE_ICONE } from "@/lib/atividade-tipos";
@@ -135,7 +136,7 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="relative rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
+        <button aria-label="Notificações" className="relative flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Bell className="h-4 w-4" />
           {naoLidas > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-label font-bold text-destructive-foreground">
@@ -169,17 +170,19 @@ export function NotificationBell() {
                 setOpen(false);
                 navigate("/contacts?estagio=lead");
               }}
-              className="flex w-full items-start gap-3 border-b border-border bg-primary/[0.04] px-4 py-3 text-left transition-colors last:border-0 hover:bg-accent"
+              className="flex w-full items-start gap-3 border-b border-border px-4 py-3 text-left transition-colors last:border-0 hover:bg-surface-2"
             >
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <UserPlus className="h-3.5 w-3.5 text-primary" />
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent">
+                <UserPlus className="h-4 w-4 text-primary" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold">{l.nome}</p>
+                <p className="truncate text-sm font-semibold">{l.nome}</p>
                 <p className="text-label text-muted-foreground">
                   Novo lead · {formatarTempoRelativo(l.created_at)}
                 </p>
               </div>
+              {/* Lead só some ao marcar como visto: enquanto está na lista é não lido. */}
+              <span aria-label="Não lido" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
             </button>
           ))}
 
@@ -190,25 +193,25 @@ export function NotificationBell() {
             return (
               <div
                 key={a.id}
-                className={`flex items-start gap-3 border-b border-border px-4 py-3 transition-colors last:border-0 ${
-                  lida ? "opacity-50" : "bg-muted/30"
-                }`}
+                className={cn("flex items-start gap-3 border-b border-border px-4 py-3 transition-colors last:border-0", lida && "opacity-50")}
               >
-                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${venceu ? "bg-destructive/10" : "bg-primary/10"}`}>
-                  <Icone className={`h-3.5 w-3.5 ${venceu ? "text-destructive" : "text-primary"}`} />
+                <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", venceu ? "bg-destructive-soft" : "bg-accent")}>
+                  <Icone className={cn("h-4 w-4", venceu ? "text-destructive" : "text-primary")} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium">{a.title}</p>
-                  <p className={`text-label ${venceu ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+                  <p className="truncate text-sm font-semibold">{a.title}</p>
+                  <p className={cn("text-label", venceu ? "font-medium text-destructive" : "text-muted-foreground")}>
                     <Clock className="mr-0.5 inline h-2.5 w-2.5" />
                     {a.due_date ? formatarDataHoraCurta(a.due_date) : "Sem data"}
                     {venceu && " · Atrasada"}
                   </p>
                 </div>
+                {!lida && <span aria-label="Não lida" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />}
                 <button
                   onClick={() => concluir(a.id)}
-                  className="rounded p-1 text-muted-foreground transition-colors hover:bg-success/10 hover:text-success"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-success-soft hover:text-success"
                   title="Marcar como concluído"
+                  aria-label="Marcar como concluído"
                 >
                   <Check className="h-3.5 w-3.5" />
                 </button>
