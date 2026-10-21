@@ -32,6 +32,13 @@ export interface ContactListParams {
    * ARQUIVO em `source`, o texto deixou de ser previsível.
    */
   origin?: string;
+  /**
+   * Cidade gravada em `metadata.cidade` pelo cadastro, pela ficha e pela
+   * importação. Comparada sem diferenciar maiúsculas, mas inteira: "São Paulo"
+   * não traz "São Paulo do Potengi". Os valores oferecidos vêm de
+   * `listarCidades`, então a contagem ao lado de cada um bate com o resultado.
+   */
+  city?: string;
   sortKey?: "name" | "email" | "status" | "created_at" | "title";  // "status" mantido: é a coluna de ordenação do cabeçalho da tabela
   sortDir?: "asc" | "desc";
 }
@@ -48,7 +55,7 @@ export interface ContactListResult {
 const sanitizeSearch = (s: string) => s.replace(/[,()"\\]/g, " ").trim();
 
 const buildListQuery = (orgId: string, params: ContactListParams) => {
-  const { search, lifecycleStage, ownerId, companyId, createdFrom, createdTo, origin, sortKey = "created_at", sortDir = "desc" } = params;
+  const { search, lifecycleStage, ownerId, companyId, createdFrom, createdTo, origin, city, sortKey = "created_at", sortDir = "desc" } = params;
 
   // Contatos é a lista de TODAS as pessoas da organização.
   //
@@ -73,6 +80,9 @@ const buildListQuery = (orgId: string, params: ContactListParams) => {
   if (companyId && companyId !== "all") query = query.eq("company_id", companyId);
   if (createdFrom) query = query.gte("created_at", createdFrom);
   if (createdTo) query = query.lte("created_at", createdTo);
+  // ilike sem curinga: igualdade que ignora maiúsculas. Os curingas do próprio
+  // valor são escapados, senão uma cidade com "_" casaria com qualquer letra.
+  if (city) query = query.ilike("metadata->>cidade", city.replace(/[\\%_]/g, (c) => `\\${c}`));
   // Filtro por origem (metadata.source). Agrupa valores em buckets amigáveis.
   if (origin && origin !== "all") {
     if (origin === "cadastro_likawave") {
@@ -128,6 +138,39 @@ const buildListQuery = (orgId: string, params: ContactListParams) => {
  */
 export const PREFIXO_ORIGEM_EXATA = "src:";
 
+export interface CidadeDeContato {
+  /** O valor que vai para o filtro: a grafia mais usada daquela cidade. */
+  cidade: string;
+  contatos: number;
+}
+
+/**
+ * Agrupa as cidades como o filtro as compara: sem diferenciar maiúsculas.
+ *
+ * "campinas" e "Campinas" viram uma linha só, com a grafia mais frequente --
+ * o ilike do filtro traz as duas. Acento e espaço sobrando NÃO são
+ * igualados, porque o filtro também não os iguala: juntar aqui faria a
+ * contagem prometer contatos que o filtro não traz. "Sao Paulo" e "São Paulo"
+ * aparecem como duas linhas, e é assim que a duplicidade fica visível.
+ */
+export function agruparCidades(valores: (string | null | undefined)[]): CidadeDeContato[] {
+  const grupos = new Map<string, Map<string, number>>();
+  for (const valor of valores) {
+    if (!valor || !valor.trim()) continue;
+    const chave = valor.toLocaleLowerCase("pt-BR");
+    const grafias = grupos.get(chave) ?? new Map<string, number>();
+    grafias.set(valor, (grafias.get(valor) ?? 0) + 1);
+    grupos.set(chave, grafias);
+  }
+  return [...grupos.values()]
+    .map((grafias) => {
+      const [cidade] = [...grafias.entries()].sort((a, b) => b[1] - a[1])[0];
+      const contatos = [...grafias.values()].reduce((t, n) => t + n, 0);
+      return { cidade, contatos };
+    })
+    .sort((a, b) => a.cidade.trim().localeCompare(b.cidade.trim(), "pt-BR"));
+}
+
 export const contactsApi = {
   /**
    * As origens que existem na base, com contagem.
@@ -146,6 +189,31 @@ export const contactsApi = {
     ) => Promise<{ data: unknown; error: unknown }>)("origens_de_contato", { _org_id: orgId });
     if (error) throw error;
     return (data ?? []) as { origem: string; contatos: number }[];
+  },
+
+  /**
+   * As cidades que existem na base, com contagem, opcionalmente só de um
+   * estágio do ciclo de vida -- na fila de leads, as cidades dos leads.
+   *
+   * Lê só a coluna da cidade, em blocos: agrupar no navegador sem paginar
+   * esbarraria no corte silencioso de 1000 linhas e a lista sairia incompleta.
+   */
+  listarCidades: async (orgId: string, lifecycleStage?: string): Promise<CidadeDeContato[]> => {
+    // Seleção em variável `string`: o literal com `->>` estoura o analisador de
+    // tipos do supabase-js (TS2589). O formato da linha está no genérico abaixo.
+    const colunas: string = "cidade:metadata->>cidade";
+    const linhas = await buscarEmBlocos<{ cidade: string | null }>((inicio, fim) => {
+      const base = supabase
+        .from(TABLES.CONTACTS)
+        .select(colunas)
+        .eq("org_id", orgId)
+        .not("metadata->>cidade", "is", null);
+      const query = lifecycleStage && lifecycleStage !== "all"
+        ? base.eq("lifecycle_stage", lifecycleStage as LifecycleStage)
+        : base;
+      return query.order("id").range(inicio, fim) as unknown as PromiseLike<{ data: { cidade: string | null }[] | null; error: unknown }>;
+    });
+    return agruparCidades(linhas.map((l) => l.cidade));
   },
 
   list: async (orgId: string, params: ContactListParams = {}): Promise<ContactListResult> => {
