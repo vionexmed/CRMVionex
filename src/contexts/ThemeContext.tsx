@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = "light" | "dark" | "system";
+type Fonte = "system" | "inter";
 type Density = "compact" | "normal" | "comfortable";
 
 interface ThemeContextType {
@@ -10,6 +11,8 @@ interface ThemeContextType {
   setDensity: (d: Density) => void;
   accentColor: string;
   setAccentColor: (c: string) => void;
+  font: Fonte;
+  setFont: (f: Fonte) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
@@ -19,11 +22,13 @@ const ThemeContext = createContext<ThemeContextType>({
   setDensity: () => {},
   accentColor: "blue",
   setAccentColor: () => {},
+  font: "system",
+  setFont: () => {},
 });
 
 export const useTheme = () => useContext(ThemeContext);
 
-const ACCENT_COLORS: Record<string, { light: string; dark: string }> = {
+export const ACCENT_COLORS: Record<string, { light: string; dark: string }> = {
   // Cada variante mantém 4,5:1 para texto sobre superfícies e dentro do botão.
   // Azul Vionex, Violeta e Esmeralda são as três direções do Visual 01.
   blue: { light: "226 82% 55%", dark: "225 100% 74%" },
@@ -35,6 +40,28 @@ const ACCENT_COLORS: Record<string, { light: string; dark: string }> = {
   orange: { light: "25 95% 34%", dark: "25 95% 53%" },
   rose: { light: "347 77% 45%", dark: "347 77% 63%" },
 };
+
+/** Pilhas de fonte. A do sistema é a mesma do index.css; Inter só vale depois de carregada. */
+export const FONTES: Record<Fonte, { nome: string; pilha: string }> = {
+  system: {
+    nome: "SF Pro Text",
+    pilha: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Inter, system-ui, sans-serif",
+  },
+  inter: {
+    nome: "Inter",
+    pilha: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+  },
+};
+
+/** Inter vem do Google Fonts SÓ quando alguém a escolhe: o index.html não paga por ela. */
+function carregarInter() {
+  if (document.getElementById("fc-font-inter")) return;
+  const link = document.createElement("link");
+  link.id = "fc-font-inter";
+  link.rel = "stylesheet";
+  link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
+  document.head.appendChild(link);
+}
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => (localStorage.getItem("fc-theme") as Theme) || "light");
@@ -56,6 +83,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } catch {
       return "blue";
     }
+  });
+
+  const [font, setFontState] = useState<Fonte>(() => {
+    try { return localStorage.getItem("fc-font") === "inter" ? "inter" : "system"; } catch { return "system"; }
   });
 
   const applyTheme = (t: Theme) => {
@@ -106,6 +137,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => { applyDensity(density); }, [density]);
 
   useEffect(() => {
+    const root = document.documentElement;
+    if (font === "inter") carregarInter();
+    root.dataset.font = font;
+    root.classList.toggle("font-inter", font === "inter");
+    root.style.setProperty("--font-ui", FONTES[font].pilha);
+  }, [font]);
+
+  useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = () => { if (theme === "system") { applyTheme("system"); applyAccent(accentColor); } };
     mq.addEventListener("change", handler);
@@ -116,8 +155,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setDensity = (d: Density) => { setDensityState(d); localStorage.setItem("fc-density", d); };
   const setAccentColor = (c: string) => { setAccentState(c); localStorage.setItem("fc-accent", c); };
 
+  const setFont = (f: Fonte) => { setFontState(f); try { localStorage.setItem("fc-font", f); } catch { /* sem armazenamento */ } };
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, density, setDensity, accentColor, setAccentColor }}>
+    <ThemeContext.Provider value={{ theme, setTheme, density, setDensity, accentColor, setAccentColor, font, setFont }}>
       {children}
     </ThemeContext.Provider>
   );

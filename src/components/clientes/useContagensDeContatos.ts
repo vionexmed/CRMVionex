@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { TABLES } from "@/lib/constants";
 import { contactsKeys } from "@/hooks/queries/useContacts";
+import { contactsApi } from "@/lib/api/contacts";
 
 /**
  * Contagens das visões salvas de Contatos, por `count: exact, head: true`.
@@ -25,13 +26,14 @@ export function useContagensDeContatos(orgId: string | null | undefined, userId:
         if (error) throw error;
         return count ?? 0;
       };
-      const [todos, leads, meus, clientes] = await Promise.all([
+      const [todos, leads, meus, semResposta] = await Promise.all([
         total(base()),
         total(base().eq("lifecycle_stage", "lead")),
         userId ? total(base().eq("owner_id", userId)) : Promise.resolve(0),
-        total(base().eq("lifecycle_stage", "customer")),
+        // `null` quando a visão do banco ainda não existe: a aba fica sem número.
+        contactsApi.contarSemResposta(orgId!),
       ]);
-      return { todos, leads, meus, clientes };
+      return { todos, leads, meus, semResposta };
     },
   });
 }

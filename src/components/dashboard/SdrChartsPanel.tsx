@@ -3,9 +3,11 @@
  *
  * Coluna principal larga, lateral estreita, como no Visual 01:
  *
- *   principal  a faixa de números e a métrica escolhida dia a dia; abaixo, o
- *              funil e o desempenho por pessoa -- o que ACONTECEU
- *   lateral    o que espera ação agora; abaixo, de onde os leads vieram
+ *   principal  a faixa de números e a métrica escolhida dia a dia -- o que
+ *              ACONTECEU
+ *   lateral    o que espera ação agora
+ *   embaixo    o funil na largura toda (como no Visual 01); depois o
+ *              desempenho por pessoa e de onde os leads vieram, lado a lado
  *
  * `2fr / 1fr` com `minmax(0, …)`: as colunas podem encolher abaixo do
  * conteúdo, que é o que impede um rótulo longo de empurrar a grade.
@@ -30,8 +32,8 @@ const AREA = {
   evolucao: "lg:col-start-1 lg:row-start-1",
   lateral: "lg:col-start-2 lg:row-start-1",
   funil: "lg:col-start-1 lg:row-start-2",
-  canais: "lg:col-start-2 lg:row-start-2",
   pessoas: "lg:col-start-1 lg:row-start-3",
+  canais: "lg:col-start-2 lg:row-start-3",
 } as const;
 
 export default function SdrChartsPanel({
@@ -56,28 +58,28 @@ export default function SdrChartsPanel({
     return (
       // O esqueleto usa a MESMA grade: com pilha aqui e grade depois, a tela
       // saltava de um arranjo para outro ao terminar de carregar.
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card className={cn("min-w-0 overflow-hidden", AREA.evolucao)}>
           {faixa}
           <div className="vx-respiro" aria-label="Carregando gráfico"><Skeleton className="h-[240px]" /></div>
         </Card>
-        <div className={cn("flex min-w-0 flex-col gap-4", AREA.lateral)}>{lateral}</div>
-        <Skeleton className={cn("h-[260px] rounded-lg", AREA.funil)} />
+        <div className={cn("flex min-w-0 flex-col gap-5", AREA.lateral)}>{lateral}</div>
+        <Skeleton className={cn("h-[260px] rounded-lg lg:col-span-2", AREA.funil)} />
         <Skeleton className={cn("h-[260px] rounded-lg", AREA.canais)} />
       </div>
     );
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <Card className={cn("min-w-0 overflow-hidden", AREA.evolucao)}>
         {faixa}
         {evolucao ? <GraficoEvolucao {...evolucao} /> : semSerie}
       </Card>
 
-      <div className={cn("flex min-w-0 flex-col gap-4", AREA.lateral)}>{lateral}</div>
+      <div className={cn("flex min-w-0 flex-col gap-5", AREA.lateral)}>{lateral}</div>
 
-      <GraficoFunil dados={charts?.funil ?? []} className={AREA.funil} />
+      <GraficoFunil dados={charts?.funil ?? []} className={cn(AREA.funil, "lg:col-span-2")} />
 
       <GraficoCanais dados={charts?.canais ?? []} className={AREA.canais} />
 
@@ -87,7 +89,7 @@ export default function SdrChartsPanel({
       <GraficoPessoas
         dados={charts?.pessoas ?? []}
         falhou={charts?.pessoas === null}
-        className={cn(AREA.pessoas, "lg:col-span-2")}
+        className={AREA.pessoas}
       />
     </div>
   );

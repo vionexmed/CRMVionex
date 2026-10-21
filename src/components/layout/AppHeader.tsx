@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Building2, CalendarCheck, CircleHelp, Handshake, Plus, Search, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
@@ -12,6 +12,12 @@ import { NAV_SECTIONS, getActiveNavItem, getActiveSection } from "./navegacao";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+
+const ABAS_DE_CONFIGURACAO: Record<string, string> = {
+  profile: "Perfil", notifications: "Notificações", appearance: "Aparência", general: "Geral",
+  pipelines: "Funis e etapas", "custom-fields": "Campos personalizados", "email-signature": "Assinatura de e-mail",
+  billing: "Plano e cobrança", "design-system": "Design system",
+};
 
 type BreadcrumbPart = { label: string; href?: string };
 interface AppHeaderProps { onOpenSearch: () => void; actions?: React.ReactNode }
@@ -37,6 +43,7 @@ const CRIAR = [
  */
 export function AppHeader({ onOpenSearch, actions }: AppHeaderProps) {
   const { pathname } = useLocation();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
   const { open, openMobile, isMobile } = useSidebar();
   const section = NAV_SECTIONS.find((section) => section.id === getActiveSection(pathname));
@@ -53,6 +60,8 @@ export function AppHeader({ onOpenSearch, actions }: AppHeaderProps) {
   } else if (pathname.startsWith("/settings")) {
     parts.push({ label: "Configurações", href: "/settings" });
     if (item && item.label !== "Configurações") parts.push({ label: item.label });
+    // A aba ativa vem de `?aba=`: "Configurações / Design system".
+    else if (params.get("aba") && ABAS_DE_CONFIGURACAO[params.get("aba")!]) parts.push({ label: ABAS_DE_CONFIGURACAO[params.get("aba")!] });
   } else parts.push({ label: item?.label || "Página" });
 
   return (

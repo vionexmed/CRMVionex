@@ -15,10 +15,11 @@ import { PageTabs } from "@/components/layout/PageTabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/hooks/useOrg";
 import {
-  TrendingUp, Activity, FileText, BarChart3, Users, CalendarDays,
+  TrendingUp, Activity, Download, FileText, BarChart3, Users, CalendarDays,
 } from "lucide-react";
 import {
   Deal, Stage, Pipeline, Profile, ActivityRow, Contact, Company,
@@ -136,7 +137,6 @@ export default function Reports() {
   return (
     <PageShell
       title="Relatórios"
-      description="Vendas, atividades, previsão e contatos"
       actions={
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtros dos relatórios">
           <Select value={period} onValueChange={(v) => setPeriod(v as PeriodFilter)}>
@@ -152,22 +152,10 @@ export default function Reports() {
               <SelectItem value="this_year">Este ano</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-            <SelectTrigger aria-label="Responsável" className="w-auto min-w-36 gap-2"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os responsáveis</SelectItem>
-              {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name || m.email}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {pipelines.length > 1 && (
-            <Select value={pipelineFilter} onValueChange={setPipelineFilter}>
-              <SelectTrigger aria-label="Funil" className="w-auto min-w-36 gap-2"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os funis</SelectItem>
-                {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
+          <Button type="button" variant="outline" onClick={() => window.print()} className="gap-2 font-semibold">
+            <Download aria-hidden className="h-4 w-4" />
+            Exportar PDF
+          </Button>
         </div>
       }
     >
@@ -196,6 +184,25 @@ export default function Reports() {
             { valor: "custom", rotulo: "Personalizado", icone: FileText, rotuloCurto: "Person." },
           ]}
         />
+
+        <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Filtros por responsável e funil">
+          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+    <SelectTrigger aria-label="Responsável" className="w-auto min-w-36 gap-2"><SelectValue /></SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">Todos os responsáveis</SelectItem>
+      {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name || m.email}</SelectItem>)}
+    </SelectContent>
+  </Select>
+  {pipelines.length > 1 && (
+    <Select value={pipelineFilter} onValueChange={setPipelineFilter}>
+      <SelectTrigger aria-label="Funil" className="w-auto min-w-36 gap-2"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Todos os funis</SelectItem>
+        {pipelines.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  )}
+        </div>
 
         <TabsContent value="sales" className="mt-4">
           <SalesReport deals={filteredDeals} stages={stages} members={members} companies={companies} />

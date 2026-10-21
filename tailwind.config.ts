@@ -84,8 +84,8 @@ export default {
          * mesma família troca tudo de uma vez sem reescrever chamada nenhuma --
          * e deixa o caminho aberto para voltar a ter uma display própria.
          */
-        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"', '"Segoe UI"', 'Inter', 'system-ui', 'sans-serif'],
-        heading: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Segoe UI"', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-ui)'],
+        heading: ['var(--font-ui)'],
         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
       },
       colors: {

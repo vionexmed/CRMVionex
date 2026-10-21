@@ -82,6 +82,22 @@ export function getSdrRanges(period: SdrPeriod): { current: Range; previous: Ran
   }
 }
 
+/**
+ * Com o que o período é comparado. "anterior" é o de sempre (setembro contra
+ * outubro); "ano_anterior" tira a sazonalidade (outubro contra outubro); e
+ * "nenhuma" desliga a variação em vez de mostrar uma que a pessoa não pediu.
+ */
+export type SdrComparacao = "anterior" | "ano_anterior" | "nenhuma";
+
+/** Mesmo calendário um ano antes; null quando não há o que comparar. */
+export function rangeDeComparacao(period: SdrPeriod, comparacao: SdrComparacao): Range | null {
+  const { current, previous } = getSdrRanges(period);
+  if (comparacao === "nenhuma") return null;
+  if (comparacao === "anterior" || !current.start || !current.end) return previous;
+  const umAnoAntes = (d: Date) => new Date(d.getFullYear() - 1, d.getMonth(), d.getDate());
+  return { start: umAnoAntes(current.start), end: umAnoAntes(current.end) };
+}
+
 // ── Métricas ──────────────────────────────────────────────────────────────────
 export type MetricKey =
   | "leadsRecebidos"
@@ -173,14 +189,15 @@ async function fetchRange(orgId: string, range: Range): Promise<SdrMetricsRow | 
 
 export const sdrMetricsKeys = {
   all: (orgId: string) => ["sdr-metrics", orgId] as const,
-  period: (orgId: string, period: SdrPeriod) => ["sdr-metrics", orgId, period] as const,
+  period: (orgId: string, period: SdrPeriod, comparacao: SdrComparacao = "anterior") =>
+    ["sdr-metrics", orgId, period, comparacao] as const,
 };
 
-export function useSdrMetrics(period: SdrPeriod) {
+export function useSdrMetrics(period: SdrPeriod, comparacao: SdrComparacao = "anterior") {
   const { orgId } = useOrg();
 
   return useQuery<SdrMetrics>({
-    queryKey: sdrMetricsKeys.period(orgId ?? "", period),
+    queryKey: sdrMetricsKeys.period(orgId ?? "", period, comparacao),
     enabled: !!orgId,
     /**
      * SEMPRE revalida ao abrir o painel.
@@ -196,7 +213,8 @@ export function useSdrMetrics(period: SdrPeriod) {
      */
     refetchOnMount: "always",
     queryFn: async () => {
-      const { current, previous } = getSdrRanges(period);
+      const { current } = getSdrRanges(period);
+      const previous = rangeDeComparacao(period, comparacao);
 
       const [atual, anterior] = await Promise.all([
         fetchRange(orgId!, current),

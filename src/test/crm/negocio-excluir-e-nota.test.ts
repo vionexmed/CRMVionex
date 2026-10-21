@@ -128,8 +128,10 @@ describe("o card do quadro segue a referência", () => {
     // coluna exigia procurar.
     const i = kanban.indexOf("const DealCard");
     const card = kanban.slice(i, kanban.indexOf("const StageColumn") + 1 || undefined);
-    expect(card.indexOf("formatarMoeda(")).toBeGreaterThan(-1);
-    expect(card.indexOf("formatarMoeda(")).toBeLessThan(card.indexOf("border-t border-border"));
+    // Inteira ou com centavos: o que importa é a POSIÇÃO do valor.
+    const valor = card.search(/formatarMoeda(Inteira)?\(/);
+    expect(valor).toBeGreaterThan(-1);
+    expect(valor).toBeLessThan(card.indexOf("border-t border-border"));
   });
 
   /** A referência escreve o valor na mesma fonte do resto; `num` é a mono. */
@@ -204,9 +206,11 @@ describe("o card do quadro segue a referência", () => {
     // Já esteve dessincronizado: o clone tinha w-[220px] fixo enquanto a coluna
     // ia a sm:w-[240px]. Lê as larguras DA COLUNA e exige as mesmas no clone,
     // em vez de cravar números que o próximo ajuste de layout mudaria.
-    const coluna = kanban.slice(kanban.indexOf("function StageColumn"), kanban.indexOf("function CollapsibleStatusColumn"));
+    // A coluna tem largura única desde o Visual 01 (as faixas em seta se
+    // encaixam pela largura), então basta uma.
+    const coluna = kanban.slice(kanban.indexOf("function StageColumn"), kanban.indexOf("function WonLostDropZone"));
     const larguras = coluna.match(/(?:sm:)?w-\[\d+px\]/g) ?? [];
-    expect(larguras.length).toBeGreaterThanOrEqual(2);
+    expect(larguras.length).toBeGreaterThanOrEqual(1);
     const clone = kanban.slice(kanban.indexOf("<DragOverlay>"), kanban.indexOf("</DragOverlay>"));
     for (const w of larguras) expect(clone).toContain(w);
   });

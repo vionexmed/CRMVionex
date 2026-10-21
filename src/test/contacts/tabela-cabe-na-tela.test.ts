@@ -36,8 +36,8 @@ describe("toda ordenação declarada é alcançável", () => {
     return [...m![1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]);
   })();
 
-  it("o tipo declara as cinco", () => {
-    expect(declaradas.sort()).toEqual(["created_at", "email", "name", "status", "title"]);
+  it("o tipo declara as oito", () => {
+    expect(declaradas.sort()).toEqual(["created_at", "email", "last_contact", "lead_score", "lifecycle_stage", "name", "status", "title"]);
   });
 
   /**
@@ -58,7 +58,7 @@ describe("toda ordenação declarada é alcançável", () => {
     // Divergir faria a tela oferecer uma ordenação que o servidor ignora, e a
     // lista voltaria na ordem anterior sem dizer por quê.
     const api = readFileSync("src/lib/api/contacts.ts", "utf8");
-    const m = /sortKey\?: ([^;]+);/.exec(api);
+    const m = /export type ContactSortKey =([^;]+);/.exec(api);
     expect(m).toBeTruthy();
     const naApi = [...m![1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]);
     expect(naApi.sort()).toEqual(declaradas.sort());
@@ -72,7 +72,7 @@ describe("a tabela não volta a ter coluna morta", () => {
    * dado, uma delas consumindo uma coluna.
    */
   it("o e-mail vive sob o nome, sempre visível", () => {
-    expect(codigo).toMatch(/block truncate text-xs text-muted-foreground">\{formatarEmail\(c\.email\)\}/);
+    expect(codigo).toMatch(/block truncate text-xs tabular-nums text-muted-foreground">\s*\{c\.email \? formatarEmail\(c\.email\)/);
     expect(codigo).not.toMatch(/sm:hidden">\{formatarEmail/);
   });
 
@@ -95,12 +95,12 @@ describe("a tabela não volta a ter coluna morta", () => {
     expect(codigo).toMatch(/<OriginBadge metadata=/);
   });
 
-  it("são oito cabeçalhos, não nove", () => {
+  it("são nove cabeçalhos: a caixa de seleção e as oito colunas de dados", () => {
     // `<TableHead[\s>]` e não `<TableHead`: o segundo casa com `<TableHeader>`
     // também, e o teste contava sete. Prefixo mordendo prefixo -- terceira vez
     // que essa família de erro aparece nesta sessão.
     const cabecalhos = (codigo.match(/<TableHead[\s>]/g) || []).length;
-    expect(cabecalhos, "mudou o número de colunas").toBe(8);
+    expect(cabecalhos, "mudou o número de colunas").toBe(9);
   });
 });
 

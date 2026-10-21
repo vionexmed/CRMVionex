@@ -27,26 +27,30 @@ const LINHA_BRUTA = readFileSync("src/components/crm/LinhaDeEtapa.tsx", "utf8");
 const DEALS = semComentarios(readFileSync("src/pages/Deals.tsx", "utf8"));
 const CONFIG = semComentarios(readFileSync("src/components/settings/PipelinesTab.tsx", "utf8"));
 
-describe("as duas telas usam a mesma linha", () => {
-  it.each([
-    ["src/pages/Deals.tsx", DEALS],
-    ["src/components/settings/PipelinesTab.tsx", CONFIG],
-  ])("%s monta LinhaDeEtapa", (_arquivo, src) => {
-    expect(src).toContain("<LinhaDeEtapa");
-    expect(src).toContain('from "@/components/crm/LinhaDeEtapa"');
+/*
+ * Negócios deixou de ter editor próprio: a tela do funil do Visual 01 não tem
+ * botão de engrenagem, e editar etapas mora em Configurações → Funis e etapas
+ * (o "+ Funil" leva lá). A proteção continua a mesma -- UM editor completo, e
+ * nenhuma segunda cópia que possa divergir dele.
+ */
+describe("um editor só, completo", () => {
+  it("Configurações monta LinhaDeEtapa", () => {
+    expect(CONFIG).toContain("<LinhaDeEtapa");
+    expect(CONFIG).toContain('from "@/components/crm/LinhaDeEtapa"');
   });
 
-  it("as duas podem reordenar", () => {
-    // Negócios não podia. A ordem importa de verdade: a etapa de ENTRADA do
-    // funil é identificada pelo MENOR `order`, nunca pelo nome.
-    expect(DEALS).toContain("onMover=");
+  it("pode reordenar, renomear e recolorir", () => {
+    // A ordem importa de verdade: a etapa de ENTRADA do funil é identificada
+    // pelo MENOR `order`, nunca pelo nome.
     expect(CONFIG).toContain("onMover=");
+    expect(CONFIG).toContain("onChange=");
   });
 
-  it("as duas podem renomear e recolorir", () => {
-    // Configurações não podia: só dava para apagar e recriar, perdendo os
-    // negócios da etapa.
-    for (const src of [DEALS, CONFIG]) expect(src).toContain("onChange=");
+  it("Negócios não reabre um segundo editor à parte", () => {
+    expect(DEALS).not.toContain('type="color"');
+    expect(DEALS).not.toMatch(/win_probability:\s*Number/);
+    // E a porta para o editor continua à vista para admin.
+    expect(DEALS).toContain('"/settings?aba=pipelines"');
   });
 });
 

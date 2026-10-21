@@ -6,7 +6,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  corDaEtapa, diasParado, filtrarPorSinal, proximaAtividade, resumirFunil, rotuloDaProxima,
+  abreviarEtapa, corDaEtapa, diasParado, diasSemAvancar, filtrarPorSinal, nomeDaAtividade, proximaAtividade,
+  quandoCompleto, resumirFunil, rotuloDaProxima, temColunaTemperatura,
 } from "@/components/negocios/sinais";
 import type { AtividadeDoNegocio, DealWithRelations } from "@/lib/api/deals";
 import type { Database } from "@/integrations/supabase/types";
@@ -83,14 +84,29 @@ describe("parado", () => {
     }), AGORA)).toBe(3);
   });
 
+  it("parado no funil é não avançar de etapa; sem etapa_desde, vale a régua de movimento", () => {
+    // Fala-se com o cliente, mas o negócio não sai da etapa: está parado.
+    const conversando = negocio({
+      etapa_desde: iso(2026, 9, 1),
+      atividades: [atividade({ completed_at: iso(2026, 9, 20) })],
+    });
+    expect(diasSemAvancar(conversando, AGORA)).toBe(20);
+    // Banco sem a migração: a linha não traz a coluna.
+    const semColuna = negocio({ created_at: iso(2026, 9, 1) });
+    delete (semColuna as { etapa_desde?: string }).etapa_desde;
+    expect(diasSemAvancar(semColuna, AGORA)).toBe(20);
+  });
+
   it("os chips de sinal filtram pelos mesmos critérios do card", () => {
     const atrasado = negocio({ atividades: [atividade({ due_date: iso(2026, 9, 20) })] });
-    const parado = negocio({ created_at: iso(2026, 9, 1) });
-    const ok = negocio({});
-    const todos = [atrasado, parado, ok];
+    const parado = negocio({ created_at: iso(2026, 9, 1), etapa_desde: iso(2026, 9, 1) });
+    const quente = negocio({ temperatura: "quente" });
+    const ok = negocio({ temperatura: "frio" });
+    const todos = [atrasado, parado, quente, ok];
     expect(filtrarPorSinal(todos, { atrasada: false, paradosHa: null }, AGORA)).toEqual(todos);
     expect(filtrarPorSinal(todos, { atrasada: true, paradosHa: null }, AGORA)).toEqual([atrasado]);
     expect(filtrarPorSinal(todos, { atrasada: false, paradosHa: 7 }, AGORA)).toEqual([parado]);
+    expect(filtrarPorSinal(todos, { quentes: true, atrasada: false, paradosHa: null }, AGORA)).toEqual([quente]);
   });
 });
 
@@ -127,7 +143,7 @@ describe("faixa de indicadores", () => {
       perdidos: [negocio({ status: "lost" })],
       etapas, agora: AGORA,
     });
-    expect(r.ganhosNoMes).toEqual({ total: 50, quantidade: 1 });
+    expect(r.ganhosNoMes).toMatchObject({ total: 50, quantidade: 1, porSemana: [50, 0, 0, 0], semanaAtual: 2 });
     expect(r.taxa).toEqual({ ganhos: 3, encerrados: 4, percentual: 75 });
   });
 
@@ -186,5 +202,60 @@ describe("a página de Negócios", () => {
     const fim = deals.indexOf("/>", i);
     const painel = deals.indexOf("<PainelDoNegocio");
     expect(painel).toBeGreaterThan(fim);
+  });
+});
+
+describe("rótulos do card e do painel", () => {
+  it("título de uma palavra nomeia a atividade; título longo cede ao tipo", () => {
+    expect(nomeDaAtividade({ type: "task", title: "WhatsApp" })).toBe("WhatsApp");
+    expect(nomeDaAtividade({ type: "meeting", title: "Reunião com Dr. Henrique" })).toBe("Reunião");
+    expect(nomeDaAtividade({ type: "call", title: null })).toBe("Ligação");
+  });
+
+  it("a trilha abrevia na primeira sílaba fechada", () => {
+    expect(abreviarEtapa("Proposta enviada")).toBe("Prop.");
+    expect(abreviarEtapa("Negociação")).toBe("Neg.");
+    expect(abreviarEtapa("Fechamento")).toBe("Fech.");
+  });
+
+  it("quando era a atividade vencida, com 'às'", () => {
+    expect(quandoCompleto(new Date(2026, 9, 9, 15, 0).toISOString())).toBe("sex, 9 out às 15:00");
+  });
+
+  it("temperatura só é editável quando a linha traz a coluna", () => {
+    expect(temColunaTemperatura(negocio({}))).toBe(true);
+    const semColuna = negocio({});
+    delete (semColuna as { temperatura?: string | null }).temperatura;
+    expect(temColunaTemperatura(semColuna)).toBe(false);
+  });
+});
+
+describe("média do funil", () => {
+  const etapas = [etapa("e1", 0, 10), etapa("e2", 1, 40), etapa("e3", 2, 90)];
+  it("dias por etapa até a vitória, ignorando etapa_desde preenchido com a criação", () => {
+    const r = resumirFunil({
+      abertos: [], perdidos: [], etapas, agora: AGORA,
+      ganhos: [
+        // 18 dias até entrar na 3ª etapa = 9 por etapa percorrida.
+        negocio({ status: "won", stage_id: "e3", created_at: iso(2026, 8, 1), etapa_desde: iso(2026, 8, 19) }),
+        // Backfill da migração: etapa_desde = created_at -- sem medida.
+        negocio({ status: "won", stage_id: "e3", created_at: iso(2026, 8, 1), etapa_desde: iso(2026, 8, 1) }),
+      ],
+    });
+    expect(r.mediaPorEtapa).toBe(9);
+  });
+  it("sem amostra, null", () => {
+    expect(resumirFunil({ abertos: [], ganhos: [], perdidos: [], etapas, agora: AGORA }).mediaPorEtapa).toBeNull();
+  });
+});
+
+describe("a meta mensal", () => {
+  const meta = semComentarios(readFileSync("src/components/negocios/meta-mensal.ts", "utf8"));
+  it("coluna ausente (42703) vira 'sem coluna', não erro do funil", () => {
+    expect(meta).toContain('"42703"');
+  });
+  it("confere a linha devolvida: o RLS de organizations recusa em silêncio", () => {
+    expect(meta).toMatch(/\.update\(\{ meta_mensal: valor \}\)[\s\S]*?\.select\("id"\)/);
+    expect(meta).toMatch(/data\.length === 0/);
   });
 });

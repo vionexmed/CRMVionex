@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { ChevronsUpDown, LogOut, PanelLeftClose } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -135,19 +136,30 @@ export function AppSidebar() {
                 {collapsed
                   ? <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right" sideOffset={8}>{section.label}{selo?.valor ? ` · ${selo.valor} ${selo.rotulo}` : ""}</TooltipContent></Tooltip>
                   : link}
-                {submodulos && (
-                  <ul aria-label={`Módulos de ${section.label}`} className="mb-[6px] ml-[21px] mt-[5px] space-y-1 border-l border-sidebar-border pl-[18px]">
-                    {section.items.map((sub) => {
-                      const atual = activeItem?.path === sub.path;
-                      return <li key={sub.path}>
-                        <Link to={sub.path} onClick={closeMobile} aria-current={atual ? "page" : undefined}
-                          className={cn("flex h-[29px] items-center rounded-md px-2.5 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring max-md:h-11",
-                            atual ? "bg-sidebar-accent font-semibold text-white" : "text-sidebar-muted hover:bg-sidebar-accent/60 hover:text-sidebar-foreground")}>
-                          <span className="truncate">{sub.label}</span>
-                        </Link>
-                      </li>;
-                    })}
-                  </ul>
+                {/*
+                  Os módulos ficam MONTADOS e a área ativa os abre: a altura anima
+                  de 0 a 100% (grid de 0fr para 1fr, que mede o conteúdo sozinho,
+                  sem altura cravada) e os itens entram em sequência. Montar e
+                  desmontar fazia o menu "pular"; com a troca de área, a que fecha
+                  e a que abre se movem juntas e a lista não salta.
+                  Fechado, o bloco sai da tabulação e da leitura de tela
+                  (`visibility: hidden` ao fim da transição + aria-hidden).
+                */}
+                {!collapsed && section.items.length > 1 && (
+                  <div className="vx-submenu" data-open={selected ? "true" : "false"} aria-hidden={!selected}>
+                    <ul aria-label={`Módulos de ${section.label}`} className="mb-[6px] ml-[21px] mt-[5px] space-y-1 border-l border-sidebar-border pl-[18px]">
+                      {section.items.map((sub, i) => {
+                        const atual = activeItem?.path === sub.path;
+                        return <li key={sub.path} style={{ "--vx-i": i } as CSSProperties}>
+                          <Link to={sub.path} onClick={closeMobile} aria-current={atual ? "page" : undefined} tabIndex={selected ? undefined : -1}
+                            className={cn("flex h-[29px] items-center rounded-md px-2.5 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring max-md:h-11",
+                              atual ? "bg-sidebar-accent font-semibold text-white" : "text-sidebar-muted hover:bg-sidebar-accent/60 hover:text-sidebar-foreground")}>
+                            <span className="truncate">{sub.label}</span>
+                          </Link>
+                        </li>;
+                      })}
+                    </ul>
+                  </div>
                 )}
               </li>;
             })}

@@ -13,28 +13,30 @@
  * negócios em risco) seguem disponíveis em Relatórios.
  *
  * VISUAL 01: um cartão principal com a faixa dos quatro números e, embaixo, a
- * métrica escolhida dia a dia contra o período anterior; ao lado, o que espera
- * ação. Aba, período e métrica moram na URL: o link mandado a um colega abre o
- * mesmo recorte, e F5 não devolve o painel ao padrão.
+ * métrica escolhida dia a dia contra a comparação; ao lado, o que espera ação;
+ * embaixo, o funil. Período, comparação e métrica moram na URL: o link mandado
+ * a um colega abre o mesmo recorte, e F5 não devolve o painel ao padrão.
+ *
+ * As abas (Visão geral / Indicadores / Assistente) saíram: a referência não
+ * tem, e a trilha da barra superior já diz "Visão geral". Os indicadores
+ * completos continuam na mesma página, depois do funil; o Assistente era um
+ * "em breve" sem função, e botão que promete e não entrega não volta.
  */
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
-import { UserPlus, MessageCircle, Instagram, Globe, Linkedin, Send, CheckCheck, Reply, MessagesSquare, CalendarCheck, Briefcase, Trophy, Sparkles, Timer, Hourglass, UserCheck, RefreshCw, TriangleAlert, LineChart, ListFilter, Bot, CalendarDays, List } from "lucide-react";
+import { UserPlus, MessageCircle, Instagram, Globe, Linkedin, Send, CheckCheck, Reply, MessagesSquare, CalendarCheck, Briefcase, Trophy, Sparkles, Timer, Hourglass, UserCheck, TriangleAlert, CalendarDays, List, Download } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { StatCard, type StatAccent, type StatFormat } from "@/components/dashboard/StatCard";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useOrg } from "@/hooks/useOrg";
 import { useAbaNaUrl } from "@/hooks/useAbaNaUrl";
 import {
-  useSdrMetrics, sdrMetricsKeys, SDR_PERIOD_LABELS,
-  type SdrPeriod, type MetricKey,
+  useSdrMetrics, SDR_PERIOD_LABELS,
+  type SdrPeriod, type SdrComparacao, type MetricKey,
 } from "@/hooks/useSdrMetrics";
-import { useSdrCharts, sdrChartsKeys, type PontoSerie } from "@/hooks/useSdrCharts";
-import { sdrMetricLeadsKeys, type MetricDrilldownKey } from "@/hooks/useSdrMetricLeads";
+import { useSdrCharts, type PontoSerie } from "@/hooks/useSdrCharts";
+import { useSdrMetricLeads, type MetricDrilldownKey } from "@/hooks/useSdrMetricLeads";
 import { MetricDrilldown } from "@/components/dashboard/MetricDrilldown";
 import { MetricLeadsSheet } from "@/components/dashboard/MetricLeadsSheet";
 // Import ESTÁTICO: os gráficos são SVG puro, sem biblioteca. Não há peso a
@@ -42,16 +44,18 @@ import { MetricLeadsSheet } from "@/components/dashboard/MetricLeadsSheet";
 import SdrChartsPanel from "@/components/dashboard/SdrChartsPanel";
 import { Pendencias, AtendimentoAgora } from "@/components/dashboard/PainelLateral";
 import { useSerieAnterior } from "@/components/dashboard/useSerieAnterior";
-import { rotulosDoPeriodo } from "@/components/dashboard/periodo-do-painel";
-import { PageTabs } from "@/components/layout/PageTabs";
-import { EmBreve } from "@/components/layout/EmBreve";
-import { formatarHora } from "@/lib/formato";
+import { rotulosDoPeriodo, comparacoesDoPeriodo } from "@/components/dashboard/periodo-do-painel";
+import { formatValue, variation } from "@/components/dashboard/formato-da-metrica";
+import { formatarMoedaCurta } from "@/lib/formato";
+import { exportarCSV } from "@/lib/csv";
 import { mensagemErro } from "@/lib/erro-supabase";
 import { Secao } from "@/components/layout/Secao";
 
 type TileConfig = {
   key: MetricKey;
   label: string;
+  /** Rótulo na faixa de destaque, onde o espaço é de um quarto de cartão. */
+  rotuloCurto?: string;
   icon: LucideIcon;
   accent?: StatAccent;
   format?: StatFormat;
@@ -97,7 +101,7 @@ const GROUPS: Group[] = [
     description: "O que saiu para o lead e o que voltou",
     tiles: [
       {
-        key: "abordagens", label: "Abordagens realizadas", icon: Send, accent: "primary", href: "/activities", drilldown: "abordagens",
+        key: "abordagens", label: "Abordagens realizadas", rotuloCurto: "Abordagens", icon: Send, accent: "primary", href: "/activities", drilldown: "abordagens",
         hint: "Tentativas de contato que de fato saíram: ligação e e-mail registrados como concluídos, e-mail enviado pelo CRM, e WhatsApp aceito pela Meta. REUNIÃO NÃO ENTRA — ela é o resultado de abordar, não a abordagem, e tem card próprio. Agendada e não feita não conta, e tentativa que falhou também não.",
       },
       {
@@ -123,7 +127,7 @@ const GROUPS: Group[] = [
         hint: "Reuniões concluídas no período, pela data da conclusão. Depende de alguém registrar: nada cria reunião automaticamente e não há integração de agenda.",
       },
       {
-        key: "oportunidades", label: "Oportunidades geradas", icon: Briefcase, accent: "primary", href: "/deals", drilldown: "oportunidades",
+        key: "oportunidades", label: "Oportunidades geradas", rotuloCurto: "Oportunidades", icon: Briefcase, accent: "primary", href: "/deals", drilldown: "oportunidades",
         hint: "Negócios que SAÍRAM da etapa de entrada. Como todo contato passa a entrar no funil automaticamente, estar nele é o padrão — o feito é ter avançado. Estar no funil não conta como oportunidade.",
       },
       {
@@ -180,7 +184,10 @@ const SEM_SERIE: Partial<Record<MetricKey, string>> = {
   oportunidades: "Oportunidade é o negócio que saiu da etapa de entrada. O banco conta isso por período e ainda não tem a série por dia.",
 };
 
-const ABAS = ["visao", "indicadores", "assistente"] as const;
+const COMPARACOES: SdrComparacao[] = ["anterior", "ano_anterior", "nenhuma"];
+
+/** Teto da lista de oportunidades somada no "R$ 184 mil". */
+const TETO_OPORTUNIDADES = 1000;
 
 /** "AAAA-MM-DD" de hoje no fuso de quem olha, para cortar os dias que não vieram. */
 function hojeLocal(): string {
@@ -189,32 +196,36 @@ function hojeLocal(): string {
 }
 
 export default function Dashboard() {
-  const { orgId } = useOrg();
-  const queryClient = useQueryClient();
-  const [aba, setAba] = useAbaNaUrl("aba", "visao", ABAS);
   const [period, setPeriodNaUrl] = useAbaNaUrl<SdrPeriod>("periodo", "this_month", PERIODS);
+  const [comparacaoNaUrl, setComparacao] = useAbaNaUrl<SdrComparacao>("comparacao", "anterior", COMPARACOES);
+  // Comparação que não cabe no período (ex.: "ano anterior" em "Este ano") cai
+  // na primeira válida, sem reescrever a URL.
+  const opcoesDeComparacao = comparacoesDoPeriodo(period);
+  const comparacao = opcoesDeComparacao.includes(comparacaoNaUrl) ? comparacaoNaUrl : opcoesDeComparacao[0];
   const [metricaGrafico, setMetricaGrafico] = useAbaNaUrl<MetricKey>("metrica", "leadsRecebidos", DESTAQUE);
   /** Métrica com o painel lateral aberto. Um painel serve os quatro tiles. */
   const [painelDe, setPainelDe] = useState<MetricDrilldownKey | null>(null);
 
-  const { data, isFetching, isLoading, dataUpdatedAt, error } = useSdrMetrics(period);
+  const { data, isLoading, error } = useSdrMetrics(period, comparacao);
   const { data: charts, isLoading: loadingCharts } = useSdrCharts(period);
-  const { data: serieAnterior } = useSerieAnterior(period);
+  const { data: serieAnterior } = useSerieAnterior(period, comparacao);
+  // O valor das oportunidades sai da MESMA lista que o drill-down mostra --
+  // a função sdr_metric_leads usa o critério do card (saiu da etapa de entrada).
+  const { data: listaOportunidades } = useSdrMetricLeads("oportunidades", period, TETO_OPORTUNIDADES, true);
   const metrics = data?.metrics;
   const pessoasAbordadas = data?.pessoasAbordadas ?? null;
   const aguardando = metrics?.aguardandoHumano?.value ?? null;
 
-  const lastRefresh = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
-  const rotulos = rotulosDoPeriodo(period);
+  const rotulos = rotulosDoPeriodo(period, new Date(), comparacao);
 
-  const refresh = () => {
-    if (!orgId) return;
-    // Prefixo: alcança também a série anterior e as pendências, que moram sob
-    // as mesmas chaves (ver useSerieAnterior e usePendencias).
-    queryClient.invalidateQueries({ queryKey: sdrMetricsKeys.all(orgId) });
-    queryClient.invalidateQueries({ queryKey: sdrChartsKeys.all(orgId) });
-    queryClient.invalidateQueries({ queryKey: sdrMetricLeadsKeys.all(orgId) });
-  };
+  const valorOportunidades = listaOportunidades
+    ? listaOportunidades.reduce((s, l) => s + (Number(l.valor) || 0), 0)
+    : null;
+  // Lista no teto = soma parcial; dizer "R$ X" seria afirmar um total que a
+  // tela não tem.
+  const textoOportunidades = valorOportunidades && valorOportunidades > 0
+    ? `${formatarMoedaCurta(valorOportunidades)}${listaOportunidades!.length >= TETO_OPORTUNIDADES ? "+" : ""}`
+    : null;
 
   const tiles = GROUPS.flatMap((g) => g.tiles);
   const tilesDestaque = DESTAQUE
@@ -229,7 +240,7 @@ export default function Dashboard() {
   const pontos = serie
     ? (charts?.serie ?? []).filter((p) => p.dia.slice(0, 10) <= hoje).map((p) => ({ dia: p.dia, valor: p[serie.coluna] }))
     : [];
-  const anterior = serie && serieAnterior ? serieAnterior.map((p) => p[serie.coluna]) : null;
+  const anterior = serie && serieAnterior && comparacao !== "nenhuma" ? serieAnterior.map((p) => p[serie.coluna]) : null;
 
   const verLista = (tile: TileConfig) =>
     tile.drilldown ? (
@@ -238,24 +249,40 @@ export default function Dashboard() {
       </Button>
     ) : null;
 
-  const setPeriod = (p: SdrPeriod) => setPeriodNaUrl(p);
+  /** O CSV é o que a tela mostra: todas as métricas do período, com a comparação. */
+  const exportar = () => {
+    const intervalo = rotulos.intervalo ? `${SDR_PERIOD_LABELS[period]} (${rotulos.intervalo})` : SDR_PERIOD_LABELS[period];
+    exportarCSV(
+      GROUPS.flatMap((g) => g.tiles.map((t) => {
+        const m = metrics?.[t.key];
+        const v = t.noSource ? null : variation(m?.value ?? null, m?.previous, t.format ?? "number");
+        return {
+          Grupo: g.title,
+          "Métrica": t.label,
+          "Período": intervalo,
+          Valor: t.noSource ? "sem fonte de dado" : m?.value == null ? "" : formatValue(m.value, t.format ?? "number"),
+          "Comparação": rotulos.comparacao && !t.noComparison ? rotulos.comparacao : "",
+          "Valor na comparação": t.noSource || t.noComparison || m?.previous == null ? "" : formatValue(m.previous, t.format ?? "number"),
+          "Variação": v ? `${v.valor > 0 ? "+" : ""}${v.valor}${v.unidade === "%" ? "%" : " p.p."}` : "",
+        };
+      })),
+      `painel-${period}-${hoje}.csv`,
+    );
+  };
 
   return (
     <PageShell
       title="Painel"
-      description="Entrada, abordagem, conversão e velocidade de atendimento"
-      meta={lastRefresh ? <p className="text-xs text-muted-foreground">Atualizado às {formatarHora(lastRefresh)}</p> : undefined}
+      className="space-y-5"
       actions={<>
-          {/* Período e comparação num controle só, como na referência. A
-              comparação é sempre com o período imediatamente anterior -- é o que
-              `sdr_metrics` calcula --, então ela é rótulo, não seletor. */}
-          <div className="flex min-w-0 items-stretch rounded-md border border-input bg-card">
-            <Select value={period} onValueChange={(v) => setPeriod(v as SdrPeriod)}>
-              <SelectTrigger aria-label="Período do painel" className="w-auto gap-2 border-0 bg-transparent font-semibold">
+          {/* Período e comparação num controle só, como na referência. */}
+          <div className="flex h-10 min-w-0 items-stretch rounded-md border border-input bg-card shadow-sm">
+            <Select value={period} onValueChange={(v) => setPeriodNaUrl(v as SdrPeriod)}>
+              <SelectTrigger aria-label="Período do painel" className="h-full w-auto gap-2 border-0 bg-transparent pl-3 pr-3 font-semibold shadow-none">
                 <CalendarDays aria-hidden className="h-4 w-4 shrink-0 text-primary" />
                 <SelectValue>
                   {SDR_PERIOD_LABELS[period]}
-                  {rotulos.intervalo && <span className="ml-1.5 font-normal text-muted-foreground">{rotulos.intervalo}</span>}
+                  {rotulos.intervalo && <span className="ml-2 font-normal text-muted-foreground">{rotulos.intervalo}</span>}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -264,20 +291,34 @@ export default function Dashboard() {
                 ))}
               </SelectContent>
             </Select>
-            {rotulos.comparacao && (
-              <span className="hidden items-center whitespace-nowrap border-l border-border px-3 text-sm text-muted-foreground sm:flex">
-                vs. {rotulos.comparacao}
-              </span>
-            )}
+            <span aria-hidden className="my-2 w-px bg-border" />
+            <Select value={comparacao} onValueChange={(v) => setComparacao(v as SdrComparacao)}>
+              <SelectTrigger aria-label="Comparar com" className="h-full w-auto gap-2 border-0 bg-transparent pl-3 pr-3 shadow-none">
+                <SelectValue>{rotulos.comparacao ? `vs. ${rotulos.comparacao}` : "Sem comparação"}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {opcoesDeComparacao.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c === "nenhuma"
+                      ? "Sem comparação"
+                      : `vs. ${rotulosDoPeriodo(period, new Date(), c).comparacao ?? ""}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Button
             variant="outline"
             size="icon"
-            onClick={refresh}
-            disabled={isFetching}
-            aria-label="Atualizar métricas"
+            className="shadow-sm"
+            // 40px, a altura do seletor ao lado (o `size="icon"` usa a do controle).
+            style={{ height: 40, width: 40 }}
+            onClick={exportar}
+            disabled={isLoading || !metrics}
+            aria-label="Baixar métricas do período (CSV)"
+            title="Baixar métricas do período (CSV)"
           >
-            <RefreshCw className={isFetching ? "animate-spin" : undefined} />
+            <Download />
           </Button>
         </>}
     >
@@ -287,15 +328,10 @@ export default function Dashboard() {
           <span>Não foi possível carregar as métricas: {mensagemErro(error)}</span>
         </div>
       )}
-      <Tabs value={aba} onValueChange={setAba}>
-        <PageTabs
-          abas={[
-            { valor: "visao", rotulo: "Visão geral", icone: LineChart, rotuloCurto: "Visão" },
-            { valor: "indicadores", rotulo: "Indicadores", icone: ListFilter },
-            { valor: "assistente", rotulo: "Assistente", icone: Bot },
-          ]}
-        />
-        <TabsContent value="visao" className="mt-4">
+      {/* O respiro do painel é um degrau acima do padrão (20px, como na
+          referência) só na densidade normal: compacto e confortável continuam
+          mandando. */}
+      <div className="space-y-8 [[data-density=normal]_&]:[--respiro:1.25rem]">
           <SdrChartsPanel
             charts={charts}
             carregando={loadingCharts}
@@ -315,23 +351,25 @@ export default function Dashboard() {
                       emphasis
                       key={tile.key}
                       ativo={tile.key === tileDoGrafico.key}
-                      label={tile.label}
+                      label={tile.rotuloCurto ?? tile.label}
                       value={metrics?.[tile.key]?.value ?? null}
                       previous={metrics?.[tile.key]?.previous ?? null}
                       format={tile.format}
                       icon={tile.icon}
                       hint={tile.hint}
-                      // Toques E pessoas no mesmo card. Só em abordagens: é a
-                      // única métrica onde a diferença entre evento e gente
-                      // confunde.
+                      // Toques E pessoas em abordagens: é a única métrica onde a
+                      // diferença entre evento e gente confunde. Em
+                      // oportunidades, quanto elas valem.
                       secundario={
                         tile.key === "abordagens"
                           ? { valor: pessoasAbordadas, rotulo: "pessoas" }
-                          : undefined
+                          : tile.key === "oportunidades"
+                            ? { texto: textoOportunidades }
+                            : undefined
                       }
                       // Clicar escolhe a métrica do gráfico -- a faixa é a barra
                       // de abas dele. A lista por trás do número continua a um
-                      // passo: prévia no hover do valor e "Ver lista" no gráfico.
+                      // passo: prévia no hover do valor.
                       onCardClick={() => setMetricaGrafico(tile.key)}
                       drilldown={
                         tile.drilldown
@@ -364,7 +402,6 @@ export default function Dashboard() {
               projecao: rotulos.emAndamento && rotulos.diasNoPeriodo
                 ? { diasNoPeriodo: rotulos.diasNoPeriodo, nomeDoPeriodo: rotulos.nomeDoPeriodo }
                 : null,
-              acao: verLista(tileDoGrafico),
             } : null}
             semSerie={
               <div className="vx-respiro">
@@ -383,6 +420,7 @@ export default function Dashboard() {
                 tempoResposta={metrics?.tempoRespostaMin}
                 aguardando={aguardando}
                 carregando={isLoading}
+                period={period}
               />
             </>}
           />
@@ -393,8 +431,10 @@ export default function Dashboard() {
             total={painelDe ? (metrics?.[painelDe]?.value ?? null) : null}
             onClose={() => setPainelDe(null)}
           />
-        </TabsContent>
-        <TabsContent value="indicadores" className="mt-4 space-y-6">
+
+        {/* Todos os indicadores, abaixo do que se olha primeiro. Eram uma aba;
+            sem abas, vêm depois do funil, agrupados como antes. */}
+        <div className="space-y-6">
           {GROUPS.map((group) => (
             <Secao key={group.title} titulo={group.title} descricao={group.description}>
               <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -434,17 +474,8 @@ export default function Dashboard() {
             Métricas marcadas como <strong>sem fonte</strong> não têm dado no banco — não são zero,
             são não medidas. Passe o mouse no ícone de informação para ver o que falta gravar.
           </p>
-        </TabsContent>
-        <TabsContent value="assistente" className="mt-4">
-          {/* Era o `DashboardAIChat`, que dependia de uma chave da Lovable que
-              este projeto não usa: aceitava a pergunta e só no envio falhava.
-              Interface que promete e não entrega é pior que interface ausente. */}
-          <EmBreve
-            titulo="Assistente do painel"
-            descricao="Perguntas em linguagem natural sobre estes números ainda não estão conectadas. Use os indicadores e a lista por trás de cada métrica."
-          />
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </PageShell>
   );
 }

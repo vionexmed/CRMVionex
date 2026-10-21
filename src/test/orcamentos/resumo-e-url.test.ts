@@ -57,10 +57,10 @@ describe("telas guardam a visão na URL", () => {
   const limpo = (f: string) => readFileSync(f, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
-  it("Orçamentos: situação, busca e ordem", () => {
+  it("Orçamentos: a aba de situação mora na URL (busca e ordem saíram da tela, como na referência)", () => {
     const s = limpo("src/pages/Orcamentos.tsx");
     expect(s).toContain("useSearchParams");
-    for (const k of ['"q"', '"situacao"', '"ordem"']) expect(s).toContain(k);
+    expect(s).toContain('"situacao"');
     expect(s).not.toMatch(/useState\(""\)/);
   });
 

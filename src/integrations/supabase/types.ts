@@ -2480,6 +2480,51 @@ export type Database = {
           },
         ]
       }
+      orcamento_modelos: {
+        Row: {
+          condicoes: string | null
+          created_at: string
+          created_by: string | null
+          desconto: number
+          id: string
+          itens: Json
+          nome: string
+          observacoes: string | null
+          org_id: string
+          titulo: string | null
+          updated_at: string
+          validade_dias: number | null
+        }
+        Insert: {
+          condicoes?: string | null
+          created_at?: string
+          created_by?: string | null
+          desconto?: number
+          id?: string
+          itens?: Json
+          nome: string
+          observacoes?: string | null
+          org_id: string
+          titulo?: string | null
+          updated_at?: string
+          validade_dias?: number | null
+        }
+        Update: {
+          condicoes?: string | null
+          created_at?: string
+          created_by?: string | null
+          desconto?: number
+          id?: string
+          itens?: Json
+          nome?: string
+          observacoes?: string | null
+          org_id?: string
+          titulo?: string | null
+          updated_at?: string
+          validade_dias?: number | null
+        }
+        Relationships: []
+      }
       orcamentos: {
         Row: {
           company_id: string | null
@@ -2504,6 +2549,8 @@ export type Database = {
           valido_ate: string | null
           visto_em: string | null
           visualizacoes: number
+          ultima_visualizacao_em: string | null
+          condicoes: string | null
         }
         Insert: {
           company_id?: string | null
@@ -2528,6 +2575,8 @@ export type Database = {
           valido_ate?: string | null
           visto_em?: string | null
           visualizacoes?: number
+          ultima_visualizacao_em?: string | null
+          condicoes?: string | null
         }
         Update: {
           company_id?: string | null
@@ -2552,6 +2601,8 @@ export type Database = {
           valido_ate?: string | null
           visto_em?: string | null
           visualizacoes?: number
+          ultima_visualizacao_em?: string | null
+          condicoes?: string | null
         }
         Relationships: [
           {
@@ -2732,6 +2783,7 @@ export type Database = {
       produtos: {
         Row: {
           ativo: boolean
+          categoria: string | null
           created_at: string
           descricao: string | null
           foto_url: string | null
@@ -2741,12 +2793,15 @@ export type Database = {
           nome: string
           org_id: string
           preco: number
+          rotulo_clientes: string | null
           sku: string | null
+          tipo_cobranca: string | null
           unidade: string
           updated_at: string
         }
         Insert: {
           ativo?: boolean
+          categoria?: string | null
           created_at?: string
           descricao?: string | null
           foto_url?: string | null
@@ -2756,12 +2811,15 @@ export type Database = {
           nome: string
           org_id: string
           preco?: number
+          rotulo_clientes?: string | null
           sku?: string | null
+          tipo_cobranca?: string | null
           unidade?: string
           updated_at?: string
         }
         Update: {
           ativo?: boolean
+          categoria?: string | null
           created_at?: string
           descricao?: string | null
           foto_url?: string | null
@@ -2771,7 +2829,9 @@ export type Database = {
           nome?: string
           org_id?: string
           preco?: number
+          rotulo_clientes?: string | null
           sku?: string | null
+          tipo_cobranca?: string | null
           unidade?: string
           updated_at?: string
         }
@@ -3744,6 +3804,10 @@ export type Database = {
           toques: number
           valor: number
         }[]
+      }
+      produtos_metricas: {
+        Args: { _agora?: string; _org_id: string }
+        Returns: Json
       }
       sdr_metrics: {
         Args: { _from?: string; _org_id: string; _to?: string }

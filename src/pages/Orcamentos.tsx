@@ -1,13 +1,11 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Search, Receipt } from "lucide-react";
+import { Plus, Receipt, FileText } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { FaixaDeIndicadores, Indicador, VisoesDaLista } from "@/components/layout/ListaV1";
-import { SegmentedControl } from "@/components/layout/SegmentedControl";
 import { LoadingState, ErrorState, EmptyState } from "@/components/layout/EstadoDaLista";
 import { SemOrganizacao } from "@/components/layout/SemOrganizacao";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useOrg } from "@/hooks/useOrg";
 import { useOrcamentos } from "@/hooks/queries/useOrcamentos";
 import { ConstrutorDeOrcamento } from "@/components/orcamentos/ConstrutorDeOrcamento";
@@ -18,24 +16,29 @@ import { useMembers } from "@/hooks/queries/useMembers";
 import { PainelDeOrcamento, PreviaDeOrcamento } from "@/components/orcamentos/PainelDeOrcamento";
 import type { OrcamentoComRelacoes } from "@/lib/api/orcamentos";
 import { Card } from "@/components/ui/card";
-import { nomeDoContato } from "@/lib/contato-formato";
-import { formatarMesAno, formatarMoeda, pluralizar } from "@/lib/formato";
+import { formatarMesAno, formatarMoedaInteira, pluralizar } from "@/lib/formato";
+import { estadoDoOrcamento } from "@/lib/orcamento-calculo";
+import { ModelosDeOrcamento } from "@/components/orcamentos/ModelosDeOrcamento";
+import type { OrcamentoModelo } from "@/lib/api/orcamento-modelos";
 import {
-  ordenarOrcamentos, resumirOrcamentos, LIMITE_DA_LISTA, DIAS_DE_AVISO,
-  type OrdemDeOrcamento, type ValorPorMoeda,
+  ordenarOrcamentos, resumirOrcamentos, LIMITE_DA_LISTA,
+  type ValorPorMoeda,
 } from "@/lib/orcamento-resumo";
 
-/** Os cinco estados, em ordem de ciclo. `expirado` é derivado, não digitado. */
+/**
+ * As cinco abas. "Enviados" é o estado DERIVADO (enviado e ainda válido): o
+ * vencido sai dela e fica só em "Todos", senão a aba e "Aguardando resposta"
+ * contariam coisas diferentes.
+ */
 type Filtro = "todos" | "rascunho" | "enviado" | "aprovado" | "recusado";
 
 const FILTROS: readonly Filtro[] = ["todos", "rascunho", "enviado", "aprovado", "recusado"];
-const ORDENS: readonly OrdemDeOrcamento[] = ["data", "valor"];
 
 /** Uma moeda por parcela: somar moedas diferentes daria um número sem unidade. */
 function textoDoValor(v: ValorPorMoeda): string {
   const moedas = Object.keys(v);
-  if (moedas.length === 0) return formatarMoeda(0);
-  return moedas.map((m) => formatarMoeda(v[m], m)).join(" + ");
+  if (moedas.length === 0) return formatarMoedaInteira(0);
+  return moedas.map((m) => formatarMoedaInteira(v[m], m)).join(" + ");
 }
 
 export default function Orcamentos() {
@@ -43,41 +46,27 @@ export default function Orcamentos() {
   const { data: orcamentos = [], isLoading, isError, refetch } = useOrcamentos();
 
   /*
-   * Situação, busca e ordem moram na URL (replace: o filtro não é navegação, e
-   * o Voltar não deve desfazer cada letra digitada). Assim F5 e link mantêm a
-   * visão. Valor desconhecido cai no padrão -- `?situacao=xyz` não pode deixar
-   * a lista vazia sem botão ativo. Os valores padrão não vão para a URL.
+   * A situação mora na URL (replace: a aba não é navegação, e o Voltar não
+   * deve desfazer cada clique). Assim F5 e link mantêm a visão. Valor
+   * desconhecido cai no padrão -- `?situacao=xyz` não pode deixar a lista vazia
+   * sem aba ativa. O padrão não vai para a URL.
    */
   const [params, setParams] = useSearchParams();
-  const busca = params.get("q") ?? "";
   const situacaoUrl = params.get("situacao");
   const filtro: Filtro = FILTROS.includes(situacaoUrl as Filtro) ? (situacaoUrl as Filtro) : "todos";
-  const ordemUrl = params.get("ordem");
-  const ordem: OrdemDeOrcamento = ORDENS.includes(ordemUrl as OrdemDeOrcamento)
-    ? (ordemUrl as OrdemDeOrcamento) : "data";
-
-  const mudarParam = (chave: string, valor: string, padrao = "") => {
+  const setFiltro = (v: Filtro) => {
     setParams((atual) => {
       const proximo = new URLSearchParams(atual);
-      if (valor === padrao) proximo.delete(chave);
-      else proximo.set(chave, valor);
+      if (v === "todos") proximo.delete("situacao");
+      else proximo.set("situacao", v);
       return proximo;
     }, { replace: true });
   };
-  const setBusca = (v: string) => mudarParam("q", v);
-  const setFiltro = (v: Filtro) => mudarParam("situacao", v, "todos");
-  // Uma escrita só: duas chamadas seguidas de setParams usam a MESMA query da
-  // renderização, e a segunda desfaria a primeira.
-  const limparFiltros = () => {
-    setParams((atual) => {
-      const proximo = new URLSearchParams(atual);
-      proximo.delete("q");
-      proximo.delete("situacao");
-      return proximo;
-    }, { replace: true });
-  };
-  const setOrdem = (v: OrdemDeOrcamento) => mudarParam("ordem", v, "data");
+  const limparFiltros = () => setFiltro("todos");
   const [construindo, setConstruindo] = useState<OrcamentoComRelacoes | "novo" | null>(null);
+  const [modelosAberto, setModelosAberto] = useState(false);
+  /** Modelo escolhido em "Modelos" para o orçamento novo nascer preenchido. */
+  const [modeloEscolhido, setModeloEscolhido] = useState<OrcamentoModelo | null>(null);
   const [noPainel, setNoPainel] = useState<OrcamentoComRelacoes | null>(null);
   /** Linha mostrada na prévia ao lado (xl). Guarda só o id: o dado vem da lista viva. */
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
@@ -86,33 +75,27 @@ export default function Orcamentos() {
   const nomeDoResponsavel = (id: string | null) =>
     (id ? membros.find((m) => m.id === id)?.name : null) ?? null;
 
-  const termo = busca.trim().toLowerCase();
-
   // O resumo é da lista INTEIRA, não da filtrada: ele descreve o negócio, e
   // trocar de aba de situação não deve mudar "aprovado no mês".
   const resumo = useMemo(() => resumirOrcamentos(orcamentos), [orcamentos]);
 
   const visiveis = useMemo(
     () =>
-      ordenarOrcamentos(orcamentos, ordem).filter((o) => {
-        if (filtro !== "todos" && o.status !== filtro) return false;
-        if (!termo) return true;
-        const pessoa = o.contact
-          ? nomeDoContato(o.contact.first_name, o.contact.last_name)
-          : "";
-        // Número, pessoa, empresa e título: são as quatro formas de alguém se
-        // referir a um orçamento ao telefone.
-        return `${o.numero} ${pessoa} ${o.company?.name ?? ""} ${o.titulo ?? ""}`
-          .toLowerCase().includes(termo);
-      }),
-    [orcamentos, ordem, filtro, termo],
+      ordenarOrcamentos(orcamentos, "data").filter((o) =>
+        filtro === "todos" ? true
+          : filtro === "enviado" ? estadoDoOrcamento(o) === "enviado"
+            : o.status === filtro,
+      ),
+    [orcamentos, filtro],
   );
 
-  // As contagens das abas descrevem a lista inteira, como o resumo: a busca
-  // refina a tabela, mas "Enviados 7" não deve mudar a cada letra digitada.
+  // As contagens das abas descrevem a lista inteira, como o resumo.
   const contagens = useMemo(() => {
     const c: Record<Filtro, number> = { todos: orcamentos.length, rascunho: 0, enviado: 0, aprovado: 0, recusado: 0 };
-    for (const o of orcamentos) if (o.status in c) c[o.status as Filtro]++;
+    for (const o of orcamentos) {
+      if (o.status === "rascunho" || o.status === "aprovado" || o.status === "recusado") c[o.status]++;
+      else if (estadoDoOrcamento(o) === "enviado") c.enviado++;
+    }
     return c;
   }, [orcamentos]);
 
@@ -129,17 +112,19 @@ export default function Orcamentos() {
   return (
     <PageShell
       title="Orçamentos"
-      contagem={{ valor: visiveis.length, unidade: "orçamento" }}
       actions={
-        // Sem "Modelos": o app não tem modelos de orçamento, e um botão sem
-        // função seria promessa vazia.
-        <Button onClick={() => setConstruindo("novo")}>
-          <Plus className="mr-1.5 h-4 w-4" />Novo orçamento
-        </Button>
+        <>
+          <Button size="sm" variant="outline" className="[font-size:inherit]" onClick={() => setModelosAberto(true)}>
+            <FileText aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />Modelos
+          </Button>
+          <Button size="sm" className="[font-size:inherit]" onClick={() => { setModeloEscolhido(null); setConstruindo("novo"); }}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />Novo orçamento
+          </Button>
+        </>
       }
     >
       {!isLoading && !isError && orcamentos.length > 0 && (
-        <div role="group" aria-label="Resumo dos orçamentos">
+        <div role="group" aria-label="Resumo dos orçamentos" className="!mt-5 [&_.mt-1\.5]:!mt-0">
           <FaixaDeIndicadores>
             <Indicador
               rotulo={`Enviados em ${mes}`}
@@ -162,13 +147,13 @@ export default function Orcamentos() {
               apoio={textoDoValor(resumo.emAberto.valor)}
             />
             <Indicador
-              rotulo="Expiram em breve"
+              rotulo="Expiram amanhã"
               tom={resumo.expiramEmBreve.quantidade > 0 ? "atencao" : undefined}
               valor={resumo.expiramEmBreve.quantidade}
               apoio={
                 resumo.expiramEmBreve.quantidade > 0
-                  ? `${textoDoValor(resumo.expiramEmBreve.valor)} · em até ${DIAS_DE_AVISO} dias`
-                  : `Nada vence em ${DIAS_DE_AVISO} dias`
+                  ? textoDoValor(resumo.expiramEmBreve.valor)
+                  : "Nada vence amanhã"
               }
             />
           </FaixaDeIndicadores>
@@ -181,43 +166,22 @@ export default function Orcamentos() {
         </div>
       )}
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="!mt-[22px] grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
         <Card className="min-w-0 overflow-hidden">
           <VisoesDaLista<Filtro>
             rotulo="Situação do orçamento"
             valor={filtro}
             onChange={setFiltro}
-            className="px-2"
+            className="px-2 pt-0.5 [&_[role=tab]]:!min-h-11"
+            contagemEmChip
             visoes={[
               { valor: "todos", rotulo: "Todos", contagem: contagens.todos },
               { valor: "rascunho", rotulo: "Rascunhos", contagem: contagens.rascunho },
               { valor: "enviado", rotulo: "Enviados", contagem: contagens.enviado },
-              { valor: "aprovado", rotulo: "Aceitos", contagem: contagens.aprovado },
-              { valor: "recusado", rotulo: "Recusados", contagem: contagens.recusado },
+              { valor: "aprovado", rotulo: "Aceitos", contagem: contagens.aprovado, tom: "sucesso" },
+              { valor: "recusado", rotulo: "Recusados", contagem: contagens.recusado, tom: "perigo" },
             ]}
           />
-          <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
-            <div className="relative min-w-0 flex-1 sm:max-w-64">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                placeholder="Número, pessoa ou empresa"
-                aria-label="Buscar orçamento"
-                className="pl-8 text-xs"
-              />
-            </div>
-            <SegmentedControl<OrdemDeOrcamento>
-              rotuloGrupo="Ordenação"
-              valor={ordem}
-              onChange={setOrdem}
-              opcoes={[
-                { valor: "data", rotulo: "Recentes" },
-                { valor: "valor", rotulo: "Maior valor" },
-              ]}
-            />
-          </div>
-
           {isLoading ? (
             <LoadingState />
           ) : isError ? (
@@ -228,9 +192,7 @@ export default function Orcamentos() {
               titulo={
                 orcamentos.length === 0
                   ? "Nenhum orçamento ainda"
-                  : termo
-                    ? `Nada encontrado para “${busca.trim()}”`
-                    : "Nenhum orçamento neste estado"
+                  : "Nenhum orçamento neste estado"
               }
               descricao={
                 orcamentos.length === 0
@@ -282,7 +244,14 @@ export default function Orcamentos() {
       <ConstrutorDeOrcamento
         aberto={construindo !== null}
         orcamento={construindo === "novo" ? null : construindo}
-        aoFechar={() => setConstruindo(null)}
+        modelo={construindo === "novo" ? modeloEscolhido : null}
+        aoFechar={() => { setConstruindo(null); setModeloEscolhido(null); }}
+      />
+
+      <ModelosDeOrcamento
+        aberto={modelosAberto}
+        aoFechar={() => setModelosAberto(false)}
+        aoUsar={(m) => { setModeloEscolhido(m); setConstruindo("novo"); }}
       />
 
       <PainelDeOrcamento

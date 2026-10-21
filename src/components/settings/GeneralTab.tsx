@@ -10,13 +10,10 @@ import {
 } from "@/components/ui/select";
 import { Plus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Database } from "@/integrations/supabase/types";
 
-type Profile = Database["public"]["Tables"]["profiles"]["Row"];
-
-export function GeneralTab({ orgId, userId, profile }: { orgId: string | null; userId?: string; profile: Profile | null }) {
+/** Só organização: o perfil pessoal virou aba própria (ProfileTab), visível a todos. */
+export function GeneralTab({ orgId }: { orgId: string | null }) {
   const { toast } = useToast();
-  const [profileForm, setProfileForm] = useState({ name: "", title: "", timezone: "UTC" });
   const [orgForm, setOrgForm] = useState({ name: "", slug: "", currency: "BRL", timezone: "America/Sao_Paulo" });
   const [orgSettings, setOrgSettings] = useState<Record<string, unknown>>({});
   const [industries, setIndustries] = useState<string[]>([]);
@@ -27,10 +24,6 @@ export function GeneralTab({ orgId, userId, profile }: { orgId: string | null; u
     "Consultoria", "Educação", "Saúde", "Financeiro", "Varejo",
     "Logística", "Agronegócio", "Imobiliário", "Jurídico", "Marketing",
   ];
-
-  useEffect(() => {
-    if (profile) setProfileForm({ name: profile.name || "", title: profile.title || "", timezone: profile.timezone || "UTC" });
-  }, [profile]);
 
   useEffect(() => {
     if (orgId) {
@@ -45,14 +38,6 @@ export function GeneralTab({ orgId, userId, profile }: { orgId: string | null; u
       });
     }
   }, [orgId]);
-
-  const saveProfile = async () => {
-    if (!userId) return;
-    const { error } = await supabase.from("profiles").update({
-      name: profileForm.name, title: profileForm.title, timezone: profileForm.timezone,
-    }).eq("id", userId);
-    toast(error ? { title: "Erro", description: error.message, variant: "destructive" } : { title: "Perfil atualizado" });
-  };
 
   const saveOrg = async () => {
     if (!orgId) return;
@@ -88,32 +73,6 @@ export function GeneralTab({ orgId, userId, profile }: { orgId: string | null; u
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="vx-titulo-secao">Perfil Pessoal</CardTitle>
-          <CardDescription>Suas informações pessoais</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1"><Label className="text-xs">Nome</Label><Input value={profileForm.name} onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })} className="h-8 text-xs" /></div>
-            <div className="space-y-1"><Label className="text-xs">Cargo</Label><Input value={profileForm.title} onChange={(e) => setProfileForm({ ...profileForm, title: e.target.value })} className="h-8 text-xs" /></div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Fuso horário</Label>
-            <Select value={profileForm.timezone} onValueChange={(v) => setProfileForm({ ...profileForm, timezone: v })}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="America/Sao_Paulo">São Paulo (BRT)</SelectItem>
-                <SelectItem value="America/New_York">New York (EST)</SelectItem>
-                <SelectItem value="Europe/London">London (GMT)</SelectItem>
-                <SelectItem value="UTC">UTC</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex justify-end"><Button size="sm" className="h-8 text-xs" onClick={saveProfile}>Salvar Perfil</Button></div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
           <CardTitle className="vx-titulo-secao">Organização</CardTitle>

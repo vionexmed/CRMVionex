@@ -9,7 +9,7 @@
  * Sem dependência de React nem de Supabase de propósito: dá para testar com
  * `agora` fixo.
  */
-import { getSdrRanges, type SdrPeriod } from "@/hooks/useSdrMetrics";
+import { getSdrRanges, type SdrComparacao, type SdrPeriod } from "@/hooks/useSdrMetrics";
 
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -55,7 +55,29 @@ export type RotulosDoPeriodo = {
   nomeDoPeriodo: string;
 };
 
-export function rotulosDoPeriodo(period: SdrPeriod, agora: Date = new Date()): RotulosDoPeriodo {
+/** "o mesmo período de 2025", na forma que cabe depois de "vs.". */
+function rotuloDoAnoAnterior(period: SdrPeriod, inicio: Date): string {
+  const ano = inicio.getFullYear() - 1;
+  if (period === "this_month" || period === "last_month") return `${MESES[inicio.getMonth()]} de ${ano}`;
+  const mesmo = { today: "mesmo dia", this_week: "mesma semana", this_quarter: "mesmo trimestre" }[period as "today" | "this_week" | "this_quarter"];
+  return mesmo ? `${mesmo} de ${ano}` : String(ano);
+}
+
+/**
+ * Comparações que fazem sentido para o período. "Este ano" contra o ano
+ * anterior JÁ é o período anterior; "todo o período" não tem com o que comparar.
+ */
+export function comparacoesDoPeriodo(period: SdrPeriod): SdrComparacao[] {
+  if (period === "all") return ["nenhuma"];
+  if (period === "this_year") return ["anterior", "nenhuma"];
+  return ["anterior", "ano_anterior", "nenhuma"];
+}
+
+export function rotulosDoPeriodo(
+  period: SdrPeriod,
+  agora: Date = new Date(),
+  comparacaoEscolhida: SdrComparacao = "anterior",
+): RotulosDoPeriodo {
   const { current, previous } = getSdrRanges(period);
   const nomeDoPeriodo = {
     today: "dia", this_week: "semana", this_month: "mês", last_month: "mês",
@@ -93,9 +115,11 @@ export function rotulosDoPeriodo(period: SdrPeriod, agora: Date = new Date()): R
     : `${diaCurto(inicio)} a ${diaCurto(fimVisivel)}`;
 
   const mensal = period === "this_month" || period === "last_month";
-  const comparacao = !previous
+  const comparacao = !previous || comparacaoEscolhida === "nenhuma"
     ? null
-    : mensal
+    : comparacaoEscolhida === "ano_anterior" && period !== "this_year"
+      ? rotuloDoAnoAnterior(period, inicio)
+      : mensal
       ? MESES[previous.start!.getMonth()]
       : { today: "ontem", this_week: "semana anterior", this_quarter: "trimestre anterior", this_year: String(previous.start!.getFullYear()) }[period as "today" | "this_week" | "this_quarter" | "this_year"];
 
@@ -110,4 +134,14 @@ export function rotulosDoPeriodo(period: SdrPeriod, agora: Date = new Date()): R
     emAndamento,
     nomeDoPeriodo,
   };
+}
+
+/**
+ * A média que a tela MOSTRA (arredondada) vezes os dias, em dezenas. "Média 13"
+ * e "projeção 406" lado a lado fazem a pessoa refazer a conta e achar 403; o
+ * "≈" já avisa que é estimativa, então a dezena é a precisão honesta.
+ */
+export function projetar(media: number, dias: number): number {
+  const bruto = Math.round(media) * dias;
+  return bruto >= 100 ? Math.round(bruto / 10) * 10 : bruto;
 }

@@ -210,6 +210,10 @@ describe("os cartões respiram igual", () => {
         const classes = m[2].split(" ");
         if (classes.includes("p-4")) infratores.push(`${arquivo}  <Card${m[1]} ${m[2]}`);
         if (m[1] === "Header" && classes.some((c) => /^pb-[234]$/.test(c))) {
+          // EXCEÇÃO REGISTRADA: o cartão "Atendimento agora" do Painel tem 16px
+          // entre o título e o conteúdo na referência do Visual 01 (os demais
+          // cartões fecham com pb-2). É a única; qualquer outra volta a falhar.
+          if (arquivo.endsWith("dashboard/PainelLateral.tsx") && m[2] === "pb-4 pt-[calc(var(--respiro)-1px)]") continue;
           infratores.push(`${arquivo}  <CardHeader ${m[2]}`);
         }
       }

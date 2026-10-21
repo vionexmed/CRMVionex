@@ -16,10 +16,9 @@
 import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SeloComPonto } from "@/components/layout/ListaV1";
 import { CHART_COLORS } from "@/components/reports/types";
 import { Donut } from "./svg/Donut";
-import { maiorPerda } from "./funil";
+import { fraseDaPerda, maiorPerda } from "./funil";
 import type { EtapaFunil, FatiaCanal, LinhaPessoa } from "@/hooks/useSdrCharts";
 import { formatarNumero } from "@/lib/formato";
 import { cn } from "@/lib/utils";
@@ -39,7 +38,8 @@ function Cabecalho({ titulo, descricao, extra }: { titulo: string; descricao?: s
     <CardHeader>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 space-y-1">
-          <CardTitle>{titulo}</CardTitle>
+          {/* 16px, o título de bloco do Visual 01 (Funil de conversão). */}
+          <CardTitle className="vx-titulo-painel">{titulo}</CardTitle>
           {descricao && <CardDescription className="max-w-2xl leading-relaxed">{descricao}</CardDescription>}
         </div>
         {extra}
@@ -73,9 +73,9 @@ export function GraficoFunil({ dados, className }: { dados: EtapaFunil[]; classN
         titulo="Funil de conversão"
         descricao="Dos contatos que entraram no período, até onde chegaram — e a perda entre as etapas"
         extra={topo > 0 && perda && (
-          <SeloComPonto tom="perigo" variante="suave" className="whitespace-normal">
-            Maior perda: {perda.perda}% entre {perda.de} e {perda.para}
-          </SeloComPonto>
+          <span className="self-center rounded-md bg-destructive-soft px-2.5 py-1.5 text-xs font-medium text-destructive">
+            Maior perda: {fraseDaPerda(perda)}
+          </span>
         )}
       />
       <CardContent>

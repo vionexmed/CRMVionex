@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Trash2, Search } from "lucide-react";
+import { Loader2, Plus, Trash2, Search, BookmarkPlus } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
@@ -17,6 +18,10 @@ import { mensagemErro } from "@/lib/erro-supabase";
 import { formatarMoeda } from "@/lib/formato";
 import { useAllContacts } from "@/hooks/queries/useContacts";
 import { useProdutos } from "@/hooks/queries/useProdutos";
+import { useOrcamentoModelos } from "@/hooks/queries/useOrcamentoModelos";
+import { FormularioDeModelo, type ModeloInicial } from "@/components/orcamentos/ModelosDeOrcamento";
+import type { OrcamentoModelo } from "@/lib/api/orcamento-modelos";
+import { diasDeValidade, validadeEmDias } from "@/lib/orcamento-modelos";
 import { useCriarOrcamento, useAtualizarOrcamento, useTrocarItens } from "@/hooks/queries/useOrcamentos";
 import {
   itemDeProduto, totalDoItem, totaisDoOrcamento,
@@ -84,6 +89,7 @@ export function ConstrutorDeOrcamento({
   orcamento,
   dealId,
   contactIdInicial,
+  modelo,
   aoFechar,
 }: {
   aberto: boolean;
@@ -92,6 +98,8 @@ export function ConstrutorDeOrcamento({
   /** Preenchido quando o construtor abre a partir de um negócio. */
   dealId?: string | null;
   contactIdInicial?: string | null;
+  /** Modelo com que um orçamento NOVO nasce preenchido (ignorado ao editar). */
+  modelo?: OrcamentoModelo | null;
   aoFechar: () => void;
 }) {
   const { toast } = useToast();
@@ -108,6 +116,23 @@ export function ConstrutorDeOrcamento({
   const [observacoes, setObservacoes] = useState("");
   const [itens, setItens] = useState<ItemEmEdicao[]>([]);
   const [catalogoAberto, setCatalogoAberto] = useState(false);
+  const [condicoes, setCondicoes] = useState("");
+  const [salvandoModelo, setSalvandoModelo] = useState<ModeloInicial | null>(null);
+  const { data: modelos = [] } = useOrcamentoModelos();
+
+  /** Preenche o formulário com um modelo: itens copiados, validade a partir de hoje. */
+  const aplicarModelo = (m: OrcamentoModelo) => {
+    setTitulo(m.titulo ?? "");
+    setValidoAte(validadeEmDias(m.validade_dias));
+    setDesconto(String(m.desconto ?? 0));
+    setObservacoes(m.observacoes ?? "");
+    setCondicoes(m.condicoes ?? "");
+    setItens(m.itens.map((i) => ({
+      produto_id: i.produto_id, nome: i.nome, descricao: i.descricao, unidade: i.unidade,
+      preco_unit: String(i.preco_unit), quantidade: String(i.quantidade),
+      desconto: i.desconto ? String(i.desconto) : "",
+    })));
+  };
 
   const editando = !!orcamento;
 
@@ -119,6 +144,7 @@ export function ConstrutorDeOrcamento({
       setValidoAte(orcamento.valido_ate ?? "");
       setDesconto(String(orcamento.desconto ?? 0));
       setObservacoes(orcamento.observacoes ?? "");
+      setCondicoes(orcamento.condicoes ?? "");
       setItens(
         (orcamento.itens ?? []).map((i) => ({
           produto_id: i.produto_id,
@@ -138,9 +164,12 @@ export function ConstrutorDeOrcamento({
       setValidoAte("");
       setDesconto("0");
       setObservacoes("");
+      setCondicoes("");
       setItens([]);
+      if (modelo) aplicarModelo(modelo);
     }
-  }, [aberto, orcamento, contactIdInicial]);
+    // aplicarModelo só usa setters e o modelo recebido: não precisa ser dependência.
+  }, [aberto, orcamento, contactIdInicial, modelo]);
 
   const totais = useMemo(
     () => totaisDoOrcamento(itens.map(paraCalculo), num(desconto)),
@@ -172,6 +201,9 @@ export function ConstrutorDeOrcamento({
       valido_ate: validoAte || null,
       desconto: totais.desconto,
       observacoes: observacoes.trim() || null,
+      // Só entra quando preenchida: antes da migração a coluna não existe, e
+      // mandar `condicoes: null` faria TODO salvamento falhar com 42703.
+      ...(condicoes.trim() ? { condicoes: condicoes.trim() } : orcamento?.condicoes ? { condicoes: null } : {}),
     };
 
     try {
@@ -187,6 +219,22 @@ export function ConstrutorDeOrcamento({
     } catch (e: unknown) {
       toast({ title: "Não foi possível salvar", description: mensagemErro(e), variant: "destructive" });
     }
+  };
+
+  const comoModelo = () => {
+    if (itens.length === 0) {
+      toast({ title: "Acrescente ao menos um item para salvar como modelo", variant: "destructive" });
+      return;
+    }
+    setSalvandoModelo({
+      nome: "",
+      titulo: titulo.trim() || null,
+      itens: itens.map((i) => ({ ...paraGravar(i), descricao: i.descricao })),
+      validade_dias: diasDeValidade(validoAte),
+      desconto: totais.desconto,
+      condicoes: condicoes.trim() || null,
+      observacoes: observacoes.trim() || null,
+    });
   };
 
   const salvando = criar.isPending || atualizar.isPending || trocarItens.isPending;
@@ -205,6 +253,19 @@ export function ConstrutorDeOrcamento({
         </DialogHeader>
 
         <div className="space-y-4">
+          {!editando && modelos.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-2 p-2">
+              <Label className="text-xs">Começar de um modelo</Label>
+              <Select onValueChange={(id) => { const m = modelos.find((x) => x.id === id); if (m) aplicarModelo(m); }}>
+                <SelectTrigger className="h-8 w-56 text-xs" aria-label="Modelo de orçamento">
+                  <SelectValue placeholder="Escolher modelo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {modelos.map((m) => <SelectItem key={m.id} value={m.id} className="text-xs">{m.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs">Contato</Label>
@@ -427,6 +488,15 @@ export function ConstrutorDeOrcamento({
                 />
               </div>
               <div className="space-y-1.5">
+                <Label className="text-xs">Condições (o cliente lê)</Label>
+                <Textarea
+                  value={condicoes}
+                  onChange={(e) => setCondicoes(e.target.value)}
+                  placeholder="Implantação em 2 parcelas · plano cobrado mensalmente"
+                  className="min-h-[56px] text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
                 <Label className="text-xs">Observações internas</Label>
                 <Textarea
                   value={observacoes}
@@ -472,6 +542,9 @@ export function ConstrutorDeOrcamento({
         </div>
 
         <DialogFooter>
+          <Button variant="ghost" size="sm" className="h-8 text-label sm:mr-auto" onClick={comoModelo} disabled={salvando}>
+            <BookmarkPlus className="mr-1 h-3.5 w-3.5" />Salvar como modelo
+          </Button>
           <Button variant="outline" size="sm" className="h-8 text-label" onClick={aoFechar} disabled={salvando}>
             Cancelar
           </Button>
@@ -481,6 +554,7 @@ export function ConstrutorDeOrcamento({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <FormularioDeModelo inicial={salvandoModelo} aoFechar={() => setSalvandoModelo(null)} />
     </Dialog>
   );
 }

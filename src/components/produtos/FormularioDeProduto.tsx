@@ -19,7 +19,16 @@ import { pluralizar } from "@/lib/formato";
 
 const VAZIO = {
   nome: "", descricao: "", foto_url: "", preco: "", unidade: "un", sku: "", ativo: true,
+  categoria: "", tipo: "", rotulo_clientes: "",
 };
+
+/** "" = não classificado: a tela deduz da unidade (ver `tipoDoProduto`). */
+const TIPOS = [
+  { valor: "", rotulo: "Automático (pela unidade)" },
+  { valor: "recorrente", rotulo: "Recorrente" },
+  { valor: "unico", rotulo: "Único" },
+  { valor: "adicional", rotulo: "Adicional" },
+];
 
 /**
  * Cadastro de produto.
@@ -35,8 +44,11 @@ const VAZIO = {
 export function FormularioDeProduto({
   aberto,
   produto,
+  categorias = [],
   aoFechar,
 }: {
+  /** Categorias já usadas, sugeridas ao digitar. */
+  categorias?: string[];
   aberto: boolean;
   /** `null` cria; um produto edita. */
   produto: Produto | null;
@@ -67,6 +79,10 @@ export function FormularioDeProduto({
             unidade: produto.unidade,
             sku: produto.sku ?? "",
             ativo: produto.ativo,
+            // Colunas da migração 20261021140000: ausentes até ela ser aplicada.
+            categoria: produto.categoria ?? "",
+            tipo: produto.tipo_cobranca ?? "",
+            rotulo_clientes: produto.rotulo_clientes ?? "",
           }
         : VAZIO,
     );
@@ -94,6 +110,13 @@ export function FormularioDeProduto({
       // conflitam. Com string vazia, o segundo seria recusado.
       sku: form.sku.trim() || null,
       ativo: form.ativo,
+      // Só vão quando preenchidas (ou ao limpar um que existia): antes da
+      // migração a coluna não existe, e mandá-la vazia faria TODO salvamento
+      // falhar com 42703.
+      ...(form.categoria.trim() || produto?.categoria ? { categoria: form.categoria.trim() || null } : {}),
+      ...(form.tipo || produto?.tipo_cobranca ? { tipo_cobranca: form.tipo || null } : {}),
+      ...(form.rotulo_clientes.trim() || produto?.rotulo_clientes
+        ? { rotulo_clientes: form.rotulo_clientes.trim() || null } : {}),
     };
 
     try {
@@ -209,6 +232,42 @@ export function FormularioDeProduto({
                 className="h-8 text-xs"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Categoria</Label>
+              <Input
+                value={form.categoria}
+                onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))}
+                placeholder="Planos, Serviços…"
+                list="categorias-de-produto"
+                className="h-8 text-xs"
+              />
+              <datalist id="categorias-de-produto">
+                {categorias.map((c) => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tipo de cobrança</Label>
+              <select
+                value={form.tipo}
+                onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
+                aria-label="Tipo de cobrança"
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+              >
+                {TIPOS.map((t) => <option key={t.valor} value={t.valor}>{t.rotulo}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Como chamar quem compra</Label>
+            <Input
+              value={form.rotulo_clientes}
+              onChange={(e) => setForm((f) => ({ ...f, rotulo_clientes: e.target.value }))}
+              placeholder="clientes (ou redes, unidades…)"
+              className="h-8 text-xs"
+            />
           </div>
 
           <div className="flex items-center justify-between rounded-lg border border-border p-3">

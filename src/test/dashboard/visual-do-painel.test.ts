@@ -64,9 +64,17 @@ describe("o tile de métrica tem presença sem competir", () => {
   });
 });
 
+/**
+ * Onde cada faixa começa no fonte. Eram as abas (`value="visao"`,
+ * `value="indicadores"`); o Visual 01 tirou as abas e os indicadores vieram
+ * para depois do funil, na mesma página. A âncora mudou, a regra não.
+ */
+const ANCORA_FAIXA = "faixa={";
+const ANCORA_INDICADORES = "GROUPS.map((group)";
+
 describe("indicadores agrupados em faixas", () => {
   it("o destaque usa uma faixa com divisórias", () => {
-    const i = PAINEL.indexOf('value="visao"');
+    const i = PAINEL.indexOf(ANCORA_FAIXA);
     const bloco = PAINEL.slice(i, i + 700);
     expect(bloco).toContain("vx-metrics-strip");
     expect(bloco).toMatch(/grid grid-cols-2[^"\n]*lg:grid-cols-4/);
@@ -75,7 +83,7 @@ describe("indicadores agrupados em faixas", () => {
   });
 
   it("os indicadores usam a faixa", () => {
-    const i = PAINEL.indexOf('value="indicadores"');
+    const i = PAINEL.indexOf(ANCORA_INDICADORES);
     const bloco = PAINEL.slice(i, i + 900);
     // Uma moldura só por grupo, e as células dentro dela.
     expect(bloco).toMatch(/overflow-hidden rounded-lg border border-border/);
@@ -97,7 +105,7 @@ describe("indicadores agrupados em faixas", () => {
    * `bg-border`, e o vazio volta a ser cinza.
    */
   it("célula vazia não vira bloco cinza", () => {
-    const i = PAINEL.indexOf('value="indicadores"');
+    const i = PAINEL.indexOf(ANCORA_INDICADORES);
     const bloco = PAINEL.slice(i, i + 900);
     // O fundo do contêiner é o do cartão: é ele que aparece onde não há métrica.
     expect(bloco).toContain("bg-card");
@@ -143,7 +151,7 @@ describe("indicadores agrupados em faixas", () => {
     expect(emFaixa, "border-b/border-r desenham para o vazio em linha incompleta")
       .not.toMatch(/border-[br]\b/);
 
-    const i = PAINEL.indexOf('value="indicadores"');
+    const i = PAINEL.indexOf(ANCORA_INDICADORES);
     const bloco = PAINEL.slice(i, i + 1400);
     expect(bloco).toContain("-ml-px");
     expect(bloco).toContain("-mt-px");
@@ -159,7 +167,7 @@ describe("indicadores agrupados em faixas", () => {
    * cabelo: duas telas diferentes para o mesmo conteúdo.
    */
   it("o esqueleto leva as bordas da célula", () => {
-    const i = PAINEL.indexOf('value="indicadores"');
+    const i = PAINEL.indexOf(ANCORA_INDICADORES);
     const bloco = PAINEL.slice(i, i + 1400);
     const iEsqueleto = bloco.indexOf("isLoading ? (");
     expect(iEsqueleto).toBeGreaterThan(-1);

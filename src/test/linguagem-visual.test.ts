@@ -161,8 +161,10 @@ describe("o painel mantém as métricas que tem", () => {
    * critério que tirou o olho do card do kanban e que mantém o interruptor fora
    * do cartão de integração que não tem o que desligar.
    */
-  it("a aba do assistente diz que está por vir, em vez de falhar no envio", () => {
-    expect(PAINEL).toContain("<EmBreve");
+  // No Visual 01 o Painel não tem abas, e o "em breve" do assistente saiu com
+  // elas: a intenção continua -- nenhum chat que aceita a pergunta e falha.
+  it("o assistente não volta como chat que falha no envio", () => {
     expect(PAINEL).not.toContain("DashboardAIChat");
+    expect(PAINEL).not.toMatch(/rotulo: "Assistente"/);
   });
 });

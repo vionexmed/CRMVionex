@@ -47,7 +47,9 @@ describe("contactsApi.list()", () => {
   it("calls the correct table", async () => {
     mockFrom.mockReturnValue(makeChain({ data: [], count: 0, error: null }));
     await contactsApi.list("org-1");
-    expect(mockFrom).toHaveBeenCalledWith("contacts");
+    // A lista lê a visão `contacts` + `ultimo_contato`; `contacts` é o recuo
+    // para quando a migração ainda não subiu (ver visoes-de-contatos.test.ts).
+    expect(mockFrom).toHaveBeenCalledWith("contatos_com_ultimo_contato");
   });
 
   it("applies page/pageSize via range", async () => {

@@ -114,7 +114,7 @@ export function MetricDrilldown({
   return (
     <HoverCard open={aberto} onOpenChange={setAberto} openDelay={120} closeDelay={100}>
       <HoverCardTrigger asChild>
-        <span className="cursor-pointer underline decoration-dotted decoration-from-font underline-offset-4 transition-colors hover:decoration-solid">
+        <span className="cursor-pointer decoration-dotted decoration-from-font underline-offset-4 hover:underline">
           {children}
         </span>
       </HoverCardTrigger>
