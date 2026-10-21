@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { TABLES, DEFAULT_PAGE_SIZE } from "@/lib/constants";
 import type { Database } from "@/integrations/supabase/types";
+import { buscarEmBlocos } from "@/lib/paginar";
 
 type Deal = Database["public"]["Tables"]["deals"]["Row"];
 export type DealInsert = Database["public"]["Tables"]["deals"]["Insert"];
@@ -104,6 +105,24 @@ export const dealsApi = {
     return { data: (data ?? []) as DealWithRelations[], count: count ?? 0 };
   },
 
+  /**
+   * Lista leve para pickers (select de negócio em Atividades). Pagina em
+   * blocos de 1000, no mesmo padrão de `contactsApi.listForPicker` -- o mesmo
+   * teto silencioso do PostgREST vale aqui, e `useDeals({ pageSize: 1000 })`
+   * já mordeu por isso.
+   */
+  listForPicker: async (
+    orgId: string,
+  ): Promise<Pick<Deal, "id" | "title" | "contact_id" | "company_id">[]> =>
+    buscarEmBlocos((inicio, fim) =>
+      supabase
+        .from(TABLES.DEALS)
+        .select("id, title, contact_id, company_id")
+        .eq("org_id", orgId)
+        .order("title", { ascending: true })
+        .range(inicio, fim),
+    ),
+
   create: async (deal: DealInsert): Promise<Deal> => {
     const { data, error } = await supabase.from(TABLES.DEALS).insert(deal).select().single();
     if (error) throw error;
@@ -121,9 +140,26 @@ export const dealsApi = {
     if (error) throw error;
   },
 
-  updateStatus: async (id: string, status: DealStatus, lossReason?: string): Promise<void> => {
+  /**
+   * `lossReasonId` é a categoria do catálogo `loss_reasons`; `lossReasonNote`
+   * é o texto livre, opcional, digitado no modal.
+   *
+   * Os dois NÃO são mais concatenados num campo só. Isso era o que fazia o
+   * relatório de perdas agrupar por string inteira -- cada nota digitada virava
+   * um grupo novo, e "por que perdemos?" não tinha resposta confiável. Agora
+   * `loss_reason_id` carrega a categoria e `loss_reason` guarda só a nota.
+   */
+  updateStatus: async (
+    id: string,
+    status: DealStatus,
+    lossReasonId?: string | null,
+    lossReasonNote?: string | null,
+  ): Promise<void> => {
     const payload: DealUpdate = { status };
-    if (lossReason) payload.loss_reason = lossReason;
+    if (status === "lost") {
+      payload.loss_reason_id = lossReasonId ?? null;
+      payload.loss_reason = lossReasonNote ?? null;
+    }
     const { error } = await supabase.from(TABLES.DEALS).update(payload).eq("id", id);
     if (error) throw error;
   },

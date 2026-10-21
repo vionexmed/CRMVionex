@@ -10,7 +10,7 @@ import { useOrg } from "@/hooks/useOrg";
 import { useContactFromSearch } from "@/hooks/queries/useGlobalSearch";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useContacts, useAllContacts, useLastActivities, useDeleteContacts,
+  useContacts, useAllContacts, useLastActivities, useDeleteContacts, useCidadesDeContato,
   useUpdateContactsLifecycle, useUpdateContactOwner, contactsKeys,
 } from "@/hooks/queries/useContacts";
 import { contactsApi } from "@/lib/api/contacts";
@@ -162,6 +162,15 @@ export default function Contacts() {
   // Debounce search to avoid a query on every keystroke
   const debouncedSearch = useDebounce(search, 300);
   const debouncedFilters = useDebounce(filters, 300);
+
+  /**
+   * As cidades oferecidas seguem o ciclo de vida escolhido: em /leads, só as
+   * cidades dos leads. Uma cidade já escolhida que não esteja na lista (o
+   * estágio mudou, ou a consulta falhou) continua como opção, senão o seletor
+   * ficaria em branco com o filtro ainda ativo.
+   */
+  const { data: cidades = [] } = useCidadesDeContato(filters.lifecycleStage);
+  const cidadeForaDaLista = !!filters.city && !cidades.some((c) => c.cidade === filters.city);
 
 
   // Reset to page 0 when filters/search/sort change
@@ -643,8 +652,19 @@ export default function Contacts() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="contact-city" className="text-xs">Cidade</Label>
-            <Input id="contact-city" placeholder="Ex.: Campinas" className="w-44 h-8 text-xs" value={filters.city ?? ""} onChange={(e) => aplicarFiltros({ city: e.target.value || undefined })} />
+            <Label htmlFor="filtro-cidade" className="text-xs">Cidade</Label>
+            <Select value={filters.city || "all"} onValueChange={(v) => aplicarFiltros({ city: v === "all" ? undefined : v })}>
+              <SelectTrigger id="filtro-cidade" className="w-44 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as cidades</SelectItem>
+                {cidadeForaDaLista && <SelectItem value={filters.city!}>{filters.city!.trim()}</SelectItem>}
+                {cidades.map((c) => (
+                  <SelectItem key={c.cidade} value={c.cidade}>
+                    {c.cidade.trim()} ({c.contatos})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Criado de</Label>
@@ -657,6 +677,16 @@ export default function Contacts() {
         </BarraDeFiltros>
       )}
 
+      {/* Com o painel fechado, a cidade escolhida continua à vista: uma lista
+          filtrada em silêncio lê-se como base pequena. */}
+      {!showFilters && filters.city && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Filtrando por cidade:</span>
+          <Button variant="outline" size="sm" className="h-8 text-xs" aria-label={`Remover filtro de cidade ${filters.city.trim()}`} onClick={() => aplicarFiltros({ city: undefined })}>
+            {filters.city.trim()} <X className="ml-1 h-3 w-3" />
+          </Button>
+        </div>
+      )}
 
       {selectedContacts.size > 0 && (
         <BarraDeSelecao

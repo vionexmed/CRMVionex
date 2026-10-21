@@ -10,6 +10,16 @@ import { readFileSync, existsSync } from "node:fs";
 
 const ler = (p: string) => readFileSync(p, "utf8");
 const CSS = ler("src/index.css");
+/**
+ * Sem comentários.
+ *
+ * Duas regras deste arquivo liam o CSS cru e acabaram medindo a PROSA dentro
+ * dos blocos em vez das declarações -- uma delas passou meses verde guardando
+ * uma regra que já não existia. É a armadilha que o CLAUDE.md registra como
+ * regra de como escrever teste aqui: varredura tem de apagar o comentário
+ * antes de procurar.
+ */
+const CSS_LIMPO = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
 const HTML = ler("index.html");
 
 describe("um sistema de aviso só", () => {

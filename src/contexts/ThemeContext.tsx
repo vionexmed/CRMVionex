@@ -91,10 +91,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const palette = ACCENT_COLORS[color] || ACCENT_COLORS.blue;
     const val = isDark ? palette.dark : palette.light;
     root.style.setProperty("--primary", val);
+<<<<<<< HEAD
     root.style.setProperty("--primary-foreground", isDark ? "211 68% 7%" : "0 0% 100%");
     root.style.setProperty("--ring", val);
     root.style.setProperty("--sidebar-primary", val);
     root.style.setProperty("--sidebar-primary-foreground", isDark ? "211 68% 7%" : "0 0% 100%");
+=======
+    /*
+     * O ANEL DE FOCO SEGUE O TEMA, não só a cor escolhida.
+     *
+     * Havia um terceiro valor, `ring`, que era sempre o da variante CLARA --
+     * então no tema escuro o anel de foco saía numa cor escura sobre fundo
+     * escuro, praticamente invisível. Era um problema de acessibilidade, e
+     * silencioso: ninguém navega por teclado ao revisar.
+     *
+     * O anel é a mesma cor do acento. Não havia motivo para ser outra.
+     */
+    root.style.setProperty("--ring", val);
+    root.style.setProperty("--sidebar-primary", val);
+>>>>>>> origin/main
     root.style.setProperty("--sidebar-ring", val);
   };
 

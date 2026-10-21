@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { CommunicationLayout, LegacyChannelRedirect } from "@/components/layout/CommunicationLayout";
 import { RequireAdmin } from "@/components/layout/RequireAdmin";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineDetector } from "@/components/OfflineDetector";
@@ -95,7 +94,7 @@ const DealDetail       = lazyChunk(() => import("./pages/DealDetail"));
 const Activities       = lazyChunk(() => import("./pages/Activities"));
 const Inbox            = lazyChunk(() => import("./pages/Inbox"));
 const MyEmail          = lazyChunk(() => import("./pages/MyEmail"));
-const Conversations    = lazyChunk(() => import("./pages/Conversations"));
+const Atendimento      = lazyChunk(() => import("./pages/Atendimento"));
 const Reports          = lazyChunk(() => import("./pages/Reports"));
 const Settings         = lazyChunk(() => import("./pages/Settings"));
 const Integrations     = lazyChunk(() => import("./pages/Integrations"));
@@ -200,15 +199,20 @@ const App = () => (
                     20260909140000 o histórico de e-mail e de conversa é da
                     organização, como o resto do CRM. */}
                 <Route path="/settings/email" element={<SuspenseRoute><MyEmail /></SuspenseRoute>} />
-                <Route path="/conversations" element={<LegacyChannelRedirect to="/comunicacao/whatsapp" />} />
-                <Route path="/instagram" element={<LegacyChannelRedirect to="/comunicacao/instagram" />} />
-                <Route path="/inbox" element={<LegacyChannelRedirect to="/comunicacao/email" />} />
-                <Route path="/comunicacao" element={<LegacyChannelRedirect to="/comunicacao/whatsapp" />} />
-                <Route element={<CommunicationLayout />}>
-                  <Route path="/comunicacao/whatsapp" element={<SuspenseRoute><Conversations key="whatsapp" canal="whatsapp" /></SuspenseRoute>} />
-                  <Route path="/comunicacao/instagram" element={<SuspenseRoute><Conversations key="instagram" canal="instagram" /></SuspenseRoute>} />
-                  <Route path="/comunicacao/email" element={<SuspenseRoute><Inbox /></SuspenseRoute>} />
-                </Route>
+                {/* UMA tela para os três canais. Eram três destinos, e quem
+                    atende tinha de adivinhar em qual deles a conversa estava. */}
+                <Route path="/atendimento" element={<SuspenseRoute><Atendimento /></SuspenseRoute>} />
+                <Route path="/comunicacao" element={<Navigate to="/atendimento?canal=whatsapp" replace />} />
+                <Route path="/comunicacao/whatsapp" element={<Navigate to="/atendimento?canal=whatsapp" replace />} />
+                <Route path="/comunicacao/instagram" element={<Navigate to="/atendimento?canal=instagram" replace />} />
+                <Route path="/comunicacao/email" element={<Navigate to="/inbox" replace />} />
+                {/* As rotas de canal viram redirecionamento COM O FILTRO já
+                    aplicado: link salvo e favorito continuam chegando à mesma
+                    conversa, agora ao lado das dos outros canais. `replace` para
+                    o botão Voltar não cair de novo aqui. */}
+                <Route path="/conversations" element={<Navigate to="/atendimento?canal=whatsapp" replace />} />
+                <Route path="/instagram" element={<Navigate to="/atendimento?canal=instagram" replace />} />
+                <Route path="/inbox" element={<SuspenseRoute><Inbox /></SuspenseRoute>} />
 
                 {/* Todo mundo vê quem é da equipe. As ações (trocar papel, remover,
                     convidar) já são protegidas por isAdmin dentro da própria página. */}

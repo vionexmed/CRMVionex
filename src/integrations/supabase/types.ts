@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       activities: {
@@ -485,12 +460,16 @@ export type Database = {
           avatar_url: string | null
           company_id: string | null
           created_at: string | null
+          descadastrado_em: string | null
+          descadastrado_motivo: string | null
           disqualified_at: string | null
           email: string | null
+          equipamento_atual: string | null
           first_name: string
           id: string
           instagram_igsid: string | null
           instagram_username: string | null
+          interesse_educacao: string | null
           last_name: string | null
           lead_score: number | null
           lifecycle_changed_at: string
@@ -499,23 +478,32 @@ export type Database = {
           metadata: Json
           org_id: string
           owner_id: string | null
+          pacientes_mes_max: number | null
+          pacientes_mes_min: number | null
           phone: string | null
+          potencial_aluguel: string | null
+          potencial_compra: string | null
           qualified_at: string | null
           qualified_by: string | null
           status: Database["public"]["Enums"]["contact_status"] | null
           title: string | null
           updated_at: string | null
+          usa_ondas_choque: boolean | null
         }
         Insert: {
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string | null
+          descadastrado_em?: string | null
+          descadastrado_motivo?: string | null
           disqualified_at?: string | null
           email?: string | null
+          equipamento_atual?: string | null
           first_name: string
           id?: string
           instagram_igsid?: string | null
           instagram_username?: string | null
+          interesse_educacao?: string | null
           last_name?: string | null
           lead_score?: number | null
           lifecycle_changed_at?: string
@@ -524,23 +512,32 @@ export type Database = {
           metadata?: Json
           org_id: string
           owner_id?: string | null
+          pacientes_mes_max?: number | null
+          pacientes_mes_min?: number | null
           phone?: string | null
+          potencial_aluguel?: string | null
+          potencial_compra?: string | null
           qualified_at?: string | null
           qualified_by?: string | null
           status?: Database["public"]["Enums"]["contact_status"] | null
           title?: string | null
           updated_at?: string | null
+          usa_ondas_choque?: boolean | null
         }
         Update: {
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string | null
+          descadastrado_em?: string | null
+          descadastrado_motivo?: string | null
           disqualified_at?: string | null
           email?: string | null
+          equipamento_atual?: string | null
           first_name?: string
           id?: string
           instagram_igsid?: string | null
           instagram_username?: string | null
+          interesse_educacao?: string | null
           last_name?: string | null
           lead_score?: number | null
           lifecycle_changed_at?: string
@@ -549,12 +546,17 @@ export type Database = {
           metadata?: Json
           org_id?: string
           owner_id?: string | null
+          pacientes_mes_max?: number | null
+          pacientes_mes_min?: number | null
           phone?: string | null
+          potencial_aluguel?: string | null
+          potencial_compra?: string | null
           qualified_at?: string | null
           qualified_by?: string | null
           status?: Database["public"]["Enums"]["contact_status"] | null
           title?: string | null
           updated_at?: string | null
+          usa_ondas_choque?: boolean | null
         }
         Relationships: [
           {
@@ -665,6 +667,7 @@ export type Database = {
           currency: string | null
           id: string
           loss_reason: string | null
+          loss_reason_id: string | null
           org_id: string
           owner_id: string | null
           probability: number | null
@@ -684,6 +687,7 @@ export type Database = {
           currency?: string | null
           id?: string
           loss_reason?: string | null
+          loss_reason_id?: string | null
           org_id: string
           owner_id?: string | null
           probability?: number | null
@@ -703,6 +707,7 @@ export type Database = {
           currency?: string | null
           id?: string
           loss_reason?: string | null
+          loss_reason_id?: string | null
           org_id?: string
           owner_id?: string | null
           probability?: number | null
@@ -727,6 +732,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_loss_reason_id_fkey"
+            columns: ["loss_reason_id"]
+            isOneToOne: false
+            referencedRelation: "loss_reasons"
             referencedColumns: ["id"]
           },
           {
@@ -1328,8 +1340,211 @@ export type Database = {
           },
         ]
       }
+      google_ads_accounts: {
+        Row: {
+          created_at: string
+          currency: string | null
+          customer_id: string
+          id: string
+          is_active: boolean
+          login_customer_id: string | null
+          name: string
+          org_id: string
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          customer_id: string
+          id?: string
+          is_active?: boolean
+          login_customer_id?: string | null
+          name?: string
+          org_id: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          customer_id?: string
+          id?: string
+          is_active?: boolean
+          login_customer_id?: string | null
+          name?: string
+          org_id?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_ads_campaigns: {
+        Row: {
+          account_id: string
+          channel_type: string | null
+          daily_budget: number | null
+          end_date: string | null
+          google_campaign_id: string
+          id: string
+          name: string
+          org_id: string
+          raw: Json | null
+          start_date: string | null
+          status: string | null
+          synced_at: string
+        }
+        Insert: {
+          account_id: string
+          channel_type?: string | null
+          daily_budget?: number | null
+          end_date?: string | null
+          google_campaign_id: string
+          id?: string
+          name: string
+          org_id: string
+          raw?: Json | null
+          start_date?: string | null
+          status?: string | null
+          synced_at?: string
+        }
+        Update: {
+          account_id?: string
+          channel_type?: string | null
+          daily_budget?: number | null
+          end_date?: string | null
+          google_campaign_id?: string
+          id?: string
+          name?: string
+          org_id?: string
+          raw?: Json | null
+          start_date?: string | null
+          status?: string | null
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_campaigns_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "google_ads_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_ads_campaigns_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_ads_insights: {
+        Row: {
+          campaign_id: string
+          clicks: number | null
+          conversion_value: number | null
+          conversions: number | null
+          cpc: number | null
+          ctr: number | null
+          dia: string
+          id: string
+          impressions: number | null
+          org_id: string
+          raw: Json | null
+          spend: number | null
+          synced_at: string
+        }
+        Insert: {
+          campaign_id: string
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          ctr?: number | null
+          dia: string
+          id?: string
+          impressions?: number | null
+          org_id: string
+          raw?: Json | null
+          spend?: number | null
+          synced_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          ctr?: number | null
+          dia?: string
+          id?: string
+          impressions?: number | null
+          org_id?: string
+          raw?: Json | null
+          spend?: number | null
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_insights_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_ads_sync_log: {
+        Row: {
+          campanhas: number | null
+          created_at: string
+          dias: number | null
+          id: string
+          mensagem: string | null
+          ok: boolean
+          org_id: string
+        }
+        Insert: {
+          campanhas?: number | null
+          created_at?: string
+          dias?: number | null
+          id?: string
+          mensagem?: string | null
+          ok: boolean
+          org_id: string
+        }
+        Update: {
+          campanhas?: number | null
+          created_at?: string
+          dias?: number | null
+          id?: string
+          mensagem?: string | null
+          ok?: boolean
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_sync_log_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_oauth_secrets: {
         Row: {
+          ads_developer_token: string | null
+          ads_refresh_token: string | null
           client_id: string
           client_secret: string
           id: string
@@ -1338,6 +1553,8 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          ads_developer_token?: string | null
+          ads_refresh_token?: string | null
           client_id: string
           client_secret: string
           id?: string
@@ -1346,6 +1563,8 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          ads_developer_token?: string | null
+          ads_refresh_token?: string | null
           client_id?: string
           client_secret?: string
           id?: string
@@ -1733,27 +1952,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      leads_evento: {
-        Row: {
-          criado_em: string
-          dispositivo: string | null
-          id: number
-          respostas: Json
-        }
-        Insert: {
-          criado_em?: string
-          dispositivo?: string | null
-          id?: never
-          respostas: Json
-        }
-        Update: {
-          criado_em?: string
-          dispositivo?: string | null
-          id?: never
-          respostas?: Json
-        }
-        Relationships: []
       }
       loss_reasons: {
         Row: {
@@ -2222,8 +2420,8 @@ export type Database = {
       orcamento_itens: {
         Row: {
           created_at: string
-          desconto: number
           descricao: string | null
+          desconto: number
           id: string
           nome: string
           orcamento_id: string
@@ -2235,8 +2433,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          desconto?: number
           descricao?: string | null
+          desconto?: number
           id?: string
           nome: string
           orcamento_id: string
@@ -2248,8 +2446,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          desconto?: number
           descricao?: string | null
+          desconto?: number
           id?: string
           nome?: string
           orcamento_id?: string
@@ -2526,6 +2724,7 @@ export type Database = {
           descricao: string | null
           foto_url: string | null
           id: string
+          modalidade: string
           moeda: string
           nome: string
           org_id: string
@@ -2540,6 +2739,7 @@ export type Database = {
           descricao?: string | null
           foto_url?: string | null
           id?: string
+          modalidade?: string
           moeda?: string
           nome: string
           org_id: string
@@ -2554,6 +2754,7 @@ export type Database = {
           descricao?: string | null
           foto_url?: string | null
           id?: string
+          modalidade?: string
           moeda?: string
           nome?: string
           org_id?: string
@@ -3332,8 +3533,21 @@ export type Database = {
         }
         Returns: undefined
       }
-      claim_pending_invitation: { Args: never; Returns: Json }
-      cleanup_automation_events: { Args: never; Returns: undefined }
+      canais_do_atendimento: {
+        Args: { _org_id: string }
+        Returns: {
+          instagram: boolean
+          whatsapp: boolean
+        }[]
+      }
+      claim_pending_invitation: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      cleanup_automation_events: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       create_organization_for_user: {
         Args: {
           p_name: string
@@ -3343,10 +3557,7 @@ export type Database = {
         }
         Returns: string
       }
-      criar_negocio_de_entrada: {
-        Args: { _contact_id: string }
-        Returns: string
-      }
+      criar_negocio_de_entrada: { Args: { _contact_id: string }; Returns: string }
       deals_parados: {
         Args: { _dias?: number; _limite?: number; _org_id: string }
         Returns: {
@@ -3388,7 +3599,7 @@ export type Database = {
         Returns: undefined
       }
       instagram_credencial_estado: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           app_id: string
           atualizado_em: string
@@ -3415,7 +3626,7 @@ export type Database = {
         Returns: boolean
       }
       list_org_sessions: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           atual: boolean
           criada_em: string
@@ -3435,13 +3646,6 @@ export type Database = {
         Args: { _estagio: Database["public"]["Enums"]["lifecycle_stage"] }
         Returns: number
       }
-      canais_do_atendimento: {
-        Args: { _org_id: string }
-        Returns: {
-          instagram: boolean
-          whatsapp: boolean
-        }[]
-      }
       origens_de_contato: {
         Args: { _org_id: string }
         Returns: {
@@ -3457,16 +3661,14 @@ export type Database = {
         Args: { p_contact_id: string; p_pipeline_id: string }
         Returns: string
       }
-      remove_org_member:
-        | { Args: { _transfer_to?: string; _user_id: string }; Returns: Json }
-        | {
-            Args: {
-              _apagar_conta?: boolean
-              _transfer_to?: string
-              _user_id: string
-            }
-            Returns: Json
-          }
+      remove_org_member: {
+        Args: {
+          _apagar_conta?: boolean
+          _transfer_to?: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       reserve_email_send: { Args: { _connection_id: string }; Returns: boolean }
       reserve_instagram_send: {
         Args: { _connection_id: string }
@@ -3705,9 +3907,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       activity_type: ["call", "email", "meeting", "note", "task", "orcamento"],
