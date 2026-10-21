@@ -33,6 +33,24 @@ export function useAllContacts(params: ContactListParams = {}, enabled = true) {
   });
 }
 
+/**
+ * Cidades da base para o filtro de Contatos, com contagem.
+ *
+ * Recebe o estágio para que, na fila de leads, a lista mostre só as cidades
+ * dos leads -- e a contagem ao lado bata com o que o filtro devolve. A chave
+ * fica sob `contactsKeys.all`: cadastrar, importar ou editar um contato
+ * invalida a lista junto com a tabela.
+ */
+export function useCidadesDeContato(lifecycleStage?: string) {
+  const { orgId } = useOrg();
+  return useQuery({
+    queryKey: [...contactsKeys.all(orgId ?? ""), "cidades", lifecycleStage ?? "all"] as const,
+    queryFn: () => contactsApi.listarCidades(orgId!, lifecycleStage),
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+}
+
 /** Lista leve p/ selects de contato (Negócios, Tarefas) — inclui leads */
 export function useContactsPicker() {
   const { orgId } = useOrg();
