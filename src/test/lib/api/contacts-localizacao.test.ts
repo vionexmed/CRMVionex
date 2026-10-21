@@ -22,6 +22,8 @@ describe("localização dos contatos na consulta ao servidor", () => {
     await contactsApi.list("org-a", { country: "Brasil", city: "Campinas", origin: "src:Evento", page: 1, pageSize: 25 });
     const query = new URL(requests[0]).searchParams;
     expect(query.get("metadata->>pais")).toBe("ilike.Brasil");
+    // Cidade inteira, sem curinga: o seletor oferece as cidades da base com
+    // contagem, e a contagem só bate se o filtro comparar a cidade toda.
     expect(query.get("metadata->>cidade")).toBe("ilike.Campinas");
     expect(query.get("org_id")).toBe("eq.org-a");
     expect(query.get("metadata->>source")).toBe("eq.Evento");
@@ -29,8 +31,10 @@ describe("localização dos contatos na consulta ao servidor", () => {
   });
 
   it("a exportação usa os mesmos filtros de localização", async () => {
-    await contactsApi.listAll("org-a", { city: "  São Paulo  " });
-    expect(new URL(requests[0]).searchParams.get("metadata->>cidade")).toBe("ilike.São Paulo");
+    await contactsApi.listAll("org-a", { country: "  Brasil  ", city: "São Paulo" });
+    const query = new URL(requests[0]).searchParams;
+    expect(query.get("metadata->>pais")).toBe("ilike.Brasil");
+    expect(query.get("metadata->>cidade")).toBe("ilike.São Paulo");
   });
 
   it("não envia filtros vazios", async () => {

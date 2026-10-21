@@ -712,7 +712,7 @@ export default function DealDetail() {
                   ? allLossReasons.find((r) => r.id === deal.loss_reason_id)?.label
                   : null;
                 return (
-                  <div className="mt-2 rounded-md bg-destructive-soft p-2 space-y-0.5">
+                  <div className="mt-2 space-y-0.5 rounded-md bg-destructive-soft p-2">
                     <p className="text-xs font-medium text-destructive">Motivo da perda:</p>
                     <p className="text-xs text-destructive">{categoria ?? deal.loss_reason}</p>
                     {categoria && deal.loss_reason && (

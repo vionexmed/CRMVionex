@@ -11,7 +11,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { SegmentedControl } from "@/components/layout/SegmentedControl";
 import { EmptyState, ErrorState, LoadingState } from "@/components/layout/EstadoDaLista";
 import { SemOrganizacao } from "@/components/layout/SemOrganizacao";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Iniciais } from "@/components/layout/ListaV1";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,13 +116,6 @@ function rotuloDaConversa(c: Conversa): string {
   }
   if (c.canal === "whatsapp") return formatarTelefone(c.identidade);
   return c.identidade || "Sem remetente";
-}
-
-function iniciais(nome: string): string {
-  const termos = nome.replace(/^@/, "").trim().split(/\s+/).filter(Boolean);
-  if (termos.length === 0) return "?";
-  if (termos.length === 1) return termos[0].slice(0, 2).toUpperCase();
-  return (termos[0][0] + termos[termos.length - 1][0]).toUpperCase();
 }
 
 /**
@@ -231,8 +224,25 @@ export default function Atendimento() {
   const marcarLido = useMarcarEmailLido();
   useAtendimentoAoVivo();
 
-  const [selecionada, setSelecionada] = useState<string | null>(null);
-  const [busca, setBusca] = useState("");
+  /*
+   * Conversa aberta e busca moram na URL (`?thread=` e `?q=`), com replace:
+   * F5 não tira a pessoa da conversa e o link vai para o colega. `thread` é a
+   * chave da conversa (`whatsapp:<contact_id>`); a forma curta (só o id, o
+   * telefone ou o endereço) também vale, para link escrito à mão e para as
+   * rotas antigas de canal, que redirecionam preservando a query.
+   */
+  const mudarParametro = (chave: string, valor: string | null) => {
+    setParametros((atual) => {
+      const proximos = new URLSearchParams(atual);
+      if (valor) proximos.set(chave, valor);
+      else proximos.delete(chave);
+      return proximos;
+    }, { replace: true });
+  };
+  const threadNaUrl = parametros.get("thread");
+  const busca = parametros.get("q") ?? "";
+  const setBusca = (v: string) => mudarParametro("q", v);
+  const setSelecionada = (k: string) => mudarParametro("thread", k);
   const [rascunho, setRascunho] = useState("");
   const [enviando, setEnviando] = useState(false);
   const rolagem = useRef<HTMLDivElement>(null);
@@ -246,12 +256,7 @@ export default function Atendimento() {
     ? (filtroBruto as CanalAtendimento)
     : "todos";
 
-  const trocarFiltro = (f: Filtro) => {
-    const novos = new URLSearchParams(parametros);
-    if (f === "todos") novos.delete("canal");
-    else novos.set("canal", f);
-    setParametros(novos, { replace: true });
-  };
+  const trocarFiltro = (f: Filtro) => mudarParametro("canal", f === "todos" ? null : f);
 
   const mensagens = useMemo(() => data?.mensagens ?? [], [data]);
   const contatos = useMemo(() => data?.contatos ?? {}, [data]);
@@ -316,7 +321,20 @@ export default function Atendimento() {
       });
   }, [conversas, filtro, busca]);
 
-  const aberta = conversas.find((c) => c.key === selecionada) ?? null;
+  // Enquanto as mensagens carregam não há conversa para casar; a URL é mantida
+  // (não limpar!) e a seleção aparece quando a lista chega.
+  const aberta = useMemo(() => {
+    if (!threadNaUrl) return null;
+    const exata = conversas.find((c) => c.key === threadNaUrl);
+    if (exata) return exata;
+    const ordem = filtro === "todos" ? CANAIS : [filtro];
+    for (const canal of ordem) {
+      const curta = conversas.find((c) => c.key === `${canal}:${threadNaUrl}`);
+      if (curta) return curta;
+    }
+    return null;
+  }, [conversas, threadNaUrl, filtro]);
+  const selecionada = aberta?.key ?? null;
 
   const daConversa = useMemo<MensagemUnificada[]>(() => {
     if (!aberta) return [];
@@ -398,13 +416,16 @@ export default function Atendimento() {
   });
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col">
+    // Altura da janela menos o cabeçalho (3,5rem) e o respiro da casca de
+    // Comunicação (1,5rem em cima e embaixo): a lista e a conversa rolam por
+    // dentro, sem a página inteira rolar junto.
+    <div className="flex h-[calc(100dvh-6.5rem)] min-h-[28rem] flex-col">
       <PageHeader
         title="Atendimento"
         description="E-mail, WhatsApp e Instagram na mesma fila, do mais recente para o mais antigo"
         contagem={{ valor: visiveis.length, unidade: "conversa" }}
         actions={
-          <Button variant="outline" size="sm" className="h-8 text-label" asChild>
+          <Button variant="outline" size="sm" asChild>
             <Link to="/inbox">
               <Inbox className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
               Caixa de e-mail completa
@@ -416,7 +437,7 @@ export default function Atendimento() {
       {desconectados.map((c) => (
         <div
           key={c}
-          className="mx-4 mt-3 flex items-center gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs"
+          className="mt-3 flex items-center gap-3 rounded-lg border border-transparent bg-warning-soft p-3 text-sm"
         >
           <AlertCircle className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
           <div className="flex-1">
@@ -426,11 +447,11 @@ export default function Atendimento() {
         </div>
       ))}
 
-      <div className="mt-3 grid flex-1 grid-cols-1 overflow-hidden border-t md:grid-cols-[340px_1fr]">
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-lg border border-border md:grid-cols-[340px_1fr]">
         {/* `bg-card/50` e não `bg-muted`: `--muted` tem o MESMO valor de
             `--background`, então a coluna cinza seria invisível no tema claro. */}
-        <aside className="flex min-h-0 flex-col border-r bg-card/50">
-          <div className="space-y-2 border-b p-3">
+        <aside className="flex min-h-0 flex-col border-r border-border bg-card">
+          <div className="space-y-2 border-b border-border p-3">
             <SegmentedControl<Filtro>
               rotuloGrupo="Canal"
               valor={filtro}
@@ -445,7 +466,7 @@ export default function Atendimento() {
               ]}
             />
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
@@ -475,7 +496,7 @@ export default function Atendimento() {
                 }
               />
             ) : (
-              <ul className="divide-y">
+              <ul className="divide-y divide-border">
                 {visiveis.map((c) => {
                   const nome = rotuloDaConversa(c);
                   const ativa = c.key === selecionada;
@@ -486,18 +507,14 @@ export default function Atendimento() {
                         onClick={() => setSelecionada(c.key)}
                         aria-current={ativa ? "true" : undefined}
                         className={cn(
-                          "flex w-full items-start gap-3 p-3 text-left transition-colors hover:bg-accent/50",
-                          ativa && "bg-accent",
+                          "flex min-h-14 w-full items-start gap-3 p-3 text-left transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                          ativa && "bg-accent hover:bg-accent",
                         )}
                       >
-                        <Avatar className="h-9 w-9 shrink-0">
-                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                            {iniciais(nome)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <Iniciais nome={nome.replace(/^@/, "")} tamanho="lg" destaque={ativa} />
                         <div className="flex min-w-0 flex-1 flex-col">
                           <div className="flex items-center justify-between gap-2">
-                            <span className={cn("truncate text-sm", c.nao_lidas > 0 ? "font-bold" : "font-medium")}>
+                            <span className={cn("truncate text-sm", c.nao_lidas > 0 ? "font-bold" : "font-semibold")}>
                               {nome}
                             </span>
                             <span className="shrink-0 text-label tabular-nums text-muted-foreground">
@@ -509,7 +526,7 @@ export default function Atendimento() {
                           <div className="mt-0.5 flex items-center gap-2">
                             <SeloDeCanal canal={c.canal} />
                             {c.nao_lidas > 0 && (
-                              <Badge variant="secondary" className="h-4 tabular-nums">
+                              <Badge variant="info" className="tabular-nums">
                                 {c.nao_lidas} {c.nao_lidas === 1 ? "nova" : "novas"}
                               </Badge>
                             )}
@@ -535,15 +552,11 @@ export default function Atendimento() {
             </div>
           ) : (
             <>
-              <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-card p-3">
+              <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card p-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                      {iniciais(rotuloDaConversa(aberta))}
-                    </AvatarFallback>
-                  </Avatar>
+                  <Iniciais nome={rotuloDaConversa(aberta).replace(/^@/, "")} tamanho="lg" destaque />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{rotuloDaConversa(aberta)}</div>
+                    <div className="truncate text-sm font-semibold">{rotuloDaConversa(aberta)}</div>
                     <div className="flex flex-wrap items-center gap-1 text-label text-muted-foreground">
                       {aberta.canal === "instagram" && (
                         <>
@@ -583,7 +596,6 @@ export default function Atendimento() {
                             key={c.key}
                             variant="outline"
                             size="sm"
-                            className="h-8 text-label"
                             onClick={() => { setSelecionada(c.key); trocarFiltro("todos"); }}
                           >
                             <Icone className="mr-1 h-3 w-3" aria-hidden="true" />
@@ -594,7 +606,7 @@ export default function Atendimento() {
                     </div>
                   )}
                   {aberta.contact_id ? (
-                    <Button variant="outline" size="sm" className="h-8 text-label" asChild>
+                    <Button variant="outline" size="sm" asChild>
                       <Link to={`/contacts?id=${aberta.contact_id}`}>Ver contato</Link>
                     </Button>
                   ) : (
@@ -611,8 +623,8 @@ export default function Atendimento() {
                       <li key={m.id} className={cn("flex", saiu ? "justify-end" : "justify-start")}>
                         <div
                           className={cn(
-                            "max-w-[75%] rounded-lg px-3 py-2 text-xs shadow-sm",
-                            saiu ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
+                            "max-w-[75%] rounded-lg px-3 py-2 text-sm",
+                            saiu ? "bg-primary text-primary-foreground" : "border border-border bg-card text-foreground",
                           )}
                         >
                           {m.assunto && (
@@ -659,15 +671,15 @@ export default function Atendimento() {
                 </ul>
               </div>
 
-              <footer className="border-t bg-card p-3">
+              <footer className="border-t border-border bg-background p-3">
                 {janela.aviso && (
                   <div
                     className={cn(
-                      "mb-2 rounded-md border px-2 py-1.5 text-label",
+                      "mb-2 rounded-md border px-2 py-1.5 text-xs",
                       janela.podeEnviar
                         // Aviso que não bloqueia é informação, não alarme.
-                        ? "border-border bg-muted text-muted-foreground"
-                        : "border-warning/30 bg-warning/10 text-warning",
+                        ? "border-border bg-surface-2 text-muted-foreground"
+                        : "border-transparent bg-warning-soft text-warning",
                     )}
                   >
                     {janela.aviso}
@@ -683,7 +695,9 @@ export default function Atendimento() {
                     </span>
                   </p>
                 )}
-                <div className="flex gap-2">
+                {/* O campo e o botão moram num cartão só: o envio é parte da
+                    caixa de texto, não um controle solto ao lado. */}
+                <div className="flex items-end gap-2 rounded-lg border border-border bg-card p-2 focus-within:ring-2 focus-within:ring-ring">
                   <Textarea
                     value={rascunho}
                     onChange={(e) => setRascunho(e.target.value)}
@@ -694,7 +708,7 @@ export default function Atendimento() {
                     aria-label={`Responder por ${ROTULO_CANAL[aberta.canal]}`}
                     disabled={!janela.podeEnviar || enviando}
                     rows={2}
-                    className="resize-none"
+                    className="min-h-0 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
                   />
                   <Button
                     onClick={() => void enviar()}

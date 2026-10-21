@@ -89,6 +89,7 @@ interface ContactFilters {
   ownerId?: string;
   companyId?: string;
   country?: string;
+  /** Mesmo nome que em `ContactListParams`: vai para a API pelo espalhamento. */
   city?: string;
   origin?: string;
   createdFrom?: string;
@@ -556,7 +557,7 @@ export default function Contacts() {
         )}
         {([["country", "País"], ["city", "Cidade"]] as const).map(([key, label]) => filters[key] && (
           <ChipDeFiltro key={key} ativo onRemover={() => aplicarFiltros({ [key]: undefined })} rotuloRemover={`Remover filtro de ${label.toLowerCase()}`}>
-            {label}: {filters[key]}
+            {label}: {filters[key]?.trim()}
           </ChipDeFiltro>
         ))}
         {periodo && (
@@ -651,6 +652,8 @@ export default function Contacts() {
               </SelectContent>
             </Select>
           </div>
+          {/* A cidade é escolhida entre as que existem na base, com contagem --
+              e a contagem bate com o filtro, que compara a cidade inteira. */}
           <div className="space-y-1">
             <Label htmlFor="filtro-cidade" className="text-xs">Cidade</Label>
             <Select value={filters.city || "all"} onValueChange={(v) => aplicarFiltros({ city: v === "all" ? undefined : v })}>
@@ -677,16 +680,6 @@ export default function Contacts() {
         </BarraDeFiltros>
       )}
 
-      {/* Com o painel fechado, a cidade escolhida continua à vista: uma lista
-          filtrada em silêncio lê-se como base pequena. */}
-      {!showFilters && filters.city && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-muted-foreground">Filtrando por cidade:</span>
-          <Button variant="outline" size="sm" className="h-8 text-xs" aria-label={`Remover filtro de cidade ${filters.city.trim()}`} onClick={() => aplicarFiltros({ city: undefined })}>
-            {filters.city.trim()} <X className="ml-1 h-3 w-3" />
-          </Button>
-        </div>
-      )}
 
       {selectedContacts.size > 0 && (
         <BarraDeSelecao

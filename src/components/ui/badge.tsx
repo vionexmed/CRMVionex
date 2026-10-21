@@ -10,14 +10,14 @@ const badgeVariants = cva(
   //
   // Raio do token (o mesmo de tudo), menos preenchimento lateral, e peso médio
   // em vez de semibold: o selo passa a ser uma marca, não um botão.
-  "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-label font-medium leading-4 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center rounded border px-1.5 py-0.5 text-label font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
   {
     variants: {
       variant: {
         default: "border-transparent bg-primary text-primary-foreground",
-        secondary: "border-border bg-secondary text-secondary-foreground hover:bg-muted",
-        destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border-border text-foreground",
+        secondary: "border-transparent bg-secondary text-secondary-foreground",
+        destructive: "border-transparent bg-destructive text-destructive-foreground",
+        outline: "text-foreground",
         /* Estado em fundo suave: o selo do Visual 01. Texto curto, sem pílula. */
         success: "border-transparent bg-success-soft text-success",
         warning: "border-transparent bg-warning-soft text-warning",

@@ -26,7 +26,7 @@ const atividade = (p: Partial<AtividadeDoNegocio>): AtividadeDoNegocio => ({
 const negocio = (p: Partial<DealWithRelations>): DealWithRelations => ({
   id: Math.random().toString(36), org_id: "o", title: "N", value: 0, currency: "BRL",
   stage_id: "e1", status: "open", probability: 0, close_date: null, company_id: null,
-  contact_id: null, owner_id: null, loss_reason: null, qualification: null,
+  contact_id: null, owner_id: null, loss_reason: null, loss_reason_id: null, qualification: null,
   qualification_score: null, created_at: iso(2026, 9, 20), updated_at: null,
   atividades: [], ...p,
 });
