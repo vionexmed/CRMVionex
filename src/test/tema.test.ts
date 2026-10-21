@@ -10,6 +10,16 @@ import { readFileSync, existsSync } from "node:fs";
 
 const ler = (p: string) => readFileSync(p, "utf8");
 const CSS = ler("src/index.css");
+/**
+ * Sem comentários.
+ *
+ * Duas regras deste arquivo liam o CSS cru e acabaram medindo a PROSA dentro
+ * dos blocos em vez das declarações -- uma delas passou meses verde guardando
+ * uma regra que já não existia. É a armadilha que o CLAUDE.md registra como
+ * regra de como escrever teste aqui: varredura tem de apagar o comentário
+ * antes de procurar.
+ */
+const CSS_LIMPO = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
 const HTML = ler("index.html");
 
 describe("um sistema de aviso só", () => {
@@ -199,7 +209,12 @@ describe("a lateral ancora a tela", () => {
    * troca de cor de destaque deixaria o item ativo na cor antiga.
    */
   it("o item ativo usa a cor de destaque da lateral", () => {
-    const b = bloco(".vx-nav-active {");
+    // Lido SEM comentários (CSS_LIMPO): a regra tem prosa dentro do bloco, e
+    // medir a prosa foi exatamente o que deixou um teste anterior verde
+    // guardando uma regra que não existia mais.
+    const i = CSS_LIMPO.indexOf(".vx-nav-active {");
+    expect(i, "regra .vx-nav-active não encontrada").toBeGreaterThan(-1);
+    const b = CSS_LIMPO.slice(i, CSS_LIMPO.indexOf("}", i));
     expect(b).toContain("hsl(var(--sidebar-primary))");
     expect(b).toContain("hsl(var(--sidebar-primary-foreground))");
     expect(b).not.toMatch(/#[0-9a-f]{3,6}|rgba?\(/i);

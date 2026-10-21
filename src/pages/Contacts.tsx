@@ -10,7 +10,7 @@ import { useOrg } from "@/hooks/useOrg";
 import { useContactFromSearch } from "@/hooks/queries/useGlobalSearch";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useContacts, useAllContacts, useLastActivities, useDeleteContacts,
+  useContacts, useAllContacts, useLastActivities, useDeleteContacts, useCidadesDeContato,
   useUpdateContactsLifecycle, useUpdateContactOwner, contactsKeys,
 } from "@/hooks/queries/useContacts";
 import { contactsApi } from "@/lib/api/contacts";
@@ -89,6 +89,7 @@ interface ContactFilters {
   ownerId?: string;
   companyId?: string;
   country?: string;
+  /** Mesmo nome que em `ContactListParams`: vai para a API pelo espalhamento. */
   city?: string;
   origin?: string;
   createdFrom?: string;
@@ -162,6 +163,15 @@ export default function Contacts() {
   // Debounce search to avoid a query on every keystroke
   const debouncedSearch = useDebounce(search, 300);
   const debouncedFilters = useDebounce(filters, 300);
+
+  /**
+   * As cidades oferecidas seguem o ciclo de vida escolhido: em /leads, só as
+   * cidades dos leads. Uma cidade já escolhida que não esteja na lista (o
+   * estágio mudou, ou a consulta falhou) continua como opção, senão o seletor
+   * ficaria em branco com o filtro ainda ativo.
+   */
+  const { data: cidades = [] } = useCidadesDeContato(filters.lifecycleStage);
+  const cidadeForaDaLista = !!filters.city && !cidades.some((c) => c.cidade === filters.city);
 
 
   // Reset to page 0 when filters/search/sort change
@@ -547,7 +557,7 @@ export default function Contacts() {
         )}
         {([["country", "País"], ["city", "Cidade"]] as const).map(([key, label]) => filters[key] && (
           <ChipDeFiltro key={key} ativo onRemover={() => aplicarFiltros({ [key]: undefined })} rotuloRemover={`Remover filtro de ${label.toLowerCase()}`}>
-            {label}: {filters[key]}
+            {label}: {filters[key]?.trim()}
           </ChipDeFiltro>
         ))}
         {periodo && (
@@ -642,9 +652,22 @@ export default function Contacts() {
               </SelectContent>
             </Select>
           </div>
+          {/* A cidade é escolhida entre as que existem na base, com contagem --
+              e a contagem bate com o filtro, que compara a cidade inteira. */}
           <div className="space-y-1">
-            <Label htmlFor="contact-city" className="text-xs">Cidade</Label>
-            <Input id="contact-city" placeholder="Ex.: Campinas" className="w-44 h-8 text-xs" value={filters.city ?? ""} onChange={(e) => aplicarFiltros({ city: e.target.value || undefined })} />
+            <Label htmlFor="filtro-cidade" className="text-xs">Cidade</Label>
+            <Select value={filters.city || "all"} onValueChange={(v) => aplicarFiltros({ city: v === "all" ? undefined : v })}>
+              <SelectTrigger id="filtro-cidade" className="w-44 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as cidades</SelectItem>
+                {cidadeForaDaLista && <SelectItem value={filters.city!}>{filters.city!.trim()}</SelectItem>}
+                {cidades.map((c) => (
+                  <SelectItem key={c.cidade} value={c.cidade}>
+                    {c.cidade.trim()} ({c.contatos})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Criado de</Label>

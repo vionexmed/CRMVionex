@@ -19,6 +19,21 @@ export const dealsKeys = {
   detail: (id: string) => ["deals", "detail", id] as const,
 };
 
+/**
+ * Lista leve p/ o seletor de negócio em Atividades — sem o teto de 1000 que
+ * `useDeals({ pageSize: 1000 })` reproduzia (mesma armadilha do PostgREST
+ * documentada para `useAllContacts`).
+ */
+export function useDealsPicker() {
+  const { orgId } = useOrg();
+  return useQuery({
+    queryKey: [...dealsKeys.all(orgId ?? ""), "picker"] as const,
+    queryFn: () => dealsApi.listForPicker(orgId!),
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useDeal(id: string | undefined) {
   return useQuery({
     queryKey: dealsKeys.detail(id ?? ""),
@@ -100,12 +115,16 @@ export function useUpdateDealStatus() {
     mutationFn: ({
       id,
       status,
-      lossReason,
+      lossReasonId,
+      lossReasonNote,
     }: {
       id: string;
       status: DealStatus;
-      lossReason?: string;
-    }) => dealsApi.updateStatus(id, status, lossReason),
+      /** Categoria do catálogo `loss_reasons`, quando `status` é "lost". */
+      lossReasonId?: string | null;
+      /** Texto livre opcional -- NÃO concatenado com a categoria (ver dealsApi.updateStatus). */
+      lossReasonNote?: string | null;
+    }) => dealsApi.updateStatus(id, status, lossReasonId, lossReasonNote),
     onSuccess: () => qc.invalidateQueries({ queryKey: dealsKeys.all(orgId ?? "") }),
   });
 }

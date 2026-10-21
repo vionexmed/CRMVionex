@@ -46,6 +46,41 @@ describe("todo destino do menu existe no roteador", () => {
     expect(APP).toMatch(/path="\/tasks" element=\{<Navigate to="\/activities\?tipo=task" replace \/>\}/);
   });
 
+  /**
+   * ATENDIMENTO ERA TRÊS DESTINOS: WhatsApp, Instagram e E-mail.
+   *
+   * Quem atende tinha de adivinhar em qual das três telas a conversa estava, e
+   * a mesma pessoa escrevendo por dois canais virava dois atendimentos que não
+   * sabiam um do outro. Viraram uma tela com filtro de canal.
+   *
+   * As duas rotas de canal TÊM de continuar atendendo, com o filtro já
+   * aplicado: é o mesmo critério de `/tasks` e `/leads`.
+   */
+  it("as rotas de canal redirecionam para a tela única", () => {
+    // `LegacyChannelRedirect` aplica `?canal=` POR CIMA da query original (e
+    // usa replace): `/conversations?thread=…` chega à mesma conversa. O
+    // comportamento está coberto em navigation/estrutura-e-aliases.test.tsx.
+    expect(APP).toMatch(
+      /path="\/conversations" element=\{<LegacyChannelRedirect to="\/atendimento" canal="whatsapp" \/>\}/,
+    );
+    expect(APP).toMatch(
+      /path="\/instagram" element=\{<LegacyChannelRedirect to="\/atendimento" canal="instagram" \/>\}/,
+    );
+  });
+
+  /**
+   * `/inbox` NÃO virou redirecionamento, e é decisão: ela é a caixa de e-mail
+   * completa -- pastas do Gmail, rótulos, spam, lixeira, adiar e anexos. Nada
+   * disso cabe numa lista de conversas, e redirecionar apagaria a tela inteira.
+   * Ela só saiu do MENU; o cabeçalho de Atendimento leva até lá.
+   */
+  it("a caixa de e-mail completa continua sendo uma tela, fora do menu", () => {
+    expect(APP).toMatch(/path="\/inbox" element=\{<SuspenseRoute><Inbox \/><\/SuspenseRoute>\}/);
+    const destinos = NAV_GRUPOS.flatMap((g) => g.items.map((i) => i.url));
+    expect(destinos).not.toContain("/inbox");
+    expect(readFileSync("src/pages/Atendimento.tsx", "utf8")).toContain('to="/inbox"');
+  });
+
   it("nenhum destino é a raiz", () => {
     // `/` é o Login. Menu de navegação de app autenticado nunca deve apontar
     // para lá -- quem quer sair usa o botão de sair.

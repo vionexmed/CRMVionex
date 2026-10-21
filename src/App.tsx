@@ -95,7 +95,7 @@ const DealDetail       = lazyChunk(() => import("./pages/DealDetail"));
 const Activities       = lazyChunk(() => import("./pages/Activities"));
 const Inbox            = lazyChunk(() => import("./pages/Inbox"));
 const MyEmail          = lazyChunk(() => import("./pages/MyEmail"));
-const Conversations    = lazyChunk(() => import("./pages/Conversations"));
+const Atendimento      = lazyChunk(() => import("./pages/Atendimento"));
 const Reports          = lazyChunk(() => import("./pages/Reports"));
 const Settings         = lazyChunk(() => import("./pages/Settings"));
 const Integrations     = lazyChunk(() => import("./pages/Integrations"));
@@ -200,14 +200,28 @@ const App = () => (
                     20260909140000 o histórico de e-mail e de conversa é da
                     organização, como o resto do CRM. */}
                 <Route path="/settings/email" element={<SuspenseRoute><MyEmail /></SuspenseRoute>} />
-                <Route path="/conversations" element={<LegacyChannelRedirect to="/comunicacao/whatsapp" />} />
-                <Route path="/instagram" element={<LegacyChannelRedirect to="/comunicacao/instagram" />} />
-                <Route path="/inbox" element={<LegacyChannelRedirect to="/comunicacao/email" />} />
-                <Route path="/comunicacao" element={<LegacyChannelRedirect to="/comunicacao/whatsapp" />} />
+
+                {/* UMA tela para os três canais (Atendimento). Eram três
+                    destinos, e quem atende tinha de adivinhar em qual deles a
+                    conversa estava. As rotas antigas de canal -- as de antes e as
+                    `/comunicacao/*` do Visual 01 -- viram redirecionamento COM O
+                    FILTRO já aplicado e preservando `?thread=`/`#`: link salvo e
+                    favorito continuam chegando à mesma conversa. `replace` para o
+                    botão Voltar não cair de novo aqui. */}
+                <Route path="/conversations" element={<LegacyChannelRedirect to="/atendimento" canal="whatsapp" />} />
+                <Route path="/instagram" element={<LegacyChannelRedirect to="/atendimento" canal="instagram" />} />
+                <Route path="/comunicacao" element={<LegacyChannelRedirect to="/atendimento" />} />
+                <Route path="/comunicacao/whatsapp" element={<LegacyChannelRedirect to="/atendimento" canal="whatsapp" />} />
+                <Route path="/comunicacao/instagram" element={<LegacyChannelRedirect to="/atendimento" canal="instagram" />} />
+                <Route path="/comunicacao/email" element={<LegacyChannelRedirect to="/inbox" />} />
                 <Route element={<CommunicationLayout />}>
-                  <Route path="/comunicacao/whatsapp" element={<SuspenseRoute><Conversations key="whatsapp" canal="whatsapp" /></SuspenseRoute>} />
-                  <Route path="/comunicacao/instagram" element={<SuspenseRoute><Conversations key="instagram" canal="instagram" /></SuspenseRoute>} />
-                  <Route path="/comunicacao/email" element={<SuspenseRoute><Inbox /></SuspenseRoute>} />
+                  <Route path="/atendimento" element={<SuspenseRoute><Atendimento /></SuspenseRoute>} />
+                  {/* A CAIXA COMPLETA FICA, e não é teimosia: `/inbox` tem pastas
+                      do Gmail, rótulos, spam, lixeira, adiar e anexos -- gestão de
+                      caixa, que não cabe numa lista de conversas e que virar
+                      redirecionamento APAGARIA. Saiu da barra lateral; o cabeçalho
+                      de Atendimento leva até ela, e o link salvo continua valendo. */}
+                  <Route path="/inbox" element={<SuspenseRoute><Inbox /></SuspenseRoute>} />
                 </Route>
 
                 {/* Todo mundo vê quem é da equipe. As ações (trocar papel, remover,

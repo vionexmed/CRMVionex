@@ -35,6 +35,7 @@ describe("catálogo da navegação aprovada", () => {
   it.each([
     ["/deals/registro-id", "negocios"], ["/produtos", "negocios"], ["/orcamentos", "negocios"],
     ["/companies", "clientes"], ["/leads", "clientes"], ["/tasks", "atividades"],
+    ["/atendimento", "comunicacao"],
     ["/conversations", "comunicacao"], ["/instagram", "comunicacao"], ["/inbox", "comunicacao"],
     ["/comunicacao/instagram", "comunicacao"],
     ["/marketing/visao-geral", "analise"],
@@ -112,10 +113,17 @@ function CurrentRoute() {
 }
 
 describe("breadcrumbs e navegação interna", () => {
-  it("identifica área e módulo ao abrir Instagram diretamente", () => {
-    render(<MemoryRouter initialEntries={["/instagram"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={vi.fn()} /></SidebarProvider></MemoryRouter>);
+  it("identifica área e módulo ao abrir Atendimento diretamente", () => {
+    render(<MemoryRouter initialEntries={["/atendimento?canal=instagram"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={vi.fn()} /></SidebarProvider></MemoryRouter>);
     expect(screen.getByRole("navigation", { name: "breadcrumb" })).toHaveTextContent("Comunicação");
-    expect(screen.getByRole("navigation", { name: "breadcrumb" })).toHaveTextContent("Instagram");
+    expect(screen.getByRole("navigation", { name: "breadcrumb" })).toHaveTextContent("Atendimento");
+  });
+
+  it("a caixa de e-mail completa se nomeia na trilha, dentro de Comunicação", () => {
+    render(<MemoryRouter initialEntries={["/inbox"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={vi.fn()} /></SidebarProvider></MemoryRouter>);
+    const trilha = screen.getByRole("navigation", { name: "breadcrumb" });
+    expect(trilha).toHaveTextContent("Comunicação");
+    expect(trilha).toHaveTextContent("Caixa de e-mail");
   });
 
   it("mobile mantém Clientes ativo dentro de Empresas", () => {
@@ -123,45 +131,46 @@ describe("breadcrumbs e navegação interna", () => {
     expect(screen.getByRole("link", { name: "Clientes" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("Comunicação oferece canais e troca seleção sem mesclar o conteúdo", async () => {
+  // Os canais viraram FILTRO dentro de Atendimento (uma tela só): a área tem
+  // um módulo, e a casca não desenha uma faixa de módulos de um item.
+  it("Comunicação é um destino só, sem faixa de canais na casca", async () => {
     const { CommunicationLayout } = await vi.importActual<typeof import("@/components/layout/CommunicationLayout")>("@/components/layout/CommunicationLayout");
-    render(<MemoryRouter initialEntries={["/comunicacao/whatsapp"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><Routes><Route element={<CommunicationLayout />}>
-      <Route path="/comunicacao/whatsapp" element={<p>Mensagens WhatsApp</p>} />
-      <Route path="/comunicacao/instagram" element={<p>Mensagens Instagram</p>} />
+    render(<MemoryRouter initialEntries={["/atendimento"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><Routes><Route element={<CommunicationLayout />}>
+      <Route path="/atendimento" element={<p>Fila de atendimento</p>} />
     </Route></Routes></MemoryRouter>);
-    const nav = screen.getByRole("navigation", { name: "Módulos de Comunicação" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(3);
-    fireEvent.click(within(nav).getByRole("link", { name: "Instagram" }));
-    expect(screen.getByText("Mensagens Instagram")).toBeVisible();
-    expect(screen.queryByText("Mensagens WhatsApp")).toBeNull();
-    expect(within(nav).getByRole("link", { name: "Instagram" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("Fila de atendimento")).toBeVisible();
+    expect(screen.queryByRole("navigation", { name: "Módulos de Comunicação" })).toBeNull();
+    expect(navigation.getVisibleNavigation(true).find((section) => section.id === "comunicacao")!.items.map((item) => item.path))
+      .toEqual(["/atendimento"]);
   });
 });
 
 describe("aliases de Comunicação", () => {
   it.each([
-    ["/conversations", "/comunicacao/whatsapp"], ["/instagram", "/comunicacao/instagram"], ["/inbox", "/comunicacao/email"],
-  ])("%s preserva query e hash ao ir para %s", async (alias, target) => {
+    ["/conversations", "/atendimento", "whatsapp"], ["/instagram", "/atendimento", "instagram"],
+    ["/comunicacao/whatsapp", "/atendimento", "whatsapp"], ["/comunicacao/email", "/inbox", undefined],
+  ])("%s preserva query e hash ao ir para %s", async (alias, target, canal) => {
     const { LegacyChannelRedirect } = await vi.importActual<typeof import("@/components/layout/CommunicationLayout")>("@/components/layout/CommunicationLayout");
-    render(<MemoryRouter initialEntries={[`${alias}?id=registro&folder=sent#mensagem`]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><Routes>
-      <Route path={alias} element={<LegacyChannelRedirect to={target} />} /><Route path={target} element={<CurrentRoute />} />
+    render(<MemoryRouter initialEntries={[`${alias}?thread=registro&folder=sent#mensagem`]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><Routes>
+      <Route path={alias} element={<LegacyChannelRedirect to={target} canal={canal} />} /><Route path={target} element={<CurrentRoute />} />
     </Routes></MemoryRouter>);
-    expect(screen.getByTestId("route")).toHaveTextContent(`${target}?id=registro&folder=sent#mensagem`);
+    const filtro = canal ? `&canal=${canal}` : "";
+    expect(screen.getByTestId("route")).toHaveTextContent(`${target}?thread=registro&folder=sent${filtro}#mensagem`);
   });
 
   it("Voltar não reabre o alias e Avançar retorna ao canal canônico", async () => {
     const { LegacyChannelRedirect } = await vi.importActual<typeof import("@/components/layout/CommunicationLayout")>("@/components/layout/CommunicationLayout");
     render(<MemoryRouter initialEntries={["/dashboard"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><Routes>
-      <Route path="/dashboard" element={<><Link to="/inbox?q=teste">Abrir caixa</Link><CurrentRoute /></>} />
-      <Route path="/inbox" element={<LegacyChannelRedirect to="/comunicacao/email" />} />
-      <Route path="/comunicacao/email" element={<CurrentRoute />} />
+      <Route path="/dashboard" element={<><Link to="/instagram?q=teste">Abrir Instagram</Link><CurrentRoute /></>} />
+      <Route path="/instagram" element={<LegacyChannelRedirect to="/atendimento" canal="instagram" />} />
+      <Route path="/atendimento" element={<CurrentRoute />} />
     </Routes></MemoryRouter>);
-    fireEvent.click(screen.getByRole("link", { name: "Abrir caixa" }));
-    expect(screen.getByTestId("route")).toHaveTextContent("/comunicacao/email?q=teste");
+    fireEvent.click(screen.getByRole("link", { name: "Abrir Instagram" }));
+    expect(screen.getByTestId("route")).toHaveTextContent("/atendimento?q=teste&canal=instagram");
     fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
     expect(screen.getByTestId("route")).toHaveTextContent("/dashboard");
     fireEvent.click(screen.getByRole("button", { name: "Avançar" }));
-    expect(screen.getByTestId("route")).toHaveTextContent("/comunicacao/email?q=teste");
+    expect(screen.getByTestId("route")).toHaveTextContent("/atendimento?q=teste&canal=instagram");
   });
 });
 
@@ -209,7 +218,7 @@ describe("casca, preferência e busca compartilhada", () => {
 
 // These placeholders isolate real routing/guards from backend reads and sends.
 // Removing a registered alias or the RequireAdmin boundary fails these tests.
-vi.mock("@/pages/Conversations", () => ({ default: ({ canal }: { canal: string }) => <p>Conteúdo do canal {canal}</p> }));
+vi.mock("@/pages/Atendimento", () => ({ default: () => <p>Conteúdo do Atendimento</p> }));
 vi.mock("@/pages/Inbox", () => ({ default: () => <p>Conteúdo do e-mail</p> }));
 vi.mock("@/pages/MyEmail", () => ({ default: () => <p>Conexão pessoal do Gmail</p> }));
 vi.mock("@/pages/Dashboard", () => ({ default: () => <p>Painel autorizado</p> }));
@@ -218,17 +227,18 @@ import App from "@/App";
 
 describe("rotas registradas no App", () => {
   it.each([
-    ["/conversations", "/comunicacao/whatsapp", "Conteúdo do canal whatsapp"],
-    ["/instagram", "/comunicacao/instagram", "Conteúdo do canal instagram"],
-    ["/inbox", "/comunicacao/email", "Conteúdo do e-mail"],
-  ])("%s abre o canal correto no shell sem perder o link salvo", async (alias, target, content) => {
+    ["/conversations", "/atendimento", "?thread=123&canal=whatsapp", "Conteúdo do Atendimento"],
+    ["/instagram", "/atendimento", "?thread=123&canal=instagram", "Conteúdo do Atendimento"],
+    ["/comunicacao/whatsapp", "/atendimento", "?thread=123&canal=whatsapp", "Conteúdo do Atendimento"],
+    ["/inbox", "/inbox", "?thread=123", "Conteúdo do e-mail"],
+  ])("%s abre a tela certa no shell sem perder o link salvo", async (alias, target, search, content) => {
     window.history.replaceState({}, "", `${alias}?thread=123#mensagem`);
     render(<App />);
     expect(await screen.findByText(content)).toBeVisible();
     expect(window.location.pathname).toBe(target);
-    expect(window.location.search).toBe("?thread=123");
+    expect(window.location.search).toBe(search);
     expect(window.location.hash).toBe("#mensagem");
-    expect(screen.getByRole("navigation", { name: "Módulos de Comunicação" })).toBeVisible();
+    expect(screen.getAllByRole("link", { name: "Comunicação" }).some((link) => link.getAttribute("aria-current") === "page")).toBe(true);
   });
 
   it("mantém a rota pessoal usada pelo retorno OAuth", async () => {
