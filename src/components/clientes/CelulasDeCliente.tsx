@@ -71,9 +71,15 @@ const COR_DA_ORIGEM: Record<string, string> = {
 export function OrigemSelo({ metadata }: { metadata: unknown }) {
   const o = getContactOrigin(metadata as Record<string, unknown> | null);
   return (
-    <span className="inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-2.5 text-xs text-foreground">
+    /*
+     * A ORIGEM TRUNCA, não vaza. O nome vem do que a pessoa digitou ao importar
+     * ("APROXIMA MED 2026", "Congresso Brasileiro de Ortopedia 2026") e não tem
+     * limite; sem `max-w-full` + `truncate` a pílula passava por cima da coluna
+     * ao lado e escondia a pontuação. O nome inteiro continua no `title`.
+     */
+    <span title={o.label} className="inline-flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-2.5 text-xs text-foreground">
       <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: COR_DA_ORIGEM[o.label.toLowerCase()] ?? o.color }} />
-      {o.label}
+      <span className="truncate">{o.label}</span>
     </span>
   );
 }
