@@ -12,8 +12,9 @@ import { Iniciais } from "@/components/layout/ListaV1";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { useMembers } from "@/hooks/queries/useMembers";
-import { clienteDoOrcamento, codigoDoOrcamento, dataCurtaSemPonto, resumoDeVisualizacoes } from "@/lib/orcamento-resumo";
-import { CartaoDaProposta } from "@/components/orcamentos/CartaoDaProposta";
+import { clienteDoOrcamento, codigoDoOrcamento, resumoDeVisualizacoes } from "@/lib/orcamento-resumo";
+import { DocumentoDeOrcamento, type DadosDoDocumento, type SituacaoDoDocumento } from "@/components/orcamentos/DocumentoDeOrcamento";
+import { useEmpresaDoDocumento } from "@/hooks/queries/useEmpresaDoDocumento";
 import { tintaDe } from "@/components/orcamentos/TabelaDeOrcamentos";
 import { diasDeValidade } from "@/lib/orcamento-modelos";
 import { FormularioDeModelo, type ModeloInicial } from "@/components/orcamentos/ModelosDeOrcamento";
@@ -198,11 +199,34 @@ function CorpoDoOrcamento({
     });
 
   const codigo = codigoDoOrcamento(orcamento.numero);
-  const linhas = (orcamento.itens ?? []).map((i) => ({
-    nome: i.nome,
-    apoio: i.descricao || `${Number(i.quantidade)} ${i.unidade} × ${formatarMoeda(Number(i.preco_unit), orcamento.moeda)}`,
-    valor: Math.max(0, Number(i.preco_unit) * Number(i.quantidade) - Number(i.desconto)),
-  }));
+  const linhas = orcamento.itens ?? [];
+  const { data: empresa } = useEmpresaDoDocumento();
+  const documento: DadosDoDocumento = {
+    numero: orcamento.numero,
+    titulo: orcamento.titulo,
+    situacao: estado as SituacaoDoDocumento,
+    emitidoEm: orcamento.created_at,
+    validoAte: orcamento.valido_ate,
+    moeda: orcamento.moeda,
+    emitente: { ...(empresa?.empresa ?? {}), nome: empresa?.nome || "Vionex" },
+    destinatario: {
+      cliente,
+      contato: orcamento.contact ? pessoa : null,
+      email: orcamento.contact?.email,
+      telefone: orcamento.contact?.phone,
+    },
+    responsavel: dono,
+    itens: linhas.map((i) => ({
+      nome: i.nome, descricao: i.descricao, unidade: i.unidade,
+      quantidade: Number(i.quantidade), preco_unit: Number(i.preco_unit), desconto: Number(i.desconto),
+      total: Math.max(0, Number(i.preco_unit) * Number(i.quantidade) - Number(i.desconto)),
+    })),
+    subtotal: totais.subtotal,
+    desconto: totais.desconto,
+    total: totais.total,
+    condicoes: orcamento.condicoes,
+    token: orcamento.token,
+  };
   const visitas = resumoDeVisualizacoes(orcamento);
 
   return (
@@ -225,19 +249,10 @@ function CorpoDoOrcamento({
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5">
         {/* ── A proposta, como o cliente a lê ── */}
-        <section className="rounded-lg border border-border bg-surface-2 p-5">
-          <CartaoDaProposta
-            marca="Vionex"
-            validade={orcamento.valido_ate ? dataCurtaSemPonto(orcamento.valido_ate) : null}
-            vencida={estado === "expirado"}
-            para={`${cliente}${cliente !== pessoa && orcamento.contact ? ` · ${pessoa}` : ""}`}
-            linhas={linhas}
-            desconto={totais.desconto}
-            total={totais.total}
-            moeda={orcamento.moeda}
-            condicoes={orcamento.condicoes}
-          >
-            {orcamento.status === "rascunho" ? (
+        <DocumentoDeOrcamento
+          dados={documento}
+          acoes={
+            orcamento.status === "rascunho" ? (
               <Button className="w-full" onClick={marcarEnviado} disabled={atualizar.isPending}>
                 {atualizar.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                 Marcar como enviado
@@ -248,12 +263,12 @@ function CorpoDoOrcamento({
               <Button className="w-full" disabled variant="secondary">
                 {aprovado ? "Proposta aceita" : orcamento.status === "recusado" ? "Proposta recusada" : "Proposta vencida"}
               </Button>
-            )}
-          </CartaoDaProposta>
-        </section>
+            )
+          }
+        />
 
         {/* ── Ações ── */}
-        <section className="space-y-2">
+        <section className="vx-nao-imprime space-y-2">
           <div className="grid grid-cols-3 gap-2">
             <Button variant="outline" size="sm" onClick={copiar}>
               {copiado ? <Check className="mr-1 h-3.5 w-3.5 text-success" /> : <Copy className="mr-1 h-3.5 w-3.5" />}
