@@ -9,6 +9,7 @@
  * que já falharam em SILÊNCIO neste projeto — um controle que não controlava
  * nada, e cores que furam a troca de tema.
  */
+import { fontesDoPainel } from "./dashboard/fontes-do-painel";
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -116,20 +117,20 @@ describe("a cor de destaque continua trocável", () => {
   });
 
   it("violet segue disponível como escolha", () => {
-    expect(TEMA).toMatch(/violet: \{ light: "252 100% 62%"/);
+    expect(TEMA).toMatch(/violet: \{ light: "257 53% 55%"/);
   });
 });
 
 describe("o painel mantém as métricas que tem", () => {
-  const PAINEL = semComentarios(readFileSync("src/pages/Dashboard.tsx", "utf8"));
+  const PAINEL = semComentarios(fontesDoPainel());
 
   /** Uma segunda lista das quatro em destaque divergiria da primeira no dia em
    *  que alguém trocasse uma delas. */
-  it("o destaque vem de DESTAQUE, não de uma lista solta", () => {
-    expect(PAINEL).toMatch(/const DESTAQUE: MetricKey\[\]/);
-    // A faixa é DERIVADA da constante: `DESTAQUE.map(...)` sobre os tiles dos
-    // grupos, e não uma segunda lista de quatro métricas escrita à mão.
-    expect(PAINEL).toMatch(/const tilesDestaque = DESTAQUE\s*\n?\s*\.map/);
+  it("a linha de indicadores vem de uma constante, não de uma lista solta", () => {
+    expect(PAINEL).toMatch(/const INDICADORES_COMERCIAIS: MetricKey\[\]/);
+    // A linha é DERIVADA da constante: `INDICADORES_COMERCIAIS.map(...)`, e não
+    // uma segunda lista de métricas escrita à mão.
+    expect(PAINEL).toMatch(/INDICADORES_COMERCIAIS\.map\(/);
   });
 
   /**

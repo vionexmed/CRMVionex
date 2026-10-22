@@ -151,7 +151,7 @@ export function FaixaDoFunil({ resumo, onVerParados, meta, podeEditarMeta = fals
 
 function Cartao({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("min-h-[133px] min-w-0 rounded-lg border border-border bg-card px-[18px] py-4 shadow-sm", className)}>
+    <div className={cn("min-h-[120px] min-w-0 rounded-lg bg-card p-4 shadow-card", className)}>
       {children}
     </div>
   );

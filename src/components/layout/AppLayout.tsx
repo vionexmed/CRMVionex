@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense, type CSSPrope
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
+import { EVENTO_ABRIR_BUSCA } from "./useBuscaDaLateral";
 import { AppHeader } from "./AppHeader";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { AreaNavigation } from "./CommunicationLayout";
@@ -32,7 +33,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 export function AppLayout() {
   const [searchOpen, setSearchOpen] = useState(false);
-  const onOpenSearch = useCallback(() => setSearchOpen(true), []);
+  const isMobile = useIsMobile();
+  // Com a lateral visível (desktop), a busca abre DENTRO dela; no celular, onde
+  // a lateral é uma gaveta fechada, segue o diálogo compartilhado.
+  const onOpenSearch = useCallback(() => {
+    if (isMobile) setSearchOpen(true); else window.dispatchEvent(new Event(EVENTO_ABRIR_BUSCA));
+  }, [isMobile]);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try { return localStorage.getItem("vx-sidebar-open") !== "0"; }
     catch { return true; }
@@ -47,7 +53,6 @@ export function AppLayout() {
   const communication = activeSection === "comunicacao";
   const { user, profile, loading, isAdmin, profileStatus, profileError, refreshProfile } = useAuth();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
   const profileErrorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (profileStatus === "error" || profileStatus === "missing") profileErrorRef.current?.focus();
@@ -100,7 +105,7 @@ export function AppLayout() {
   }
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={onSidebarOpenChange} style={{ "--sidebar-width": "248px", "--sidebar-width-icon": "64px" } as CSSProperties}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={onSidebarOpenChange} style={{ "--sidebar-width": "226px", "--sidebar-width-icon": "57px" } as CSSProperties}>
       {/*
         A CASCA É FIXA; quem rola é o CONTEÚDO.
 
@@ -119,12 +124,14 @@ export function AppLayout() {
       <div className="flex h-dvh w-full overflow-hidden">
         <AppSidebar />
         <div className="flex min-h-0 flex-1 flex-col min-w-0">
-          <AppHeader onOpenSearch={onOpenSearch} />
-          {/* Os módulos da área abrem DENTRO da lateral. A faixa de abas só
-              aparece quando a lateral não pode mostrá-los: no celular, onde ela
-              vive escondida, e com a lateral recolhida em ícones. */}
-          {activeSection && !communication && (isMobile || !sidebarOpen) && <AreaNavigation sectionId={activeSection} />}
-          <main className={cn("vx-page min-h-0 min-w-0 flex-1 overflow-y-auto bg-background", communication ? "p-0" : "p-4 md:p-7", "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-7")}>
+          {/* Sem barra superior no desktop (padrão da plataforma): o cabeçalho
+              de cada tela vive no conteúdo. No celular fica a barra compacta
+              com o botão de menu. */}
+          {isMobile && <AppHeader onOpenSearch={onOpenSearch} />}
+          {/* A lateral lista TODAS as páginas (recolhida, em ícones). A faixa de
+              abas só serve no celular, onde ela vive escondida na gaveta. */}
+          {activeSection && !communication && isMobile && <AreaNavigation sectionId={activeSection} />}
+          <main className={cn("vx-page min-h-0 min-w-0 flex-1 overflow-y-auto bg-background", communication ? "p-0" : "p-4 md:px-8 md:py-7", "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-8")}>
             <Outlet />
           </main>
         </div>

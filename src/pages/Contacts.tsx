@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
-import { cn } from "@/lib/utils";
-import { PageShell } from "@/components/layout/PageShell";
+import {
+  Pagina, BarraDeFerramentas, SeletorTracejado, BotaoTracejado, TabelaDeCartoes,
+  CelulaDeNome, SeloDeTipo, AnelDeContagem, MenuDeLinha,
+} from "@/components/padrao";
 import { LoadingState, ErrorState, EmptyState } from "@/components/layout/EstadoDaLista";
-import { formatarData } from "@/lib/formato";
-import { Users as UsersIcon } from "lucide-react";
+import { formatarData, formatarDataPorExtenso } from "@/lib/formato";
+import { Users as UsersIcon, FolderOpen, PlusCircle, Plus, User } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/hooks/useOrg";
@@ -27,22 +29,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  ChipAdicionarFiltro, ChipDeFiltro, Iniciais, LinhaDeFiltros, VisoesDaLista, type Visao,
+  ChipDeFiltro, type Visao,
 } from "@/components/layout/ListaV1";
 import {
-  CabecalhoOrdenavel, CaixaDeSelecao, EstagioSelo, OrigemSelo, Pontuacao, ProximaAtividade,
+  CabecalhoOrdenavel, CaixaDeSelecao, EstagioSelo, OrigemSelo, ProximaAtividade,
   ResponsavelCelula, UltimoContato,
 } from "@/components/clientes/CelulasDeCliente";
 import {
-  BOTAO_DA_LINHA, ChipDeResponsavel, MenuDeColunas, MenuDeOrdenacao, NovaVisaoDialog,
+  ChipDeResponsavel, MenuDaLista, NovaVisaoDialog,
   SeletorDeEstagios, textoDosEstagios,
 } from "@/components/clientes/FiltrosDeContatos";
 import { useColunasVisiveis, useVisoesSalvas, type FiltrosSalvos } from "@/components/clientes/preferenciasDeContatos";
 import { useProximasAtividades } from "@/components/clientes/useProximasAtividades";
 import { useContagensDeContatos } from "@/components/clientes/useContagensDeContatos";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -50,7 +49,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Search, Upload, Trash2, X, Loader2,
+  Trash2, X, Loader2,
 } from "lucide-react";
 import { ContactsKanbanByOwner } from "@/components/crm/ContactsKanbanByOwner";
 import { useToast } from "@/hooks/use-toast";
@@ -75,9 +74,8 @@ import { Paginacao } from "@/components/layout/Paginacao";
 
 type Contact = Database["public"]["Tables"]["contacts"]["Row"];
 
-/** Larguras (px) da tabela, medidas na referência; com `table-fixed` elas valem de verdade. */
-const LARGURA = { check: 38, nome: 240, estagio: 113, empresa: 195, origem: 200, pontuacao: 91, responsavel: 95, ultimoContato: 118, proximaAtividade: 190 } as const;
 type SortKey = "name" | "email" | "status" | "created_at" | "title" | "lifecycle_stage" | "lead_score" | "last_contact";
+const NOVA_VISAO = "__nova_visao__";
 type ViewMode = "table" | "cards" | "owner";
 
 
@@ -383,8 +381,8 @@ export default function Contacts() {
    * usuário via que falhou e nada sobre o motivo, com a informação disponível
    * no campo `message`.
    */
-  const pedirExclusao = async () => {
-    const ids = Array.from(selectedContacts);
+  const pedirExclusao = () => pedirExclusaoDe(Array.from(selectedContacts));
+  const pedirExclusaoDe = async (ids: string[]) => {
     if (ids.length === 0) return;
     try {
       const vinculos = await contactsApi.contarVinculos(ids);
@@ -494,19 +492,74 @@ export default function Contacts() {
   const colunasDaTabela = (["estagio", "empresa", "origem", "pontuacao", "responsavel", "ultimoContato", "proximaAtividade"] as const)
     .filter((id) => visivel(id) && (id !== "pontuacao" || temPontuacao));
 
-  const largurasDaTabela = {
-    total: LARGURA.check + LARGURA.nome + colunasDaTabela.reduce((soma, id) => soma + LARGURA[id], 0),
+
+  const opcoesDeVisao = [
+    ...visoes.map((v) => ({
+      valor: v.valor,
+      rotulo: v.contagem != null ? `${v.rotulo} (${v.contagem})` : v.rotulo,
+    })),
+    { valor: NOVA_VISAO, rotulo: "+ Nova visão", icone: <Plus aria-hidden="true" className="h-4 w-4" /> },
+  ];
+  const opcoesDeOrdenacao: [SortKey, string][] = [
+    ["last_contact", "Último contato"],
+    ["name", "Nome"],
+    ["email", "E-mail"],
+    ["lifecycle_stage", "Estágio"],
+    ["lead_score", "Pontuação"],
+    ["title", "Especialidade"],
+    ["status", "Situação"],
+    ["created_at", "Criado em"],
+  ];
+  const larguraDaColuna: Record<(typeof colunasDaTabela)[number], string> = {
+    estagio: "8rem", empresa: "minmax(9rem,1.2fr)", origem: "minmax(10.5rem,12rem)", pontuacao: "5rem",
+    responsavel: "7rem", ultimoContato: "8rem", proximaAtividade: "minmax(13rem,1.2fr)",
   };
+  const colunasDaGrade = [
+    "2rem", "minmax(13rem,2fr)", "6rem",
+    ...colunasDaTabela.map((id) => larguraDaColuna[id]),
+    "10.5rem", "2.5rem",
+  ].join(" ");
+  const ordenavel = (rotulo: string, chave: SortKey) => (
+    <CabecalhoOrdenavel rotulo={rotulo} ativo={sortKey === chave} direcao={sortDir} onClick={() => toggleSort(chave)} />
+  );
+  const rotulosDoCabecalho = [
+    <CaixaDeSelecao key="sel" rotulo="Selecionar todos" estado={allSelected ? true : algumaSelecionada ? "parcial" : false} onChange={toggleAll} />,
+    ordenavel("Nome", "name"),
+    "Tipo",
+    ...colunasDaTabela.map((id) => ({
+      estagio: ordenavel("Estágio", "lifecycle_stage"),
+      empresa: "Empresa",
+      origem: "Origem",
+      pontuacao: ordenavel("Pontuação", "lead_score"),
+      responsavel: "Responsável",
+      ultimoContato: ordenavel("Último contato", "last_contact"),
+      proximaAtividade: "Próxima atividade",
+    })[id]),
+    ordenavel("Data de criação", "created_at"),
+    "",
+  ];
+  const vazioOuErro = (
+    isLoading ? <LoadingState linhas={5} className="p-3" />
+    : isError ? <ErrorState onTentarNovamente={() => refetch()} className="m-3" />
+    : (
+      <EmptyState
+        icone={UsersIcon}
+        titulo="Nenhum contato encontrado"
+        descricao={
+          debouncedSearch || algumFiltro
+            ? "Nenhum resultado para a busca e os filtros atuais."
+            : "Cadastre o primeiro contato ou importe uma planilha."
+        }
+      />
+    )
+  );
 
   return (
-    <PageShell
-      title="Contatos"
-      contagem={{ valor: totalCount, unidade: "contato" }}
-      actions={
-        <Button variant="outline" onClick={() => setCsvOpen(true)} className="relative -top-[7px] -my-[3px] hidden h-[41px] bg-card px-3 shadow-sm sm:flex">
-          <Upload className="mr-1 h-3.5 w-3.5" />Importar CSV
-        </Button>
-      }
+    <Pagina
+      preencher
+      titulo="Contatos"
+      subtitulo="Consulte, crie, modifique ou remova seus contatos"
+      acao={<Button onClick={() => setCreateOpen(true)}>Novo contato</Button>}
     >
       {recordId && detail.isPending && <p role="status" className="text-sm text-muted-foreground">Abrindo contato…</p>}
       {recordId && (detail.isError || (detail.isSuccess && !drawerContact)) && (
@@ -520,106 +573,81 @@ export default function Contacts() {
         </div>
       )}
 
-      {/* As visões SÃO filtros: cada aba escreve em `filters` (e em ?estagio=),
-          e a aba ativa é deduzida dele. Estado paralelo faria a aba dizer
+      {/* As visões SÃO filtros: cada opção escreve em `filters` (e em ?estagio=),
+          e a visão ativa é deduzida dele. Estado paralelo faria o seletor dizer
           "Todos" com um chip de estágio ligado ao lado. */}
-      <VisoesDaLista
-        className="!mt-[17px]"
-        visoes={visoes}
-        valor={visaoAtiva}
-        onChange={escolherVisao}
-        extra={
-          <button
-            type="button"
-            onClick={() => setNovaVisaoAberta(true)}
-            className="vx-control inline-flex h-8 items-center whitespace-nowrap rounded px-3 text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            + Nova visão
-          </button>
-        }
-      />
+      <BarraDeFerramentas
+        busca={{ valor: search, onChange: setSearch, placeholder: "Pesquisar…", rotulo: "Buscar contatos" }}
+        contador={totalCount}
+      >
+        {isFetching && <Loader2 aria-label="Atualizando" className="h-4 w-4 animate-spin text-muted-foreground" />}
+        <SeletorTracejado
+          rotulo="Visões"
+          icone={<FolderOpen aria-hidden="true" />}
+          opcoes={opcoesDeVisao}
+          valor={visaoAtiva}
+          onChange={(v) => (v === NOVA_VISAO ? setNovaVisaoAberta(true) : escolherVisao(v))}
+        />
+        <BotaoTracejado icone={<PlusCircle aria-hidden="true" />} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}>
+          Filtros
+        </BotaoTracejado>
+        <MenuDaLista<ViewMode, SortKey>
+          visivel={visivel}
+          onAlternar={alternarColuna}
+          visualizacao={viewMode}
+          onVisualizacao={setViewMode}
+          visualizacoes={[["table", "Tabela"], ["cards", "Cartões"], ["owner", "Vendedor"]]}
+          ordenacao={sortKey}
+          opcoesDeOrdenacao={opcoesDeOrdenacao}
+          onOrdenar={(k) => { if (k !== sortKey) toggleSort(k); }}
+          onImportar={() => setCsvOpen(true)}
+          onExportar={isAdmin ? exportCSV : undefined}
+          exportando={exporting}
+        />
+      </BarraDeFerramentas>
       {visaoAtiva.startsWith("salva:") && (
         <p className="sr-only">Visão salva ativa. <button type="button" onClick={() => removerVisao(visaoAtiva.slice(6))}>Excluir visão</button></p>
       )}
 
-      <LinhaDeFiltros
-        direita={
-          <>
-            <MenuDeOrdenacao<SortKey>
-              valor={sortKey}
-              onChange={(k) => { if (k !== sortKey) toggleSort(k); }}
-              opcoes={[
-                ["last_contact", "Último contato"],
-                ["name", "Nome"],
-                ["email", "E-mail"],
-                ["lifecycle_stage", "Estágio"],
-                ["lead_score", "Pontuação"],
-                ["title", "Especialidade"],
-                ["status", "Situação"],
-                ["created_at", "Criado em"],
-              ]}
-            />
-            <MenuDeColunas<ViewMode>
-              visivel={visivel}
-              onAlternar={alternarColuna}
-              visualizacao={viewMode}
-              onVisualizacao={setViewMode}
-              visualizacoes={[["table", "Tabela"], ["cards", "Cartões"], ["owner", "Vendedor"]]}
-            />
-            {isAdmin && (
-              <Button variant="outline" size="sm" onClick={exportCSV} disabled={exporting} className={BOTAO_DA_LINHA}>
-                {exporting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}Exportar
-              </Button>
-            )}
-          </>
-        }
-      >
-        {filters.lifecycleStages && (
-          <ChipDeFiltro ativo className="bg-primary/15 text-primary" onClick={() => setShowFilters(true)} onRemover={limparEstagio} rotuloRemover="Remover filtro de estágio">
-            Estágio: {textoDosEstagios(filters.lifecycleStages)}
-          </ChipDeFiltro>
-        )}
-        {filters.semResposta && (
-          <ChipDeFiltro ativo className="bg-primary/15 text-primary" onRemover={() => aplicarFiltros({ semResposta: undefined })} rotuloRemover="Remover filtro de sem resposta">
-            Sem resposta há 3+ dias
-          </ChipDeFiltro>
-        )}
-        <ChipDeResponsavel membros={members} valor={filters.ownerId} onChange={(id) => aplicarFiltros({ ownerId: id })} />
-        {filters.companyId && (
-          <ChipDeFiltro ativo onRemover={() => aplicarFiltros({ companyId: undefined })} rotuloRemover="Remover filtro de empresa">
-            Empresa: {empresaPorId.get(filters.companyId)?.name ?? "—"}
-          </ChipDeFiltro>
-        )}
-        {filters.origin && (
-          <ChipDeFiltro ativo onRemover={() => aplicarFiltros({ origin: undefined })} rotuloRemover="Remover filtro de origem">
-            Origem: {rotuloDaOrigem(filters.origin)}
-          </ChipDeFiltro>
-        )}
-        {([["country", "País"], ["city", "Cidade"]] as const).map(([key, label]) => filters[key] && (
-          <ChipDeFiltro key={key} ativo onRemover={() => aplicarFiltros({ [key]: undefined })} rotuloRemover={`Remover filtro de ${label.toLowerCase()}`}>
-            {label}: {filters[key]?.trim()}
-          </ChipDeFiltro>
-        ))}
-        {periodo && (
-          <ChipDeFiltro ativo onRemover={() => aplicarFiltros({ createdFrom: undefined, createdTo: undefined })} rotuloRemover="Remover filtro de período">
-            Período: {periodo}
-          </ChipDeFiltro>
-        )}
-        <ChipAdicionarFiltro onClick={() => setShowFilters(!showFilters)} className="border-border px-2.5 font-normal [&_svg]:h-3 [&_svg]:w-3" />
-      </LinhaDeFiltros>
-
+      {algumFiltro && (
+        <div role="group" aria-label="Filtros aplicados" className="flex flex-wrap items-center gap-2">
+          {filters.lifecycleStages && (
+            <ChipDeFiltro ativo className="bg-primary/15 text-primary" onClick={() => setShowFilters(true)} onRemover={limparEstagio} rotuloRemover="Remover filtro de estágio">
+              Estágio: {textoDosEstagios(filters.lifecycleStages)}
+            </ChipDeFiltro>
+          )}
+          {filters.semResposta && (
+            <ChipDeFiltro ativo className="bg-primary/15 text-primary" onRemover={() => aplicarFiltros({ semResposta: undefined })} rotuloRemover="Remover filtro de sem resposta">
+              Sem resposta há 3+ dias
+            </ChipDeFiltro>
+          )}
+          {filters.ownerId && <ChipDeResponsavel membros={members} valor={filters.ownerId} onChange={(id) => aplicarFiltros({ ownerId: id })} />}
+          {filters.companyId && (
+            <ChipDeFiltro ativo onRemover={() => aplicarFiltros({ companyId: undefined })} rotuloRemover="Remover filtro de empresa">
+              Empresa: {empresaPorId.get(filters.companyId)?.name ?? "—"}
+            </ChipDeFiltro>
+          )}
+          {filters.origin && (
+            <ChipDeFiltro ativo onRemover={() => aplicarFiltros({ origin: undefined })} rotuloRemover="Remover filtro de origem">
+              Origem: {rotuloDaOrigem(filters.origin)}
+            </ChipDeFiltro>
+          )}
+          {([["country", "País"], ["city", "Cidade"]] as const).map(([key, label]) => filters[key] && (
+            <ChipDeFiltro key={key} ativo onRemover={() => aplicarFiltros({ [key]: undefined })} rotuloRemover={`Remover filtro de ${label.toLowerCase()}`}>
+              {label}: {filters[key]?.trim()}
+            </ChipDeFiltro>
+          ))}
+          {periodo && (
+            <ChipDeFiltro ativo onRemover={() => aplicarFiltros({ createdFrom: undefined, createdTo: undefined })} rotuloRemover="Remover filtro de período">
+              Período: {periodo}
+            </ChipDeFiltro>
+          )}
+        </div>
+      )}
       {/* O painel completo: o chip "+ Filtro" abre isto. Os chips acima só
           mostram o que está ligado; para ligar algo novo, é aqui. */}
       {showFilters && (
         <BarraDeFiltros>
-          <div className="space-y-1">
-            <Label className="text-xs">Busca</Label>
-            <div className="relative">
-              <Search aria-hidden="true" className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
-              <Input aria-label="Buscar contatos" placeholder="Nome ou e-mail…" className="h-8 w-48 pl-8 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
-              {isFetching && <Loader2 className="absolute right-2.5 top-2 h-4 w-4 animate-spin text-muted-foreground" />}
-            </div>
-          </div>
           {/* Os seis estágios, na ordem do avanço, e VÁRIOS de uma vez. O seletor
               antigo era por `status` (coluna legada, quatro opções) e depois por
               um estágio só; "Lead, Qualificado e Oportunidade" juntos -- a fila
@@ -753,169 +781,92 @@ export default function Contacts() {
       )}
 
       {viewMode === "table" && (
-        <div className="vx-table">
-          <div className="overflow-x-auto">
-          <Table className="table-fixed text-xs" style={{ width: largurasDaTabela.total, minWidth: "100%" }}>
-            <TableHeader>
-              <TableRow>
-                <TableHead style={{ width: LARGURA.check, height: 41, paddingLeft: 4, paddingRight: 0 }}>
-                  <CaixaDeSelecao
-                    rotulo="Selecionar todos"
-                    estado={allSelected ? true : algumaSelecionada ? "parcial" : false}
-                    onChange={toggleAll}
-                  />
-                </TableHead>
-                <TableHead style={{ width: LARGURA.nome }}><CabecalhoOrdenavel rotulo="Nome" ativo={sortKey === "name"} direcao={sortDir} onClick={() => toggleSort("name")} /></TableHead>
-                {colunasDaTabela.includes("estagio") && <TableHead style={{ width: LARGURA.estagio }}><CabecalhoOrdenavel rotulo="Estágio" ativo={sortKey === "lifecycle_stage"} direcao={sortDir} onClick={() => toggleSort("lifecycle_stage")} /></TableHead>}
-                {colunasDaTabela.includes("empresa") && <TableHead style={{ width: LARGURA.empresa }}>Empresa</TableHead>}
-                {colunasDaTabela.includes("origem") && <TableHead style={{ width: LARGURA.origem }}>Origem</TableHead>}
-                {colunasDaTabela.includes("pontuacao") && <TableHead style={{ width: LARGURA.pontuacao }}><CabecalhoOrdenavel rotulo="Pontuação" ativo={sortKey === "lead_score"} direcao={sortDir} onClick={() => toggleSort("lead_score")} /></TableHead>}
-                {colunasDaTabela.includes("responsavel") && <TableHead style={{ width: LARGURA.responsavel }}>Responsável</TableHead>}
-                {colunasDaTabela.includes("ultimoContato") && <TableHead style={{ width: LARGURA.ultimoContato }}><CabecalhoOrdenavel rotulo="Último contato" ativo={sortKey === "last_contact"} direcao={sortDir} onClick={() => toggleSort("last_contact")} /></TableHead>}
-                {colunasDaTabela.includes("proximaAtividade") && <TableHead style={{ width: LARGURA.proximaAtividade }}>Próxima atividade</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contacts.map((c: ContactRow) => {
-                const comp = empresaPorId.get((c as Record<string, unknown>).company_id as string);
-                const meta = (c as Record<string, unknown>).metadata as Record<string, string> | null;
-                const nomeEmpresa = comp?.name || meta?.empresa_manual || "";
-                const marcado = selectedContacts.has(c.id);
-                // Sem a visão no banco `ultimo_contato` não vem; a última atividade
-                // registrada é o melhor substituto até a migração subir.
-                const ultimo = c.ultimo_contato !== undefined
-                  ? (c.ultimo_contato ? new Date(c.ultimo_contato) : null)
-                  : (lastActivityMap.get(c.id) ?? null);
-                return (
-                <TableRow key={c.id} data-state={marcado ? "selected" : undefined} className={cn("cursor-pointer", marcado && "bg-primary/10")} style={{ "--row-h": "52.5px" } as React.CSSProperties} onClick={() => setDrawerContact(c)}>
-                  <TableCell style={{ paddingLeft: 4, paddingRight: 0 }} onClick={(e) => e.stopPropagation()}>
-                    <CaixaDeSelecao rotulo={`Selecionar ${c.first_name}`} estado={marcado} onChange={() => toggleOne(c.id)} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Iniciais nome={nomeDoContato(c.first_name, c.last_name)} />
-                      <div className="min-w-0">
-                        <span className="block truncate font-semibold">{nomeDoContato(c.first_name, c.last_name)}</span>
-                        {/* O e-mail, ou o telefone quando não há e-mail: a
-                            referência mostra uma linha só, e é o que permitiu
-                            as colunas de e-mail e telefone saírem. */}
-                        <span className="block truncate text-xs tabular-nums text-muted-foreground">
-                          {c.email ? formatarEmail(c.email) : c.phone ? formatarTelefone(c.phone) : "—"}
-                        </span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  {colunasDaTabela.includes("estagio") && <TableCell><LifecycleBadge stage={c.lifecycle_stage} /></TableCell>}
-                  {colunasDaTabela.includes("empresa") && (
-                    <TableCell>
-                      {nomeEmpresa ? (
-                        <div className="flex items-center gap-2">
-                          <Iniciais nome={nomeEmpresa} forma="empresa" tamanho="sm" className="h-[26px] w-[26px]" />
-                          <span className="truncate">{nomeEmpresa}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                  )}
-                  {colunasDaTabela.includes("origem") && (
-                    <TableCell><OriginBadge metadata={(c as Record<string, unknown>).metadata} /></TableCell>
-                  )}
-                  {colunasDaTabela.includes("pontuacao") && (
-                    <TableCell><Pontuacao valor={c.lead_score} /></TableCell>
-                  )}
-                  {colunasDaTabela.includes("responsavel") && (
-                    <TableCell  onClick={(e) => e.stopPropagation()}>
-                      <ResponsavelCelula
-                        ownerId={c.owner_id}
-                        membros={members}
-                        onChange={(novo) => handleOwnerChange(c.id, novo)}
-                        rotuloDe={`Responsável por ${nomeDoContato(c.first_name, c.last_name)}`}
-                      />
-                    </TableCell>
-                  )}
-                  {colunasDaTabela.includes("ultimoContato") && (
-                    <TableCell><UltimoContato data={ultimo} /></TableCell>
-                  )}
-                  {colunasDaTabela.includes("proximaAtividade") && (
-                    <TableCell><ProximaAtividade info={proximas?.get(c.id)} /></TableCell>
-                  )}
-                </TableRow>
-                );
-              })}
-              {contacts.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={9} className="p-0">
-                    {/* Carregando, falhou e vazio pediam a MESMA frase antes.
-                        Falha de consulta virava "nenhum contato encontrado" --
-                        afirmação que a tela não tinha como sustentar. */}
-                    {isLoading ? (
-                      <LoadingState linhas={5} className="p-3" />
-                    ) : isError ? (
-                      <ErrorState onTentarNovamente={() => refetch()} className="m-3" />
-                    ) : (
-                      <EmptyState
-                        icone={UsersIcon}
-                        titulo="Nenhum contato encontrado"
-                        descricao={
-                          debouncedSearch || algumFiltro
-                            ? "Nenhum resultado para a busca e os filtros atuais."
-                            : "Cadastre o primeiro contato ou importe uma planilha."
-                        }
-                      />
-                    )}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-          </div>
-        </div>
+        <TabelaDeCartoes preencher colunas={colunasDaGrade} larguraMinima={colunasDaTabela.length * 130 + 620} rotulo="Contatos">
+          <TabelaDeCartoes.Cabecalho rotulos={rotulosDoCabecalho} />
+          {contacts.map((c: ContactRow) => {
+            const comp = empresaPorId.get((c as Record<string, unknown>).company_id as string);
+            const meta = (c as Record<string, unknown>).metadata as Record<string, string> | null;
+            const nomeEmpresa = comp?.name || meta?.empresa_manual || "";
+            const marcado = selectedContacts.has(c.id);
+            const nome = nomeDoContato(c.first_name, c.last_name);
+            // Sem a visão no banco `ultimo_contato` não vem; a última atividade
+            // registrada é o melhor substituto até a migração subir.
+            const ultimo = c.ultimo_contato !== undefined
+              ? (c.ultimo_contato ? new Date(c.ultimo_contato) : null)
+              : (lastActivityMap.get(c.id) ?? null);
+            return (
+              <TabelaDeCartoes.Linha key={c.id} selecionada={marcado} onClick={() => setDrawerContact(c)}>
+                <CaixaDeSelecao rotulo={`Selecionar ${c.first_name}`} estado={marcado} onChange={() => toggleOne(c.id)} />
+                <CelulaDeNome
+                  nome={nome}
+                  apoio={c.email ? formatarEmail(c.email) : c.phone ? formatarTelefone(c.phone) : undefined}
+                />
+                <SeloDeTipo icone={<User aria-hidden="true" />}>Pessoa</SeloDeTipo>
+                {colunasDaTabela.includes("estagio") && <LifecycleBadge stage={c.lifecycle_stage} />}
+                {colunasDaTabela.includes("empresa") && (
+                  nomeEmpresa ? <span className="block truncate text-sm">{nomeEmpresa}</span> : <span className="text-muted-foreground">—</span>
+                )}
+                {colunasDaTabela.includes("origem") && <OriginBadge metadata={(c as Record<string, unknown>).metadata} />}
+                {colunasDaTabela.includes("pontuacao") && (
+                  c.lead_score == null
+                    ? <span className="text-muted-foreground">—</span>
+                    : <AnelDeContagem valor={c.lead_score} rotulo="Pontos" tom={c.lead_score >= 80 ? "sucesso" : c.lead_score >= 50 ? "destaque" : "neutro"} />
+                )}
+                {colunasDaTabela.includes("responsavel") && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ResponsavelCelula
+                      ownerId={c.owner_id}
+                      membros={members}
+                      onChange={(novo) => handleOwnerChange(c.id, novo)}
+                      rotuloDe={`Responsável por ${nome}`}
+                    />
+                  </div>
+                )}
+                {colunasDaTabela.includes("ultimoContato") && <UltimoContato data={ultimo} />}
+                {colunasDaTabela.includes("proximaAtividade") && <ProximaAtividade info={proximas?.get(c.id)} />}
+                <span className="block truncate text-xs text-muted-foreground">{formatarDataPorExtenso(c.created_at)}</span>
+                <MenuDeLinha
+                  rotulo={`Mais ações de ${nome}`}
+                  acoes={[
+                    { rotulo: "Abrir", onSelect: () => setDrawerContact(c) },
+                    { rotulo: "Editar", onSelect: () => setDrawerContact(c) },
+                    ...(members.length > 0 ? [{
+                      rotulo: c.owner_id === user?.id ? "Remover responsável" : "Atribuir a mim",
+                      onSelect: () => handleOwnerChange(c.id, c.owner_id === user?.id ? null : user?.id ?? null),
+                    }] : []),
+                    ...(isAdmin ? [{ rotulo: "Excluir", destrutiva: true, onSelect: () => pedirExclusaoDe([c.id]) }] : []),
+                  ]}
+                />
+              </TabelaDeCartoes.Linha>
+            );
+          })}
+          {contacts.length === 0 && <div className="rounded-lg bg-card shadow-card">{vazioOuErro}</div>}
+        </TabelaDeCartoes>
       )}
 
       {viewMode === "cards" && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-2 content-start gap-3 overflow-y-auto p-1 md:grid-cols-3 lg:grid-cols-4">
           {contacts.map((c) => (
-            <Card key={c.id} className="cursor-pointer transition-colors hover:border-primary/40" onClick={() => setDrawerContact(c)}>
+            <Card key={c.id} className="cursor-pointer border-transparent shadow-card" onClick={() => setDrawerContact(c)}>
               <CardContent className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Iniciais nome={nomeDoContato(c.first_name, c.last_name)} tamanho="lg" />
-                  <div className="min-w-0">
-                    <p className="font-semibold truncate">{nomeDoContato(c.first_name, c.last_name)}</p>
-                    {c.title && <p className="text-xs text-muted-foreground truncate">{c.title}</p>}
-                  </div>
-                </div>
-                {c.email && <p className="text-xs text-muted-foreground truncate">{formatarEmail(c.email)}</p>}
+                <CelulaDeNome
+                  nome={nomeDoContato(c.first_name, c.last_name)}
+                  apoio={c.title || (c.email ? formatarEmail(c.email) : undefined)}
+                />
                 <div className="flex flex-wrap items-center gap-2">
+                  <SeloDeTipo icone={<User aria-hidden="true" />}>Pessoa</SeloDeTipo>
                   <LifecycleBadge stage={c.lifecycle_stage} />
                   <OriginBadge metadata={(c as Record<string, unknown>).metadata} />
                 </div>
               </CardContent>
             </Card>
           ))}
-          {contacts.length === 0 && (
-            <div className="col-span-full">
-              {isLoading ? (
-                <LoadingState linhas={4} />
-              ) : isError ? (
-                <ErrorState onTentarNovamente={() => refetch()} />
-              ) : (
-                <EmptyState
-                  icone={UsersIcon}
-                  titulo="Nenhum contato encontrado"
-                  descricao={
-                    debouncedSearch || algumFiltro
-                      ? "Nenhum resultado para a busca e os filtros atuais."
-                      : "Cadastre o primeiro contato ou importe uma planilha."
-                  }
-                />
-              )}
-            </div>
-          )}
+          {contacts.length === 0 && <div className="col-span-full">{vazioOuErro}</div>}
         </div>
       )}
 
       {viewMode === "owner" && (
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto">
         <ContactsKanbanByOwner
           contacts={allContactsForKanban}
           companies={companies}
@@ -923,9 +874,11 @@ export default function Contacts() {
           onContactClick={(c) => setDrawerContact(c)}
           onOwnerChange={handleOwnerChange}
         />
+        </div>
       )}
 
       {viewMode !== "owner" && (
+        <div className="shrink-0">
         <Paginacao
           pagina={page}
           totalPaginas={totalPages}
@@ -933,6 +886,7 @@ export default function Contacts() {
           unidade="contato"
           onMudar={setPage}
         />
+        </div>
       )}
 
       {/* Confirmação nomeando o que será apagado.
@@ -1014,6 +968,6 @@ export default function Contacts() {
         onImported={invalidate}
         entityType="contacts"
       />
-    </PageShell>
+    </Pagina>
   );
 }

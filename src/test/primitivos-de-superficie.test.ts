@@ -58,15 +58,21 @@ describe("o cartão não tem dois sinais para a mesma coisa", () => {
     expect(CARD).not.toMatch(/cn\("[^"]*\bborder\b/);
   });
 
-  it("as superfícies são separadas por linha sem sombra", () => {
+  /*
+   * Padrão da plataforma: o cartão é branco SEM borda visível e se separa do
+   * fundo pela sombra suave do token. Continua um sinal só: a borda é
+   * transparente (fica para `border-primary` de seleção não mexer no layout).
+   */
+  it("as superfícies se separam pela sombra do token, sem borda visível", () => {
     const i = CSS.indexOf(".vx-elevado {");
     const bloco = CSS.slice(i, CSS.indexOf("}", i));
-    expect(bloco).toContain("border: 1px solid hsl(var(--border))");
-    expect(bloco).toContain("box-shadow: none");
+    expect(bloco).toContain("border: 1px solid transparent");
+    expect(bloco).toContain("box-shadow: var(--shadow-card)");
   });
 
-  it("no tema escuro também não há sombra decorativa", () => {
-    expect(CSS).toMatch(/\.dark \.vx-elevado \{[^}]*box-shadow: none/);
+  it("o tema escuro tem a sua própria sombra de cartão", () => {
+    const escuro = CSS.slice(CSS.indexOf(".dark {"));
+    expect(escuro.slice(0, escuro.indexOf("}"))).toMatch(/--shadow-card:/);
   });
 
   /**

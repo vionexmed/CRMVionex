@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, Columns3 } from "lucide-react";
+import { ChevronDown, Columns3, Loader2, Menu, Upload } from "lucide-react";
+import { BotaoDeIcone } from "@/components/padrao";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -179,5 +180,65 @@ export function NovaVisaoDialog({ aberto, onFechar, onSalvar, resumo }: {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Menu "…" (hambúrguer) da barra de ferramentas: importar, exportar, forma de
+ * ver a base, ordenação e colunas visíveis. Reúne o que antes eram três botões.
+ */
+export function MenuDaLista<V extends string, K extends string>({
+  visivel, onAlternar, visualizacao, visualizacoes, onVisualizacao,
+  ordenacao, opcoesDeOrdenacao, onOrdenar, onImportar, onExportar, exportando,
+}: {
+  visivel: (id: ColunaId) => boolean;
+  onAlternar: (id: ColunaId) => void;
+  visualizacao: V;
+  visualizacoes: [V, string][];
+  onVisualizacao: (v: V) => void;
+  ordenacao: K;
+  opcoesDeOrdenacao: [K, string][];
+  onOrdenar: (k: K) => void;
+  onImportar: () => void;
+  /** Só para administradores: sem a função o item some. */
+  onExportar?: () => void;
+  exportando?: boolean;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <BotaoDeIcone aria-label="Mais opções da lista" icone={<Menu aria-hidden="true" />} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-[70vh] w-56 overflow-y-auto">
+        <DropdownMenuItem onSelect={onImportar}><Upload aria-hidden="true" className="mr-2 h-4 w-4" />Importar CSV</DropdownMenuItem>
+        {onExportar && (
+          <DropdownMenuItem onSelect={onExportar} disabled={exportando}>
+            {exportando && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}Exportar
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Visualização</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={visualizacao} onValueChange={(v) => onVisualizacao(v as V)}>
+          {visualizacoes.map(([k, rotulo]) => <DropdownMenuRadioItem key={k} value={k}>{rotulo}</DropdownMenuRadioItem>)}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={ordenacao} onValueChange={(v) => onOrdenar(v as K)}>
+          {opcoesDeOrdenacao.map(([k, rotulo]) => <DropdownMenuRadioItem key={k} value={k}>{rotulo}</DropdownMenuRadioItem>)}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Colunas visíveis</DropdownMenuLabel>
+        {COLUNAS_ESCONDIVEIS.map((c) => (
+          <DropdownMenuCheckboxItem
+            key={c.id}
+            checked={visivel(c.id)}
+            onSelect={(e) => e.preventDefault()}
+            onCheckedChange={() => onAlternar(c.id)}
+          >
+            {c.rotulo}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

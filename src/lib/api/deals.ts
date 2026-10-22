@@ -40,6 +40,12 @@ export interface DealListParams {
   maxValue?: number;
   closeDateFrom?: string;
   closeDateTo?: string;
+  /** Criado a partir desta data ("AAAA-MM-DD"): o chip "Intervalo". */
+  criadoDesde?: string;
+  /** Trecho do título (lista paginada; o quadro busca também pessoa e empresa no cliente). */
+  busca?: string;
+  /** O chip "Ordenação". Ausente: a ordem do banco, como antes. */
+  ordem?: "recentes" | "valor" | "atualizacao";
 }
 
 export interface DealListResult {
@@ -58,6 +64,9 @@ export const dealsApi = {
       maxValue,
       closeDateFrom,
       closeDateTo,
+      criadoDesde,
+      busca,
+      ordem,
     } = params;
 
     let query = supabase
@@ -93,6 +102,14 @@ export const dealsApi = {
     if (maxValue !== undefined) query = query.lte("value", maxValue);
     if (closeDateFrom) query = query.gte("close_date", closeDateFrom);
     if (closeDateTo) query = query.lte("close_date", closeDateTo);
+    if (criadoDesde) query = query.gte("created_at", criadoDesde);
+    // `%` e `_` são curingas do ILIKE: escapados, o termo é procurado literal.
+    if (busca?.trim()) query = query.ilike("title", `%${busca.trim().replace(/[\\%_]/g, "\\$&")}%`);
+    if (ordem === "valor") query = query.order("value", { ascending: false, nullsFirst: false });
+    else if (ordem === "atualizacao") query = query.order("updated_at", { ascending: false, nullsFirst: false });
+    else if (ordem === "recentes") query = query.order("created_at", { ascending: false, nullsFirst: false });
+    // Desempate estável: sem ele, empates mudam de página entre uma consulta e outra.
+    if (ordem) query = query.order("id", { ascending: true });
 
     // Only paginate in list mode; Kanban/Forecast need all records
     if (page !== undefined) {

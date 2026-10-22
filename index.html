@@ -37,12 +37,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <!--
-      O TEXTO USA A FONTE DO SISTEMA (SF Pro no Mac, Segoe UI no Windows) e não
-      baixa nada: este <link> é bloqueante de renderização, e a família de
-      texto deixou de estar nele. Fica só a monoespaçada dos números
-      (`.num`), em dois pesos.
+      O TEXTO USA INTER, a família do padrão da plataforma, nos quatro pesos que
+      a interface pratica (400/500/600/700), e a monoespaçada dos números
+      (`.num`) em dois. UM pedido só para as duas, com `display=swap`: enquanto
+      a Inter não chega, o texto sai na fonte do sistema (a reserva de
+      `--font-ui`) em vez de ficar invisível. Quem escolhe "Sistema" em
+      Aparência continua sem depender dela.
     -->
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link id="fc-font-inter" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 
     <!--

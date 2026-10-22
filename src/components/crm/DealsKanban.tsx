@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Trophy, XCircle, MoreHorizontal, Pencil, Eye, Mail, Calendar, Flame, Sun, Snowflake } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  Plus, Trophy, XCircle, MoreHorizontal, Pencil, Eye, Mail, Calendar, Flame, Sun, Snowflake, Settings2, Check, X,
+} from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent,
@@ -12,12 +15,11 @@ import {
 } from "@dnd-kit/core";
 import type { DealWithRelations } from "@/lib/api/deals";
 import type { Database } from "@/integrations/supabase/types";
-import { formatarMoedaInteira, formatarNumero, pluralizar } from "@/lib/formato";
+import { formatarMoeda, formatarMoedaInteira, pluralizar } from "@/lib/formato";
 import { cn } from "@/lib/utils";
-import { Iniciais } from "@/components/layout/ListaV1";
-import { getContactOrigin } from "@/lib/contact-options";
+import { ColunaKanban, NovaColuna, type CorDaEtapa } from "@/components/padrao";
 import {
-  corDaEtapa, diasSemAvancar, etapasEmOrdem, proximaAtividade, rotuloDaProxima,
+  diasSemAvancar, etapasEmOrdem, proximaAtividade, rotuloDaProxima,
   ROTULO_DA_TEMPERATURA, temperaturaDe, type Temperatura,
 } from "@/components/negocios/sinais";
 import { AvatarDaPessoa } from "@/components/negocios/AvatarDaPessoa";
@@ -30,6 +32,19 @@ type Contact = Database["public"]["Tables"]["contacts"]["Row"];
 const DIAS_PARADO_ALERTA = 7;
 /** A partir daqui, sem nada agendado, o card diz "Parado" -- o mesmo 14 da faixa. */
 const DIAS_PARADO_CRITICO = 14;
+
+/**
+ * Cor da faixa da coluna pela POSIÇÃO no funil, como no padrão da plataforma:
+ * a entrada é cinza (ainda não andou), as do meio são a cor de destaque (em
+ * andamento) e a última é verde (perto de fechar). Por token, nunca pelo hex de
+ * `pipeline_stages.color` -- a cor de destaque é trocável em tempo de execução
+ * e o hex gravado não tem versão para o tema escuro.
+ */
+function corDaColuna(indice: number, total: number): CorDaEtapa {
+  if (indice === 0) return "cinza";
+  if (indice === total - 1) return "verde";
+  return "azul";
+}
 
 /* ── Deal Card ───────────────────────────────────────────── */
 
@@ -44,20 +59,17 @@ const VISUAL_DA_TEMPERATURA: Record<Temperatura, { Icone: typeof Flame; cor: str
 const TRATAMENTO = /^(dra?|sra?|prof|profa)\.?$/i;
 
 /**
- * O card do quadro, no desenho do Visual 01: iniciais da empresa, título,
- * pessoa · origem, valor grande com a TEMPERATURA à direita, divisória e a
- * linha da PRÓXIMA ATIVIDADE com os dias parado e o responsável.
+ * O card do quadro, no padrão da plataforma: branco, sombra suave, sem borda.
+ * Título em negrito, pessoa · empresa, valor com a TEMPERATURA em ícone à
+ * direita, e a linha da PRÓXIMA ATIVIDADE com os dias parado e as iniciais do
+ * responsável.
  *
- * A linha de baixo lê `atividades` (que `dealsApi.list` já embute): "Ligação
- * seg, 09:00", "Reunião atrasada 2 dias" em vermelho, ou "Sem atividade". Os
- * dias aparecem a partir de 7 sem avançar de etapa (`diasSemAvancar`, o mesmo
- * critério do chip "Parados há 7+ dias"): em vermelho quando nada está agendado, porque aí
- * ninguém vai mexer; neutros quando há algo marcado.
+ * Os dias aparecem a partir de 7 sem avançar de etapa (`diasSemAvancar`, o
+ * mesmo critério do filtro "Parados há 7+ dias"): em vermelho quando nada está
+ * agendado, porque aí ninguém vai mexer; neutros quando há algo marcado.
  *
  * Seleção em lote e o menu `…` (abrir, editar, e-mail, agendar) aparecem no
- * canto ao passar o mouse ou ao focar: a referência não tem fileira de ações
- * no card, e tirá-las de vez levaria embora a única porta para EDITAR o
- * negócio a partir do quadro. Marcado, a caixa fica à vista.
+ * canto ao passar o mouse ou ao focar. Marcado, a caixa fica à vista.
  *
  * `memo` porque o quadro renderiza CONTINUAMENTE durante o arraste -- o dnd-kit
  * atualiza a posição a cada movimento do ponteiro. Sem isso, mover um card
@@ -111,11 +123,9 @@ const DealCard = memo(function DealCard({
     : null;
 
   // O nome sai do subtítulo quando o título JÁ É ele: os negócios criados pelo
-  // gatilho de entrada se chamam pelo nome da pessoa.
+  // gatilho de entrada se chamam pelo nome da pessoa. Idem a empresa.
   const nomeContato = nome && nome !== deal.title ? nome : null;
-  const origem = deal.contact
-    ? getContactOrigin(deal.contact.metadata as Record<string, unknown> | null).label
-    : null;
+  const empresa = deal.company?.name && deal.company.name !== deal.title ? deal.company.name : null;
 
   const proxima = proximaAtividade(deal.atividades, agora);
   const parado = diasSemAvancar(deal, agora);
@@ -147,7 +157,7 @@ const DealCard = memo(function DealCard({
       style={style}
       {...attributes}
       {...listeners}
-      className={cn("vx-deal-card group relative shadow-sm", selecionado && "vx-deal-card--marcado", aberto && "border-primary shadow-md ring-1 ring-primary")}
+      className={cn("vx-deal-card group relative p-3", selecionado && "vx-deal-card--marcado", aberto && "border-primary ring-1 ring-primary")}
       aria-current={aberto ? "true" : undefined}
       onPointerDown={(e) => {
         arrastou.current = false;
@@ -161,36 +171,31 @@ const DealCard = memo(function DealCard({
         onDealClick(deal);
       }}
     >
-      <div className="flex items-start gap-2.5">
-        <Iniciais nome={deal.company?.name || nome || deal.title} forma={deal.company ? "empresa" : "pessoa"} className="h-9 w-9" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold leading-snug text-foreground">{deal.title}</p>
-          {(deal.company || nomeContato || origem) && (
-            <p className="mt-0.5 truncate text-xs leading-tight text-muted-foreground">
-              {nomeContato ? (
-                onContactClick && deal.contact ? (
-                  <button
-                    type="button"
-                    {...isolar}
-                    // stopPropagation senão o clique sobe para o card e abre o
-                    // negócio -- os dois painéis abririam no mesmo clique.
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (arrastou.current) return;
-                      onContactClick(deal.contact!);
-                    }}
-                    className="hover:text-foreground hover:underline"
-                  >
-                    {tratamento ? `${tratamento} ${nomeContato}` : nomeContato}
-                  </button>
-                ) : (tratamento ? `${tratamento} ${nomeContato}` : nomeContato)
-              ) : deal.company?.name}
-              {(nomeContato || deal.company) && origem && " · "}
-              {origem}
-            </p>
+      <p className="truncate pr-6 text-sm font-semibold leading-snug text-foreground">{deal.title}</p>
+      {(nomeContato || empresa) && (
+        <p className="mt-0.5 truncate text-xs leading-tight text-muted-foreground">
+          {nomeContato && (
+            onContactClick && deal.contact ? (
+              <button
+                type="button"
+                {...isolar}
+                // stopPropagation senão o clique sobe para o card e abre o
+                // negócio -- os dois painéis abririam no mesmo clique.
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (arrastou.current) return;
+                  onContactClick(deal.contact!);
+                }}
+                className="hover:text-foreground hover:underline"
+              >
+                {tratamento ? `${tratamento} ${nomeContato}` : nomeContato}
+              </button>
+            ) : (tratamento ? `${tratamento} ${nomeContato}` : nomeContato)
           )}
-        </div>
-      </div>
+          {nomeContato && empresa && " · "}
+          {empresa}
+        </p>
+      )}
 
       {/*
         CAIXA DE SELEÇÃO e MENU no canto, por cima do card, à vista no hover e
@@ -229,8 +234,8 @@ const DealCard = memo(function DealCard({
                 <Pencil className="mr-2 h-3.5 w-3.5" />Editar
               </DropdownMenuItem>
             )}
-            {/* Abre o compositor do CRM, e não o `mailto:`: o envio passa pela
-                conta conectada e vira histórico do negócio. */}
+            {/* Abre o compositor do CRM, e não o envio pelo cliente de e-mail:
+                o envio passa pela conta conectada e vira histórico do negócio. */}
             <DropdownMenuItem disabled={!email || !onComposeEmail} onSelect={() => onComposeEmail?.(deal)}>
               <Mail className="mr-2 h-3.5 w-3.5" />
               {!email ? "Sem e-mail no contato" : "Escrever e-mail"}
@@ -242,25 +247,22 @@ const DealCard = memo(function DealCard({
         </DropdownMenu>
       </div>
 
-      <div className="mt-2.5 flex min-w-0 items-center justify-between gap-2">
-        <span className="truncate text-lg font-bold tabular-nums tracking-tight text-foreground">
+      <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+        <span className="truncate text-sm font-bold tabular-nums text-foreground">
           {formatarMoedaInteira(Number(deal.value) || 0, deal.currency || "BRL")}
         </span>
         {visualTemp && temperatura && (
-          <span className={cn("inline-flex shrink-0 items-center gap-1 text-xs font-semibold", visualTemp.cor)}>
-            <visualTemp.Icone aria-hidden="true" className="h-3.5 w-3.5" />
-            {ROTULO_DA_TEMPERATURA[temperatura]}
+          <span title={ROTULO_DA_TEMPERATURA[temperatura]} className={cn("inline-flex shrink-0 items-center", visualTemp.cor)}>
+            <visualTemp.Icone aria-hidden="true" className="h-4 w-4" />
+            <span className="sr-only">{ROTULO_DA_TEMPERATURA[temperatura]}</span>
           </span>
         )}
       </div>
 
-      {/*
-        PRÓXIMA ATIVIDADE, DIAS e RESPONSÁVEL, abaixo da divisória. A divisória
-        não sangra: na referência ela para no padding do card.
-      */}
-      <div className="mt-2 flex items-center gap-2 border-t border-border pt-2.5">
+      {/* PRÓXIMA ATIVIDADE, DIAS e RESPONSÁVEL. */}
+      <div className="mt-2 flex items-center gap-2 text-xs">
         <span aria-hidden="true" className={cn(
-          "h-2 w-2 shrink-0 rounded-full",
+          "h-1.5 w-1.5 shrink-0 rounded-full",
           proxima?.atrasada ? "bg-destructive" : proxima ? "bg-primary" : "bg-muted-foreground/50",
         )} />
         <span className={cn(
@@ -271,8 +273,8 @@ const DealCard = memo(function DealCard({
         </span>
         {parado >= DIAS_PARADO_ALERTA && (
           <span title="Dias sem avançar de etapa" className={cn(
-            "shrink-0 text-xs font-semibold tabular-nums",
-            proxima ? "text-foreground" : "text-destructive",
+            "shrink-0 font-semibold tabular-nums",
+            proxima ? "text-muted-foreground" : "text-destructive",
           )}>
             {!proxima && parado >= DIAS_PARADO_CRITICO && "Parado "}{parado} {pluralizar(parado, "dia")}
           </span>
@@ -289,15 +291,6 @@ const DealCard = memo(function DealCard({
 
 /* ── Stage Column ────────────────────────────────────────── */
 
-/**
- * A ponta de seta do cabeçalho é `clip-path`, nunca transform/rotate: um
- * ancestral do card com transform vira bloco de contenção do DragOverlay
- * (CLAUDE.md). A primeira faixa tem a esquerda reta; as outras, o entalhe que
- * encaixa na ponta da anterior.
- */
-const SETA_INICIAL = "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)";
-const SETA_SEGUINTE = "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%)";
-
 function StageColumn({
   stage,
   indice,
@@ -307,6 +300,7 @@ function StageColumn({
   abertoId,
   agora,
   tons,
+  linkConfigurarEtapas,
   onDealClick,
   onContactClick,
   onAddDeal,
@@ -323,6 +317,7 @@ function StageColumn({
   abertoId: string | null;
   agora: number;
   tons?: Map<string, string>;
+  linkConfigurarEtapas?: string;
   onDealClick: (d: DealWithRelations) => void;
   onContactClick?: (contact: Contact) => void;
   onAddDeal: (stageId: string) => void;
@@ -334,85 +329,120 @@ function StageColumn({
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
   const total = deals.reduce((s, d) => s + (Number(d.value) || 0), 0);
   const prob = Number(stage.win_probability) || 0;
-  const cor = corDaEtapa(indice, totalEtapas);
 
   return (
-    <div
-      ref={setNodeRef}
+    <ColunaKanban
+      cor={corDaColuna(indice, totalEtapas)}
+      titulo={stage.name}
+      valor={<span title={prob > 0 ? `Chance de ganho da etapa: ${prob}%` : undefined}>{formatarMoeda(total)}</span>}
+      quantidade={deals.length}
+      className="h-full w-[312px] shrink-0"
+      corpoRef={setNodeRef}
       // Realce de soltura por COR, nunca por escala/filtro: transform num
       // ancestral do card faz o DragOverlay fugir do cursor (CLAUDE.md).
-      className={cn(
-        "flex h-full w-[268px] min-h-0 shrink-0 flex-col rounded-lg transition-colors",
-        isOver ? "bg-accent" : "bg-transparent",
-      )}
-    >
-      {/*
-        A FAIXA DO CABEÇALHO em seta: fundo no tom da etapa, ponto, nome,
-        contagem e o total com a chance da etapa.
-
-        A cor vem da POSIÇÃO (escala --stage-1…6, da marca ao verde), não de
-        `pipeline_stages.color`: a escala acompanha a cor de destaque e o tema
-        escuro, e a cor gravada no banco é um hex fixo. O fundo é a mesma cor
-        misturada ao cartão por `color-mix` -- as variáveis da escala já são
-        `color-mix`, e o modificador de opacidade do Tailwind não as atravessa.
-      */}
-      <div
-        className="shrink-0 py-2.5 pl-3.5 pr-5"
-        style={{
-          clipPath: indice === 0 ? SETA_INICIAL : SETA_SEGUINTE,
-          paddingLeft: indice === 0 ? undefined : 28,
-          background: `color-mix(in oklab, var(--${cor.replace("bg-", "")}) 14%, hsl(var(--card)))`,
-        }}
-      >
-        <div className="flex items-center gap-2">
-          <span aria-hidden="true" className={cn("h-2 w-2 shrink-0 rounded-full", cor)} />
-          <h3 className="vx-titulo-secao min-w-0 truncate text-foreground">{stage.name}</h3>
-          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-card px-1.5 text-label font-semibold tabular-nums text-foreground">
-            {formatarNumero(deals.length)}
-          </span>
-        </div>
-        <p className="mt-1 truncate text-muted-foreground">
-          <span className="font-semibold tabular-nums text-foreground">{formatarMoedaInteira(total)}</span>
-          {prob > 0 && <> · prob. {prob}%</>}
-        </p>
-      </div>
-
-      {/*
-        A ROLAGEM DA COLUNA. A altura vem do PAI -- `min-h-0` é o que permite um
-        filho de flex encolher abaixo do conteúdo, sem o qual `flex-1` cresce em
-        vez de rolar.
-      */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-2 pb-2 pt-4">
-        {deals.map((deal) => (
-          <DealCard
-            key={deal.id}
-            deal={deal}
-            selecionado={selecionados.has(deal.id)}
-            aberto={deal.id === abertoId}
-            agora={agora}
-            tom={deal.owner_id ? tons?.get(deal.owner_id) : undefined}
-            onDealClick={onDealClick}
-            onContactClick={onContactClick}
-            onEditDeal={onEditDeal}
-            onComposeEmail={onComposeEmail}
-            onAbrirPagina={onAbrirPagina}
-            onAlternarSelecao={onAlternarSelecao}
-          />
-        ))}
-
-        {/* "+ Adicionar negócio" no FIM da coluna, como na referência. Fica
-            dentro da área que rola, logo depois do último card, e a zona vazia
-            abaixo dele continua sendo alvo de soltar do arraste. */}
+      corpoClassName={cn("flex flex-col gap-3 pt-1 transition-colors", isOver && "bg-accent")}
+      menu={
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" aria-label={`Opções da etapa ${stage.name}`}
+              className="-mr-1.5 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {prob > 0 && <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Chance de ganho: {prob}%</DropdownMenuLabel>}
+            <DropdownMenuItem onSelect={() => onAddDeal(stage.id)}>
+              <Plus className="mr-2 h-3.5 w-3.5" />Novo negócio nesta etapa
+            </DropdownMenuItem>
+            {linkConfigurarEtapas && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to={linkConfigurarEtapas}><Settings2 className="mr-2 h-3.5 w-3.5" />Configurar etapas</Link>
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      }
+      rodape={
         <button
           type="button"
           onClick={() => onAddDeal(stage.id)}
-          className="flex h-[46px] shrink-0 items-center justify-center gap-1 rounded-lg border border-dashed border-border font-medium text-muted-foreground transition-colors hover:border-primary hover:bg-card hover:text-primary"
+          className="flex h-9 w-full items-center justify-center gap-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
-          <Plus className="h-3.5 w-3.5" />Adicionar negócio
+          <Plus className="h-4 w-4" aria-hidden="true" />Novo negócio
         </button>
-        <div className="min-h-[40px] flex-1" />
-      </div>
-    </div>
+      }
+    >
+      {deals.map((deal) => (
+        <DealCard
+          key={deal.id}
+          deal={deal}
+          selecionado={selecionados.has(deal.id)}
+          aberto={deal.id === abertoId}
+          agora={agora}
+          tom={deal.owner_id ? tons?.get(deal.owner_id) : undefined}
+          onDealClick={onDealClick}
+          onContactClick={onContactClick}
+          onEditDeal={onEditDeal}
+          onComposeEmail={onComposeEmail}
+          onAbrirPagina={onAbrirPagina}
+          onAlternarSelecao={onAlternarSelecao}
+        />
+      ))}
+    </ColunaKanban>
+  );
+}
+
+/* ── Nova coluna (admin) ─────────────────────────────────── */
+
+/** "+ Nova coluna": vira um campo de nome no lugar, e Enter cria a etapa no fim do funil. */
+function CriarEtapa({ onCriar }: { onCriar: (nome: string) => Promise<void> }) {
+  const [editando, setEditando] = useState(false);
+  const [nome, setNome] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  if (!editando) return <NovaColuna className="h-9" onClick={() => setEditando(true)} />;
+
+  const confirmar = async () => {
+    const limpo = nome.trim();
+    if (!limpo || salvando) return;
+    setSalvando(true);
+    try {
+      await onCriar(limpo);
+      setNome("");
+      setEditando(false);
+    } catch {
+      // A página já avisou do erro; o campo fica aberto para tentar de novo.
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <form
+      className="flex items-center gap-1 rounded-lg bg-card p-1 shadow-card"
+      onSubmit={(e) => { e.preventDefault(); void confirmar(); }}
+    >
+      <input
+        autoFocus
+        value={nome}
+        onChange={(e) => setNome(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Escape") setEditando(false); }}
+        placeholder="Nome da etapa"
+        aria-label="Nome da nova etapa"
+        className="h-8 min-w-0 flex-1 rounded-md border border-input bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <button type="submit" disabled={!nome.trim() || salvando} aria-label="Criar etapa"
+        className="flex h-8 w-8 items-center justify-center rounded-md text-primary hover:bg-accent disabled:opacity-40">
+        <Check className="h-4 w-4" />
+      </button>
+      <button type="button" onClick={() => setEditando(false)} aria-label="Cancelar"
+        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent">
+        <X className="h-4 w-4" />
+      </button>
+    </form>
   );
 }
 
@@ -423,26 +453,32 @@ function WonLostDropZone({
   label,
   icon: Icon,
   color,
+  visivel,
 }: {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   color: string;
+  /** Só à vista durante o arraste; montada sempre, para o dnd-kit medi-la. */
+  visivel: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
     <div
       ref={setNodeRef}
+      aria-hidden={!visivel}
       // Só cor no realce. Havia um `scale-105` aqui -- e escala é transform,
       // que num ancestral vira bloco de contenção do DragOverlay (CLAUDE.md).
+      // `invisible` (visibility) e não `hidden`: a zona mantém a caixa medida.
       className={cn(
-        "flex w-16 shrink-0 flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors",
-        isOver ? "border-primary bg-accent" : "border-border bg-card/50",
+        "flex h-28 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed transition-colors",
+        isOver ? "border-primary bg-accent" : "border-border bg-card",
+        !visivel && "invisible",
       )}
     >
       <Icon className={`h-5 w-5 ${color}`} />
-      <span className={`mt-1 text-label font-medium ${color}`}>{label}</span>
+      <span className={`text-xs font-medium ${color}`}>{label}</span>
     </div>
   );
 }
@@ -475,11 +511,15 @@ interface DealsKanbanProps {
   onSelectionChange?: (s: Set<string>) => void;
   onMarkWon: (dealId: string) => void;
   onMarkLost: (dealId: string) => void;
+  /** Cria uma etapa no fim do funil. Ausente (não admin): sem "+ Nova coluna". */
+  onNovaEtapa?: (nome: string) => Promise<void>;
+  /** Para onde leva "Configurar etapas" no "…" da coluna. Ausente: o item some. */
+  linkConfigurarEtapas?: string;
 }
 
 export function DealsKanban({
   deals, tons, stages, onDragEnd, onDealClick, onContactClick, onAddDeal, onEditDeal, onMarkWon, onMarkLost,
-  onComposeEmail, onOpenPage, openDealId = null, selectedDeals, onSelectionChange,
+  onComposeEmail, onOpenPage, openDealId = null, selectedDeals, onSelectionChange, onNovaEtapa, linkConfigurarEtapas,
 }: DealsKanbanProps) {
   const [activeDeal, setActiveDeal] = useState<DealWithRelations | null>(null);
 
@@ -541,7 +581,7 @@ export function DealsKanban({
   // casos de "carregando", "falhou" e "nenhum funil" são resolvidos em Deals.tsx.
   if (stages.length === 0) {
     return (
-      <div className="flex items-center justify-center rounded-lg border border-dashed border-border py-20">
+      <div className="flex items-center justify-center rounded-lg bg-card py-20 shadow-card">
         <div className="text-center">
           <p className="text-muted-foreground">Este funil não tem etapas</p>
           <p className="text-sm text-muted-foreground">Vá em Configurações → Funis e etapas para adicionar</p>
@@ -550,17 +590,20 @@ export function DealsKanban({
     );
   }
 
+  const arrastando = activeDeal !== null;
+
   return (
     // `min-h-0` em cada nível até a coluna: sem ele a altura para de descer no
     // primeiro flex e a coluna volta a crescer em vez de rolar.
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={() => setActiveDeal(null)}
       >
-        <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto pb-2">
+        <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2">
           {ordenadas.map((stage, i) => (
             <StageColumn
               key={stage.id}
@@ -572,6 +615,7 @@ export function DealsKanban({
               abertoId={openDealId}
               agora={agora}
               tons={tons}
+              linkConfigurarEtapas={linkConfigurarEtapas}
               onDealClick={onDealClick}
               onContactClick={onContactClick}
               onAddDeal={onAddDeal}
@@ -582,9 +626,12 @@ export function DealsKanban({
             />
           ))}
 
-          {/* Won/Lost drop zones */}
-          <WonLostDropZone id="won-drop" label="Ganho" icon={Trophy} color="text-success" />
-          <WonLostDropZone id="lost-drop" label="Perdido" icon={XCircle} color="text-destructive" />
+          {/* "+ Nova coluna" (admin) e, durante o arraste, as zonas Ganho/Perdido. */}
+          <div className="flex w-64 shrink-0 flex-col gap-3">
+            {onNovaEtapa && <CriarEtapa onCriar={onNovaEtapa} />}
+            <WonLostDropZone id="won-drop" label="Ganho" icon={Trophy} color="text-success" visivel={arrastando} />
+            <WonLostDropZone id="lost-drop" label="Perdido" icon={XCircle} color="text-destructive" visivel={arrastando} />
+          </div>
         </div>
 
         {/*
@@ -599,10 +646,12 @@ export function DealsKanban({
         {createPortal(
           <DragOverlay>
             {activeDeal && (
-              <div className="w-[268px] opacity-90">
-                <div className="rounded-lg border border-primary bg-card p-3 shadow-lg">
+              // A largura da coluna com o mesmo respiro lateral do corpo
+              // (`px-3`): o clone sai do tamanho exato do card.
+              <div className="w-[312px] px-3">
+                <div className="rounded-lg bg-card p-3 shadow-pop ring-1 ring-primary">
                   <p className="truncate text-sm font-semibold">{activeDeal.title}</p>
-                  <p className="mt-1 text-base font-bold tabular-nums text-foreground">
+                  <p className="mt-2 text-sm font-bold tabular-nums text-foreground">
                     {formatarMoedaInteira(Number(activeDeal.value) || 0, activeDeal.currency || "BRL")}
                   </p>
                 </div>

@@ -13,6 +13,7 @@
  * Estes testes existem para que a próxima mudança de critério não deixe outra
  * função para trás.
  */
+import { fontesDoPainel } from "./fontes-do-painel";
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 
@@ -198,8 +199,8 @@ describe("o card de abordagens mostra toques E pessoas", () => {
     expect(hook).toContain("pessoas_abordadas: number");
     expect(hook).toContain("pessoasAbordadas: atual?.pessoas_abordadas");
 
-    const painel = semComentarios(ler("src/pages/Dashboard.tsx"));
-    expect(painel).toMatch(/tile\.key === "abordagens"/);
+    const painel = semComentarios(fontesDoPainel());
+    expect(painel).toMatch(/k === "abordagens"[\s\S]{0,120}pessoasAbordadas/);
   });
 });
 
@@ -255,7 +256,7 @@ describe("as cores de atividade sobrevivem ao tema escuro", () => {
 });
 
 describe("os textos de ajuda descrevem o que a SQL faz", () => {
-  const painel = ler("src/pages/Dashboard.tsx");
+  const painel = fontesDoPainel();
 
   /**
    * Mudei o SQL e não mudei a explicação: o card dizia "Toda tentativa de
@@ -335,7 +336,7 @@ describe("reunião saiu de abordagens", () => {
   });
 
   it("o texto do card diz que reunião não entra", () => {
-    const painelSrc = readFileSync("src/pages/Dashboard.tsx", "utf8");
+    const painelSrc = fontesDoPainel();
     const i = painelSrc.indexOf('key: "abordagens"');
     expect(painelSrc.slice(i, i + 500)).toMatch(/REUNIÃO NÃO ENTRA/);
   });

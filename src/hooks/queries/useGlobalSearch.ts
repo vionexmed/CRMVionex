@@ -5,10 +5,10 @@ import { searchEntities } from "@/lib/api/global-search";
 import { contactsApi } from "@/lib/api/contacts";
 import { companiesApi } from "@/lib/api/companies";
 
-export function useGlobalSearch(term: string, open = true) {
+export function useGlobalSearch(term: string, open = true, atrasoMs = 300) {
   const { user, profile } = useAuth();
   const text = term.trim().slice(0, 200);
-  const debounced = useDebounce(text, 300);
+  const debounced = useDebounce(text, atrasoMs);
   const ready = open && !!user?.id && !!profile?.org_id && text.length >= 2;
   const current = ready && text === debounced;
   const query = useQuery({

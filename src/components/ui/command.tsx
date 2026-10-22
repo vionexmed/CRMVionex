@@ -29,7 +29,7 @@ interface CommandDialogProps extends DialogProps {
 const CommandDialog = ({ children, commandProps, contentProps, ...props }: CommandDialogProps) => {
   return (
     <Dialog {...props}>
-      <DialogContent {...contentProps} className={cn("overflow-hidden p-0 shadow-md", contentProps?.className)}>
+      <DialogContent {...contentProps} className={cn("overflow-hidden p-0 shadow-pop", contentProps?.className)}>
         <DialogTitle className="sr-only">Buscar no CRM</DialogTitle>
         <DialogDescription className="sr-only">Encontre páginas, contatos, empresas e negócios. Use as setas para navegar, Enter para abrir e Escape para fechar.</DialogDescription>
         <Command {...commandProps} className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">

@@ -6,12 +6,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Bell, Clock, Check, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 import { formatarDataHoraCurta, formatarTempoRelativo } from "@/lib/formato";
 import { ATIVIDADE_ICONE } from "@/lib/atividade-tipos";
 import { nomeDoContato } from "@/lib/contato-formato";
+import { classeDoItemDaLateral } from "@/components/layout/navegacao";
 
 type Activity = Database["public"]["Tables"]["activities"]["Row"];
 
@@ -43,7 +45,11 @@ function lerVistos(orgId: string): string {
   return agora;
 }
 
-export function NotificationBell() {
+/**
+ * O item "Notificações" do rodapé da lateral, com selo de contagem. `recolhida`
+ * deixa só o ícone, com um ponto vermelho e o rótulo em dica.
+ */
+export function NotificationBell({ recolhida = false }: { recolhida?: boolean } = {}) {
   const { orgId } = useOrg();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -130,24 +136,36 @@ export function NotificationBell() {
 
   const naoLidas = pending.filter((p) => !dismissed.has(p.id)).length + leads.length;
   const vazio = pending.length === 0 && leads.length === 0;
+  const rotuloAcessivel = naoLidas > 0 ? `Notificações: ${naoLidas > 99 ? "mais de 99" : naoLidas} não lidas` : "Notificações";
 
   const atrasada = (a: Activity) => a.due_date && new Date(a.due_date) < new Date();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        {/* Visual 01: um PONTO vermelho, não um número. O total vai no nome
-            acessível -- quem usa leitor de tela ouve quantas são, e quem olha
-            vê só que há algo novo, que é o que o sininho precisa dizer. */}
-        <button aria-label={naoLidas > 0 ? `Notificações: ${naoLidas > 99 ? "mais de 99" : naoLidas} não lidas` : "Notificações"}
-          className="relative flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <Bell aria-hidden="true" className="h-[18px] w-[18px]" />
-          {naoLidas > 0 && (
-            <span aria-hidden="true" className="absolute right-[10px] top-[9px] h-[7px] w-[7px] rounded-full bg-alerta ring-2 ring-card" />
-          )}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
+      {(() => {
+        const gatilho = (
+          <PopoverTrigger asChild>
+            {/* O total vai no NOME ACESSÍVEL; quem olha vê o selo de contagem
+                (ou, recolhida, um ponto vermelho sobre o ícone). */}
+            <button type="button" aria-label={rotuloAcessivel} className={classeDoItemDaLateral(recolhida, open)}>
+              <Bell aria-hidden="true" className="h-5 w-5 shrink-0" />
+              {!recolhida && <span className="truncate">Notificações</span>}
+              {!recolhida && naoLidas > 0 && (
+                <span aria-hidden="true" className="ml-auto flex h-[18px] min-w-6 shrink-0 items-center justify-center vx-selo-nav rounded-full bg-accent px-1.5 font-semibold tabular-nums text-accent-foreground">
+                  {naoLidas > 99 ? "99+" : naoLidas}
+                </span>
+              )}
+              {recolhida && naoLidas > 0 && (
+                <span aria-hidden="true" className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-alerta" />
+              )}
+            </button>
+          </PopoverTrigger>
+        );
+        return recolhida
+          ? <Tooltip><TooltipTrigger asChild>{gatilho}</TooltipTrigger><TooltipContent side="right" sideOffset={8}>Notificações</TooltipContent></Tooltip>
+          : gatilho;
+      })()}
+      <PopoverContent align="end" side="right" sideOffset={12} className="w-80 p-0">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
           <span className="text-sm font-semibold">Notificações</span>
           {!vazio && (

@@ -71,6 +71,7 @@ export default function Produtos() {
 
   return (
     <PageShell
+      preencherAltura
       title="Produtos"
       actions={
         <>
@@ -83,6 +84,7 @@ export default function Produtos() {
         </>
       }
     >
+      <div className="flex min-h-0 flex-1 flex-col gap-6">
       {!isLoading && !isError && produtos.length > 0 && (
         <FaixaDeIndicadores>
           <Indicador rotulo="Produtos ativos" valor={ativos} apoio={`${inativos} ${pluralizar(inativos, "inativo")}`} />
@@ -126,10 +128,10 @@ export default function Produtos() {
           }
         />
       ) : (
-        <div className="space-y-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
           <AbasDeCategoria abas={abas} valor={abaAtual} onChange={setAba} />
           {/* Quatro colunas só em tela larga: o cartão tem texto de duas linhas e rodapé. */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid min-h-0 auto-rows-min content-start gap-4 overflow-y-auto p-1 sm:grid-cols-2 xl:grid-cols-4">
             {visiveis.map((p) => {
               const cat = categoriaDoProduto(p);
               const indice = categorias.findIndex((c) => c.chave === chaveDaCategoria(cat));
@@ -156,6 +158,7 @@ export default function Produtos() {
           </div>
         </div>
       )}
+      </div>
 
       <FormularioDeProduto
         aberto={emEdicao !== null}

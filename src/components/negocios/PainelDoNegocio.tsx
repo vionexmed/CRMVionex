@@ -90,7 +90,7 @@ export function PainelDoNegocio({
 
   return (
     <aside aria-label={`Negócio ${deal.title}`}
-      className="flex min-h-0 w-full flex-col overflow-y-auto rounded-lg border border-border bg-card shadow-sm">
+      className="flex min-h-0 w-full flex-col overflow-y-auto rounded-lg bg-card shadow-card">
       <div className="px-[18px] pb-4 pt-[18px]">
         <div className="flex items-start gap-3">
           <Iniciais nome={id.nomeIniciais} forma="empresa" destaque className="h-11 w-11 rounded-lg border-0 text-sm text-primary" />

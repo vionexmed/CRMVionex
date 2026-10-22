@@ -2,9 +2,13 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative min-w-0 w-full overflow-auto">
+/**
+ * `containerClassName` troca o contêiner de rolagem embutido (ex.: `overflow-visible`
+ * quando a rolagem é de um ancestral e o `<thead>` é `sticky`).
+ */
+const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement> & { containerClassName?: string }>(
+  ({ className, containerClassName, ...props }, ref) => (
+    <div className={cn("relative min-w-0 w-full overflow-auto", containerClassName)}>
       <table ref={ref} className={cn("w-full caption-bottom text-sm tabular-nums", className)} {...props} />
     </div>
   ),

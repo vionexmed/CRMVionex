@@ -94,22 +94,33 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-        primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+        primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))", hover: "var(--primary-hover)", active: "var(--primary-active)" },
         secondary: { DEFAULT: "hsl(var(--secondary))", foreground: "hsl(var(--secondary-foreground))" },
-        destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))", soft: "hsl(var(--destructive-soft))" },
+        destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))", soft: "hsl(var(--destructive-soft))", border: "hsl(var(--destructive-border))", fill: "hsl(var(--destructive-fill))" },
         // Vermelho vivo dos avisos da casca (selo da lateral, ponto do sino). Ver index.css.
         alerta: "hsl(var(--alerta))",
         muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
         accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
         popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
         card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
-        success: { DEFAULT: "hsl(var(--success))", foreground: "hsl(var(--success-foreground))", soft: "hsl(var(--success-soft))" },
-        warning: { DEFAULT: "hsl(var(--warning))", foreground: "hsl(var(--warning-foreground))", soft: "hsl(var(--warning-soft))" },
-        info: { DEFAULT: "hsl(var(--info))", foreground: "hsl(var(--info-foreground))", soft: "hsl(var(--info-soft))" },
+        success: { DEFAULT: "hsl(var(--success))", foreground: "hsl(var(--success-foreground))", soft: "hsl(var(--success-soft))", border: "hsl(var(--success-border))", fill: "hsl(var(--success-fill))" },
+        warning: { DEFAULT: "hsl(var(--warning))", foreground: "hsl(var(--warning-foreground))", soft: "hsl(var(--warning-soft))", border: "hsl(var(--warning-border))", fill: "hsl(var(--warning-fill))" },
+        info: { DEFAULT: "hsl(var(--info))", foreground: "hsl(var(--info-foreground))", soft: "hsl(var(--info-soft))", border: "hsl(var(--info-border))", fill: "hsl(var(--info-fill))" },
         neutral: { DEFAULT: "hsl(var(--neutral))", soft: "hsl(var(--neutral-soft))" },
         "surface-2": "hsl(var(--surface-2))",
         chart: {
-          1: "hsl(var(--chart-1))", 2: "hsl(var(--chart-2))", 3: "hsl(var(--chart-3))", 4: "hsl(var(--chart-4))",
+          1: "hsl(var(--chart-1))", 2: "hsl(var(--chart-2))", 3: "hsl(var(--chart-3))", 4: "hsl(var(--chart-4))", 5: "hsl(var(--chart-5))",
+          6: "hsl(var(--chart-6))", 7: "hsl(var(--chart-7))", 8: "hsl(var(--chart-8))",
+        },
+        pastel: {
+          1: { DEFAULT: "hsl(var(--pastel-1))", fg: "hsl(var(--pastel-1-fg))" },
+          2: { DEFAULT: "hsl(var(--pastel-2))", fg: "hsl(var(--pastel-2-fg))" },
+          3: { DEFAULT: "hsl(var(--pastel-3))", fg: "hsl(var(--pastel-3-fg))" },
+          4: { DEFAULT: "hsl(var(--pastel-4))", fg: "hsl(var(--pastel-4-fg))" },
+          5: { DEFAULT: "hsl(var(--pastel-5))", fg: "hsl(var(--pastel-5-fg))" },
+          6: { DEFAULT: "hsl(var(--pastel-6))", fg: "hsl(var(--pastel-6-fg))" },
+          7: { DEFAULT: "hsl(var(--pastel-7))", fg: "hsl(var(--pastel-7-fg))" },
+          8: { DEFAULT: "hsl(var(--pastel-8))", fg: "hsl(var(--pastel-8-fg))" },
         },
         stage: {
           1: "var(--stage-1)", 2: "var(--stage-2)", 3: "var(--stage-3)",
@@ -135,6 +146,17 @@ export default {
         lg: "var(--radius)",                 /* 8px — superfícies */
         md: "var(--radius-control)",   /* 6px — controles */
         sm: "var(--radius-control)",   /* 6px — pequenos elementos */
+      },
+      /*
+       * Sombras do padrão da plataforma. `card` é a do cartão branco sem borda,
+       * `card-hover` um degrau acima (cartão clicável sob o cursor), `pop` a do
+       * que flutua (menu, janela, gaveta). Os valores moram em index.css, com
+       * par no tema escuro.
+       */
+      boxShadow: {
+        card: "var(--shadow-card)",
+        "card-hover": "var(--shadow-card-hover)",
+        pop: "var(--shadow-pop)",
       },
       height: { control: "var(--control-h)", row: "var(--row-h)" },
       transitionDuration: { 180: "180ms", 240: "240ms" },

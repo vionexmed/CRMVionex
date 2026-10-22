@@ -77,23 +77,60 @@ function sidebar(path: string, defaultOpen = true) {
   </MemoryRouter>));
 }
 
-/** Os links de ÁREA, sem os módulos que abrem abaixo da área ativa. */
-const linksDeArea = (nav: HTMLElement) =>
-  within(nav).getAllByRole("link").filter((link) => !link.closest('[aria-label^="Módulos de"]'));
+const linksDaLista = (nav: HTMLElement) => within(nav).getAllByRole("link");
 
-describe("sidebar primária e acionador compartilhado", () => {
-  it("mostra só seis áreas e abre os módulos da área ativa abaixo dela", () => {
+describe("sidebar primária: lista plana, sem subpáginas", () => {
+  it("cada página é um item de primeiro nível, agrupada por rótulo, sem aninhar", () => {
     sidebar("/produtos");
     const nav = screen.getByRole("navigation", { name: "Navegação principal" });
-    expect(linksDeArea(nav)).toHaveLength(6);
-    expect(within(nav).getByRole("link", { name: "Negócios" })).toHaveAttribute("aria-current", "true");
-    const modulos = screen.getByRole("list", { name: "Módulos de Negócios" });
-    expect(within(modulos).getByRole("link", { name: "Produtos" })).toHaveAttribute("aria-current", "page");
-    // Só a área ativa abre: Comunicação não expõe os canais aqui.
-    expect(within(nav).queryByRole("link", { name: "Instagram" })).toBeNull();
+    expect(linksDaLista(nav).map((l) => l.getAttribute("aria-label"))).toEqual([
+      "Painel", "Atividades", "Contatos", "Empresas", "Pipeline", "Produtos", "Orçamentos", "Atendimento", "Relatórios",
+    ]);
+    // Nenhum item dentro de outro item, nenhuma lista de "módulos" escondida.
+    expect(nav.querySelectorAll("li li")).toHaveLength(0);
+    expect(screen.queryByRole("list", { name: /Módulos de/ })).toBeNull();
+    // Rótulos dos grupos: só os que a lista pede; Painel e Atividades não têm.
+    expect(within(nav).getAllByRole("list").map((l) => l.getAttribute("aria-labelledby") ? document.getElementById(l.getAttribute("aria-labelledby")!)!.textContent : null))
+      .toEqual([null, "Clientes", "Vendas", "Comunicação", "Análise"]);
+    expect(within(nav).getByRole("link", { name: "Produtos" })).toHaveAttribute("aria-current", "page");
+    expect(nav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
   });
 
-  it("a busca mora na barra superior e abre a busca compartilhada", () => {
+  it("o menu da engrenagem esconde Integrações e Segurança de membro e mostra a admin", async () => {
+    for (const isAdmin of [false, true]) {
+      auth.isAdmin = isAdmin;
+      sidebar("/dashboard");
+      fireEvent.keyDown(screen.getByRole("button", { name: "Configurações" }), { key: "Enter" });
+      const nomes = within(await screen.findByRole("menu")).getAllByRole("menuitem").map((i) => i.textContent);
+      expect(nomes.includes("Integrações")).toBe(isAdmin);
+      expect(nomes.includes("Segurança")).toBe(isAdmin);
+      expect(nomes).toEqual(expect.arrayContaining(["Equipe", "Sair"]));
+      cleanup();
+    }
+  });
+
+  it.each([
+    ["/deals", "Pipeline"], ["/deals/registro-id", "Pipeline"], ["/orcamentos", "Orçamentos"], ["/leads", "Contatos"],
+    ["/companies", "Empresas"], ["/tasks", "Atividades"], ["/inbox", "Atendimento"], ["/instagram", "Atendimento"], ["/reports", "Relatórios"],
+  ])("%s marca %s como a página atual", (path, nome) => {
+    sidebar(path);
+    expect(screen.getByRole("link", { name: nome })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("todo destino permitido está na lista e o que é de admin some para membro", () => {
+    for (const isAdmin of [false, true]) {
+      auth.isAdmin = isAdmin;
+      sidebar("/dashboard");
+      const nav = screen.getByRole("navigation", { name: "Navegação principal" });
+      const hrefs = linksDaLista(nav).map((l) => l.getAttribute("href"));
+      const permitidos = navigation.getVisibleNavigation(isAdmin).flatMap((section) => section.items.map((item) => item.path));
+      expect(hrefs).toEqual(permitidos);
+      expect(hrefs.includes("/marketing/visao-geral")).toBe(isAdmin);
+      cleanup();
+    }
+  });
+
+  it("a barra do celular abre a busca compartilhada", () => {
     const open = vi.fn();
     render(<MemoryRouter initialEntries={["/dashboard"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={open} /></SidebarProvider></MemoryRouter>);
     fireEvent.click(screen.getAllByRole("button", { name: /Buscar no CRM/ })[0]);
@@ -102,8 +139,10 @@ describe("sidebar primária e acionador compartilhado", () => {
 
   it("mantém nomes acessíveis e seleção quando recolhida", () => {
     sidebar("/instagram", false);
-    expect(screen.getByRole("link", { name: "Comunicação" })).toHaveAttribute("aria-current", "page");
-    expect(screen.queryByRole("list", { name: /Módulos de/ })).toBeNull();
+    expect(screen.getByRole("link", { name: "Atendimento" })).toHaveAttribute("aria-current", "page");
+    // Recolhida, os grupos viram divisórias finas e o rótulo some.
+    expect(screen.queryByText("Comunicação")).toBeNull();
+    expect(screen.getAllByRole("separator").length).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -119,18 +158,23 @@ function CurrentRoute() {
   return <><output data-testid="route">{location.pathname}{location.search}{location.hash}</output><button onClick={() => navigate(-1)}>Voltar</button><button onClick={() => navigate(1)}>Avançar</button></>;
 }
 
-describe("breadcrumbs e navegação interna", () => {
-  it("identifica área e módulo ao abrir Atendimento diretamente", () => {
+// Sem barra superior no desktop, quem diz "onde estou" é a LATERAL (área e
+// módulo marcados) e, no celular, o nome da tela na barra compacta.
+describe("onde estou e navegação interna", () => {
+  it("identifica área e tela ao abrir Atendimento diretamente", () => {
+    sidebar("/atendimento?canal=instagram");
+    expect(screen.getByRole("link", { name: "Atendimento" })).toHaveAttribute("aria-current", "page");
+    cleanup();
     render(<MemoryRouter initialEntries={["/atendimento?canal=instagram"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={vi.fn()} /></SidebarProvider></MemoryRouter>);
-    expect(screen.getByRole("navigation", { name: "breadcrumb" })).toHaveTextContent("Comunicação");
-    expect(screen.getByRole("navigation", { name: "breadcrumb" })).toHaveTextContent("Atendimento");
+    expect(screen.getByRole("banner")).toHaveTextContent("Atendimento");
   });
 
-  it("a caixa de e-mail completa se nomeia na trilha, dentro de Comunicação", () => {
+  it("a caixa de e-mail completa se nomeia na barra do celular, dentro de Comunicação", () => {
+    sidebar("/inbox");
+    expect(screen.getByRole("link", { name: "Atendimento" })).toHaveAttribute("aria-current", "page");
+    cleanup();
     render(<MemoryRouter initialEntries={["/inbox"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={vi.fn()} /></SidebarProvider></MemoryRouter>);
-    const trilha = screen.getByRole("navigation", { name: "breadcrumb" });
-    expect(trilha).toHaveTextContent("Comunicação");
-    expect(trilha).toHaveTextContent("Caixa de e-mail");
+    expect(screen.getByRole("banner")).toHaveTextContent("Caixa de e-mail");
   });
 
   it("mobile mantém Clientes ativo dentro de Empresas", () => {
@@ -206,19 +250,31 @@ describe("casca, preferência e busca compartilhada", () => {
   it("leitura de preferência bloqueada não impede acessar módulos", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("Storage indisponível"); });
     appShell();
-    // Com a lateral aberta, os módulos ficam nela, abaixo da área ativa.
-    expect(screen.getByRole("list", { name: "Módulos de Clientes" })).toBeVisible();
+    // Com a lateral aberta, todas as páginas ficam nela, como itens de primeiro nível.
+    expect(screen.getByRole("link", { name: "Empresas" })).toBeVisible();
   });
 
-  it("sidebar, header mobile e Ctrl+K compartilham a paleta", async () => {
+  it("no desktop Ctrl+K e Buscar abrem a busca DENTRO da lateral; o diálogo fica para o celular", async () => {
     appShell();
-    for (const opener of screen.getAllByRole("button", { name: /Buscar no CRM/ })) {
-      fireEvent.click(opener);
-      await waitFor(() => expect(screen.getByRole("dialog", { name: "Busca compartilhada" })).toBeVisible());
-      fireEvent.click(screen.getByRole("button", { name: "Fechar busca" }));
-    }
+    expect(screen.queryByRole("combobox", { name: "Buscar no CRM" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Buscar no CRM/ }));
+    const campo = await screen.findByRole("combobox", { name: "Buscar no CRM" });
+    expect(campo).toHaveFocus();
+    expect(screen.queryByRole("dialog", { name: "Busca compartilhada" })).toBeNull();
+    // A lista de navegação dá lugar ao painel; Esc (campo vazio) fecha e devolve o foco.
+    expect(screen.queryByRole("navigation", { name: "Navegação principal" })).toBeNull();
+    fireEvent.keyDown(campo, { key: "Escape" });
+    await waitFor(() => expect(screen.getByRole("navigation", { name: "Navegação principal" })).toBeVisible());
+    expect(screen.getByRole("button", { name: /Buscar no CRM/ })).toHaveFocus();
     fireEvent.keyDown(document, { key: "k", ctrlKey: true });
-    await waitFor(() => expect(screen.getByRole("dialog", { name: "Busca compartilhada" })).toBeVisible());
+    expect(await screen.findByRole("combobox", { name: "Buscar no CRM" })).toBeVisible();
+  });
+
+  it("no celular a barra abre o diálogo compartilhado", async () => {
+    const abrir = vi.fn();
+    render(<MemoryRouter initialEntries={["/dashboard"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={abrir} /></SidebarProvider></MemoryRouter>);
+    fireEvent.click(screen.getAllByRole("button", { name: /Buscar no CRM/ })[0]);
+    expect(abrir).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -245,7 +301,7 @@ describe("rotas registradas no App", () => {
     expect(window.location.pathname).toBe(target);
     expect(window.location.search).toBe(search);
     expect(window.location.hash).toBe("#mensagem");
-    expect(screen.getAllByRole("link", { name: "Comunicação" }).some((link) => link.getAttribute("aria-current") === "page")).toBe(true);
+    expect(screen.getAllByRole("link", { name: "Atendimento" }).some((link) => link.getAttribute("aria-current") === "page")).toBe(true);
   });
 
   it("mantém a rota pessoal usada pelo retorno OAuth", async () => {

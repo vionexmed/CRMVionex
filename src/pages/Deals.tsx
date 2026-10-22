@@ -10,7 +10,7 @@ import { useDeals, useCreateDeal, useUpdateDeal, useUpdateDealStage, useUpdateDe
 import { useContactsPicker } from "@/hooks/queries/useContacts";
 import { useCompanies } from "@/hooks/queries/useCompanies";
 import { useMembers } from "@/hooks/queries/useMembers";
-import { usePipelines, usePipelineStages } from "@/hooks/queries/usePipelines";
+import { usePipelines, usePipelineStages, useCriarEtapa } from "@/hooks/queries/usePipelines";
 import { useLossReasons } from "@/hooks/queries/useLossReasons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,15 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { SquareKanban, List, LineChart, Loader2, ChevronLeft, ChevronRight, Trophy, XCircle, Trash2 } from "lucide-react";
+import {
+  SquareKanban, List, LineChart, Loader2, ChevronLeft, ChevronRight, Trophy, XCircle, Trash2,
+  MoreVertical, PlusCircle, BarChart3, Plus, Settings2,
+} from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup,
+  DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { BarraDeFerramentas, BotaoTracejado, BotaoDeIcone, ChipDeEstado } from "@/components/padrao";
 import { BarraDeSelecao } from "@/components/layout/BarraDeAcoes";
 import { ErrorState, LoadingState } from "@/components/layout/EstadoDaLista";
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
@@ -38,19 +46,23 @@ import { DealsForecast } from "@/components/crm/DealsForecast";
 import { DealsFilters, type DealFilters } from "@/components/crm/DealsFilters";
 import type { Database } from "@/integrations/supabase/types";
 import { mensagemErro } from "@/lib/erro-supabase";
-import { indexarPorId } from "@/lib/utils";
+import { cn, indexarPorId } from "@/lib/utils";
 import { PageShell } from "@/components/layout/PageShell";
-import { SegmentedControl } from "@/components/layout/SegmentedControl";
 import { SemOrganizacao } from "@/components/layout/SemOrganizacao";
 import type { DealWithRelations } from "@/lib/api/deals";
 import { SeletorDeContato } from "@/components/crm/SeletorDeContato";
-import { SeletorDeFunil, TimeDoFunil } from "@/components/negocios/CabecalhoDoFunil";
+import { AbaDeFunis, TimeDoFunil } from "@/components/negocios/CabecalhoDoFunil";
 import { FaixaDoFunil } from "@/components/negocios/FaixaDoFunil";
-import { ChipsDoFunil } from "@/components/negocios/ChipsDoFunil";
+import { ChipsDoFunil, SinaisDoFunil } from "@/components/negocios/ChipsDoFunil";
+import {
+  OPCOES_DE_INTERVALO, OPCOES_DE_ORDEM, casaComBusca, contarFiltrosAtivos, dentroDoIntervalo, inicioDoIntervalo, intervaloDaUrl,
+  normalizarBusca, ordemDaUrl, ordenarNegocios,
+} from "@/components/negocios/ordem-e-intervalo";
+import { COR_PADRAO_DE_ETAPA } from "@/components/crm/LinhaDeEtapa";
 import { PainelDoNegocio } from "@/components/negocios/PainelDoNegocio";
 import type { TipoParaRegistrar } from "@/components/negocios/acoes-rapidas";
 import {
-  filtrarPorSinal, resumirFunil, ROTULO_DA_TEMPERATURA, temColunaTemperatura, TEMPERATURAS, tonsDaEquipe,
+  etapasEmOrdem, filtrarPorSinal, resumirFunil, ROTULO_DA_TEMPERATURA, temColunaTemperatura, TEMPERATURAS, tonsDaEquipe,
   type FiltroDeSinal, type Temperatura,
 } from "@/components/negocios/sinais";
 import { useMetaMensal } from "@/components/negocios/meta-mensal";
@@ -159,12 +171,27 @@ export default function Deals() {
       return next;
     }, { replace: true });
   }, [setSearchParams]);
+  // Ordenação, intervalo, busca e o resumo aberto: também na URL.
+  const ordem = ordemDaUrl(searchParams.get("ordem"));
+  const intervalo = intervaloDaUrl(searchParams.get("intervalo"));
+  const busca = searchParams.get("q") ?? "";
+  const resumoAberto = searchParams.get("resumo") === "1";
+  const setParametro = useCallback((chave: string, valor: string | null) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (valor === null || valor === "") next.delete(chave);
+      else next.set(chave, valor);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+  const inicio = inicioDoIntervalo(intervalo);
+  const termo = normalizarBusca(busca);
   const [listPage, setListPage] = useState(0);
   // Filtro novo, página 1: na página 4 de uma lista que encolheu para duas, a
   // tela mostraria "nenhum negócio" com negócios existindo. Pela chave em
   // texto, e não pelo objeto: `filters` é refeito a cada mudança de URL --
   // inclusive as que não são filtro, como abrir o painel de um negócio.
-  const chaveDosFiltros = JSON.stringify(filters);
+  const chaveDosFiltros = JSON.stringify([filters, busca, intervalo, ordem]);
   useEffect(() => { setListPage(0); }, [chaveDosFiltros]);
 
   // Supporting data
@@ -205,6 +232,9 @@ export default function Deals() {
       maxValue: filters.maxValue,
       closeDateFrom: filters.closeDateFrom,
       closeDateTo: filters.closeDateTo,
+      criadoDesde: inicio,
+      busca: busca || undefined,
+      ordem,
     },
     { enabled: viewMode === "list" },
   );
@@ -224,6 +254,7 @@ export default function Deals() {
   const { mutateAsync: updateStatus } = useUpdateDealStatus();
   const { mutateAsync: batchUpdate } = useBatchUpdateDeals();
   const { data: metaMensal } = useMetaMensal();
+  const { mutateAsync: criarEtapaNoBanco } = useCriarEtapa();
 
   // Junção do dono, feita no cliente porque `deals.owner_id` aponta para
   // `auth.users` e não para `profiles` -- sem FK entre as duas, o PostgREST não
@@ -390,7 +421,8 @@ export default function Deals() {
     if (filters.maxValue && (Number(d.value) || 0) > filters.maxValue) return false;
     if (filters.closeDateFrom && d.close_date && d.close_date < filters.closeDateFrom) return false;
     if (filters.closeDateTo && d.close_date && d.close_date > filters.closeDateTo) return false;
-    return true;
+    if (!dentroDoIntervalo(d, inicio)) return false;
+    return casaComBusca(d, termo);
   };
   // Um Set montado uma vez, e não `pipelineStages.map(...)` DENTRO do filtro --
   // aquilo refazia a lista de etapas para cada negócio.
@@ -424,6 +456,24 @@ export default function Deals() {
       await updateStage({ id: dealId, stageId: newStageId });
     } catch (e: unknown) {
       toast({ title: "Erro ao mover negócio", description: mensagemErro(e), variant: "destructive" });
+    }
+  };
+
+  /** "+ Nova coluna" (admin): a etapa nova entra depois da última do funil. */
+  const criarEtapa = async (nome: string) => {
+    const ordenadas = etapasEmOrdem(pipelineStages);
+    const ultima = ordenadas[ordenadas.length - 1];
+    try {
+      await criarEtapaNoBanco({
+        pipelineId: selectedPipeline,
+        nome,
+        ordem: (ultima?.order ?? -1) + 1,
+        cor: ultima?.color || COR_PADRAO_DE_ETAPA,
+      });
+      toast({ title: "Etapa criada", description: nome });
+    } catch (e: unknown) {
+      toast({ title: "Erro ao criar etapa", description: mensagemErro(e), variant: "destructive" });
+      throw e;
     }
   };
 
@@ -644,7 +694,7 @@ export default function Deals() {
   });
   // Os chips de sinal estreitam o QUADRO e a previsão, não os indicadores: a
   // faixa continua dizendo o tamanho do funil enquanto se olha só os atrasados.
-  const abertosVisiveis = filtrarPorSinal(openDeals, sinais, agora);
+  const abertosVisiveis = ordenarNegocios(filtrarPorSinal(openDeals, sinais, agora), ordem);
 
   // O "Time" do funil: quem tem negócio aberto nele, de quem tem mais para
   // quem tem menos. Os tons saem da equipe inteira, para a mesma pessoa ter a
@@ -671,21 +721,22 @@ export default function Deals() {
   const etapasDoAberto = funilDoAberto ? allStages.filter((s) => s.pipeline_id === funilDoAberto) : pipelineStages;
   const quadroPronto = !funilCarregando && !funilFalhou && !semFunil && !todosFalhou && !todosCarregando;
 
+  const funilAtivo = pipelines.find((p) => p.id === selectedPipeline);
+  const filtrosAtivos = contarFiltrosAtivos(filters, precisaDeTodos ? sinais : undefined);
+  const sinaisDoPainel = precisaDeTodos ? { ...sinais, quentes: comTemperatura ? sinais.quentes : undefined } : undefined;
+  const limparTudo = () => {
+    setFilters({});
+    setSinais({ quentes: false, atrasada: false, paradosHa: null });
+  };
+
   return (
     <PageShell
-      /* Só no kanban: a coluna é que rola, e para isso o quadro precisa de
-         altura definida. Na lista e na previsão a página rolar é o certo.
-
-         Os respiros entre título, funis, indicadores, chips e quadro são os da
-         referência (8/20/20/20px), e não o `gap-6` da casca: por isso
-         `gap-0 space-y-0` aqui e margens explícitas em cada faixa. O
-         `md:-mt-2.5` cancela o respiro extra que o cabeçalho põe acima do
-         título para telas com botões ao lado -- esta não tem: criar negócio é
-         o "+ Novo" da barra superior e o "+ Adicionar negócio" de cada coluna,
-         e editar etapas mora em Configurações → Funis e etapas ("+ Funil"). */
-      preencherAltura={viewMode === "kanban"}
-      className="gap-0 space-y-0 md:-mt-2.5"
-      title="Negócios"
+      /* Kanban e lista: a página não rola, só a coluna / a tabela (para isso
+         precisam de altura definida). Na previsão, que é painel, a página rola. */
+      preencherAltura={viewMode !== "forecast"}
+      className="gap-3"
+      title="Pipeline"
+      description={funilAtivo?.name}
       meta={
         listFetching && viewMode === "list" ? (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -695,76 +746,117 @@ export default function Deals() {
         ) : undefined
       }
       /*
-        A LINHA DOS FUNIS, com a equipe e a troca de visão à direita.
-
-        Os funis saíram do select do cabeçalho e viraram pílulas com contagem.
-        "+ Funil" só para admin: criar funil existe em Configurações → Funis e
-        etapas, que é aba de admin -- oferecer a quem não pode seria uma porta
-        fechada.
+        A BARRA À DIREITA DO TÍTULO: busca, "Filtros", "Resumo", o menu de
+        pontos (visão e etapas) e a ação primária. Ordenação é o chip logo
+        abaixo -- um controle por função.
+      */
+      actions={
+        <BarraDeFerramentas
+          busca={{
+            valor: busca,
+            onChange: (v) => setParametro("q", v),
+            placeholder: "Pesquisar...",
+            rotulo: "Pesquisar negócios por título, contato ou empresa",
+          }}
+        >
+          <BotaoTracejado icone={<PlusCircle />} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}>
+            Filtros
+            {filtrosAtivos > 0 && (
+              <span className="rounded-full bg-primary px-1.5 text-label font-semibold tabular-nums text-primary-foreground">
+                {filtrosAtivos}
+              </span>
+            )}
+          </BotaoTracejado>
+          {viewMode === "kanban" && (
+            <BotaoTracejado icone={<BarChart3 />} aria-expanded={resumoAberto}
+              onClick={() => setParametro("resumo", resumoAberto ? null : "1")}>
+              Resumo
+            </BotaoTracejado>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <BotaoDeIcone aria-label="Mais opções do funil" icone={<MoreVertical />} className="rounded-full" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Visualização</DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+                <DropdownMenuRadioItem value="kanban"><SquareKanban className="mr-2 h-3.5 w-3.5" />Kanban</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="list"><List className="mr-2 h-3.5 w-3.5" />Lista</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="forecast"><LineChart className="mr-2 h-3.5 w-3.5" />Previsão</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+              {/* Criar funil e editar etapas existem só em Configurações, que é
+                  aba de admin -- oferecer a quem não pode seria porta fechada. */}
+              {isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => navigate("/settings?aba=pipelines")}>
+                    <Settings2 className="mr-2 h-3.5 w-3.5" />Configurar funis e etapas
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={() => openNew()} disabled={pipelineStages.length === 0}>
+            <Plus className="mr-1.5 h-4 w-4" />Novo negócio
+          </Button>
+        </BarraDeFerramentas>
+      }
+      /*
+        A LINHA DE ESTADO: a aba dos funis na borda, os chips "Ordenação" e
+        "Intervalo", e os filtros ligados como chips removíveis.
       */
       toolbar={
-        <div className="mt-1.5 flex flex-wrap items-end justify-between gap-3">
-          {pipelines.length > 0 ? (
-            <SeletorDeFunil
+        <div className="flex min-h-9 flex-wrap items-center gap-2">
+          {pipelines.length > 0 && (
+            <AbaDeFunis
               funis={pipelines}
               valor={selectedPipeline}
               onChange={setSelectedPipeline}
               contagens={precisaDeTodos && !todosCarregando && !todosFalhou ? abertosPorFunil : undefined}
               linkNovoFunil={isAdmin ? "/settings?aba=pipelines" : undefined}
             />
-          ) : <span />}
-          <div className="flex flex-wrap items-center gap-3">
-            <TimeDoFunil pessoas={timeDoFunil} tons={tons} />
-            {/* Era um grupo de pílulas escrito à mão, o quarto do projeto, com
-                medidas próprias e sem `aria-pressed` -- nenhuma das quatro cópias
-                anunciava a seleção para leitor de tela. */}
-            <SegmentedControl<ViewMode>
-              rotuloGrupo="Visualização"
-              variante="cartao"
-              valor={viewMode}
-              onChange={setViewMode}
-              opcoes={[
-                { valor: "kanban", rotulo: "Kanban", icone: SquareKanban },
-                { valor: "list", rotulo: "Lista", icone: List },
-                { valor: "forecast", rotulo: "Previsão", icone: LineChart },
-              ]}
+          )}
+          <ChipDeEstado rotulo="Ordenação" valor={ordem} opcoes={OPCOES_DE_ORDEM}
+            onChange={(v) => setParametro("ordem", v === "recentes" ? null : v)} />
+          <ChipDeEstado rotulo="Intervalo" valor={intervalo} opcoes={OPCOES_DE_INTERVALO}
+            onChange={(v) => setParametro("intervalo", v === "tudo" ? null : v)} />
+          {!semFunil && (
+            <ChipsDoFunil
+              filtros={filters}
+              onFiltros={setFilters}
+              membros={members}
+              sinais={sinaisDoPainel}
+              onSinais={precisaDeTodos ? setSinais : undefined}
+              onAbrirFiltros={() => setShowFilters(true)}
+              onLimparTudo={limparTudo}
             />
-          </div>
+          )}
+          {viewMode === "kanban" && resumoAberto && timeDoFunil.length > 0 && (
+            <div className="ml-auto"><TimeDoFunil pessoas={timeDoFunil} tons={tons} /></div>
+          )}
         </div>
       }
     >
-      <div className={viewMode === "kanban" ? "mt-5 flex min-h-0 min-w-0 flex-1 flex-col gap-5" : "mt-5 min-w-0 space-y-5"}>
-
-      {/* Os indicadores precisam do funil inteiro carregado: na lista, que é
-          paginada, eles mediriam só a página. Na previsão também não: ela tem a
-          própria faixa (comprometido/provável), e duas faixas empilhadas
-          disputariam a mesma atenção. */}
-      {viewMode === "kanban" && quadroPronto && (
-        <FaixaDoFunil
-          resumo={resumo}
-          onVerParados={() => setSinais({ ...sinais, paradosHa: 14 })}
-          meta={metaMensal?.coluna ? metaMensal.valor : undefined}
-          podeEditarMeta={role === "owner"}
-        />
-      )}
-
-      {!semFunil && (
-        <ChipsDoFunil
-          filtros={filters}
-          onFiltros={setFilters}
-          membros={members}
-          sinais={precisaDeTodos ? { ...sinais, quentes: comTemperatura ? sinais.quentes : undefined } : undefined}
-          onSinais={precisaDeTodos ? setSinais : undefined}
-          onAbrirFiltros={() => setShowFilters(!showFilters)}
-          onLimparTudo={() => {
-            setFilters({});
-            setSinais({ quentes: false, atrasada: false, paradosHa: null });
-          }}
-        />
-      )}
+      <div className={viewMode === "forecast" ? "min-w-0 space-y-4" : cn("flex min-h-0 min-w-0 flex-1 flex-col", viewMode === "kanban" ? "gap-3" : "gap-4")}>
 
       {showFilters && (
-        <DealsFilters filters={filters} onFiltersChange={setFilters} members={members} />
+        <DealsFilters filters={filters} onFiltersChange={setFilters} members={members}>
+          {sinaisDoPainel && <SinaisDoFunil sinais={sinaisDoPainel} onSinais={setSinais} />}
+        </DealsFilters>
+      )}
+
+      {/* O RESUMO DO FUNIL, recolhido por padrão (botão "Resumo"). Precisa do
+          funil inteiro carregado: na lista, que é paginada, mediria só a
+          página; a previsão tem a própria faixa. */}
+      {viewMode === "kanban" && quadroPronto && resumoAberto && (
+        <section aria-label="Resumo do funil" className="flex shrink-0 flex-col gap-3">
+          <FaixaDoFunil
+            resumo={resumo}
+            onVerParados={() => setSinais({ ...sinais, paradosHa: 14 })}
+            meta={metaMensal?.coluna ? metaMensal.valor : undefined}
+            podeEditarMeta={role === "owner"}
+          />
+        </section>
       )}
 
       {/* Falha de consulta de negócios não pode parecer funil vazio. */}
@@ -844,7 +936,7 @@ export default function Deals() {
         // A margem negativa come o respiro de baixo do <main> (28px) e os 10px
         // que o `md:-mt-2.5` da casca subiu: na referência o quadro e o painel
         // vão até a borda da janela, e quem rola é a coluna.
-        <div className="flex min-h-0 min-w-0 flex-1 gap-5 md:-mb-[38px]">
+        <div className="flex min-h-0 min-w-0 flex-1 gap-4">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <DealsKanban
               deals={abertosVisiveis}
@@ -862,6 +954,8 @@ export default function Deals() {
               onComposeEmail={escreverEmail}
               selectedDeals={selectedDeals}
               onSelectionChange={setSelectedDeals}
+              onNovaEtapa={isAdmin ? criarEtapa : undefined}
+              linkConfigurarEtapas={isAdmin ? "/settings?aba=pipelines" : undefined}
             />
           </div>
           {negocioAberto && (
@@ -894,8 +988,11 @@ export default function Deals() {
       {viewMode === "list" && listaCarregando && <LoadingState linhas={8} />}
 
       {viewMode === "list" && !listaFalhou && !listaCarregando && (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
           <DealsList
+            // Trocar o chip recomeça a ordem da tabela pela dele.
+            key={ordem}
+            ordemInicial={ordem === "valor" ? "value" : ordem === "atualizacao" ? "updated_at" : "created_at"}
             deals={listDeals}
             stages={allStages}
             selectedDeals={selectedDeals}
@@ -905,7 +1002,7 @@ export default function Deals() {
             canDelete={isAdmin}
           />
           {listTotalPages > 1 && (
-            <div className="flex items-center justify-between">
+            <div className="flex shrink-0 items-center justify-between">
               <span className="text-xs text-muted-foreground">
                 Página {listPage + 1} de {listTotalPages} · {listDealsResult.count} negócios
               </span>
@@ -919,7 +1016,7 @@ export default function Deals() {
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {viewMode === "forecast" && !todosFalhou && !todosCarregando && (

@@ -100,8 +100,10 @@ describe("contagem e texto fixo não dividem o mesmo campo", () => {
   // Negócios saiu: no Visual 01 a contagem mora nas pílulas de funil
   // ("Vendas Clínicas 31") e no cartão "Em aberto", não ao lado do título.
   const QUE_CONTAM = [
-    "Contacts", "Companies", "Activities",
+    "Activities",
   ];
+  // Contacts e Companies saíram: no padrão da plataforma a contagem vive na barra
+  // de ferramentas ("N resultados"), não ao lado do título.
   it.each(QUE_CONTAM)("%s passa contagem", (nome) => {
     expect(readFileSync(`src/pages/${nome}.tsx`, "utf8")).toMatch(/contagem=\{\{/);
   });
@@ -193,7 +195,7 @@ describe("o subtítulo passa no contraste mínimo", () => {
 
   it.each([
     ["o branco do cartão", [255, 255, 255] as [number, number, number]],
-    ["o cinza de --muted", hslParaRgb(220, 13, 93)],
+    ["o cinza de --muted", (() => { const m = CSS.match(/--muted:\s*(\d+)\s+(\d+)%\s+(\d+)%/)!; return hslParaRgb(Number(m[1]), Number(m[2]), Number(m[3])); })()],
   ])("atinge 4,5:1 sobre %s", (_onde, fundo) => {
     const fg = hslParaRgb(Number(claro[1]), Number(claro[2]), Number(claro[3]));
     expect(contraste(fg, fundo)).toBeGreaterThanOrEqual(4.5);

@@ -131,7 +131,9 @@ describe("o card do quadro segue a referência", () => {
     // Inteira ou com centavos: o que importa é a POSIÇÃO do valor.
     const valor = card.search(/formatarMoeda(Inteira)?\(/);
     expect(valor).toBeGreaterThan(-1);
-    expect(valor).toBeLessThan(card.indexOf("border-t border-border"));
+    // A linha de baixo é a da próxima atividade (o padrão da plataforma tirou
+    // a divisória do card; a ordem é o que este teste protege).
+    expect(valor).toBeLessThan(card.indexOf("rotuloDaProxima("));
   });
 
   /** A referência escreve o valor na mesma fonte do resto; `num` é a mono. */
