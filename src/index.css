@@ -845,3 +845,66 @@
   .vx-dialog, .vx-sheet, .vx-overlay { animation: none !important; }
   .vx-deal-card:hover, .vx-deal-card:active { transform: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DOCUMENTO DE ORÇAMENTO (folha A4)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * A folha é PAPEL: branca e de tinta quase preta MESMO no tema escuro, porque
+ * um documento impresso/PDF não escurece. Por isso as cores são hsl LITERAIS,
+ * escopadas aqui, e não tokens do tema (que inverteriam no dark). Só o
+ * destaque (`--primary`) segue o tema, e só em detalhes.
+ */
+.vx-documento {
+  --doc-papel: 0 0% 100%;
+  --doc-tinta: 220 20% 8%;
+  --doc-suave: 220 8% 38%;      /* rótulos: contraste ≥ 4.5:1 sobre o papel */
+  --doc-linha: 220 10% 62%;     /* bordas finas, visíveis também na impressão */
+  --doc-fundo-leve: 220 14% 96%;
+  --doc-ok: 152 60% 24%;
+  --doc-erro: 0 65% 40%;
+  --doc-aviso: 32 85% 30%;
+  /* O destaque da marca ESCURECIDO para o papel branco: no tema escuro o
+     `--primary` é um azul claro (feito para fundo escuro) e perdia contraste
+     sobre a folha. Misturar com preto mantém a cor escolhida e dá ≥ 4,5:1. */
+  --doc-destaque: color-mix(in oklab, hsl(var(--primary)) 60%, black);
+  background: hsl(var(--doc-papel));
+  color: hsl(var(--doc-tinta));
+  color-scheme: light;
+}
+.vx-documento .vx-doc-caixa { border: 1px solid hsl(var(--doc-linha)); }
+.vx-documento .vx-doc-rotulo {
+  display: block; text-transform: uppercase; letter-spacing: 0.04em;
+  color: hsl(var(--doc-suave)); font-weight: 600;
+}
+.vx-documento .vx-doc-suave { color: hsl(var(--doc-suave)); }
+.vx-documento .vx-doc-destaque { color: var(--doc-destaque); }
+.vx-documento .vx-doc-linha-b { border-bottom: 1px solid hsl(var(--doc-linha)); }
+.vx-documento .vx-doc-fundo { background: hsl(var(--doc-fundo-leve)); }
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html, body { background: #fff !important; }
+  /* Some tudo que não é a folha, nem um ANCESTRAL dela (gaveta, cartão,
+     layout) nem um descendente: esconder os ancestrais esconderia a folha. */
+  body *:not(.vx-documento):not(.vx-documento *):not(:has(.vx-documento)) { display: none !important; }
+  /* Ancestrais deixam de prender a folha: sem altura fixa, rolagem, posição
+     fixa ou transform, ela fluiria cortada em uma tela só. */
+  html, body, *:has(.vx-documento) {
+    position: static !important; transform: none !important; filter: none !important;
+    overflow: visible !important; height: auto !important; max-height: none !important;
+    min-height: 0 !important; width: auto !important; max-width: none !important;
+    margin: 0 !important; padding: 0 !important; border: 0 !important;
+    box-shadow: none !important; background: transparent !important; display: block !important;
+    animation: none !important;
+  }
+  .vx-documento {
+    width: 100% !important; max-width: none !important; min-height: 0 !important;
+    margin: 0 !important; box-shadow: none !important; border: 0 !important;
+    padding: 0 !important; zoom: 1 !important;
+  }
+  .vx-nao-imprime { display: none !important; }
+  .vx-documento thead { display: table-header-group; }
+  .vx-documento tr, .vx-documento .vx-doc-bloco { break-inside: avoid; page-break-inside: avoid; }
+}
