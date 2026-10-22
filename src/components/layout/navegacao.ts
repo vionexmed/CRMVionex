@@ -32,7 +32,7 @@ export const NAV_SECTIONS: NavSection[] = [
     { label: "Contatos", path: "/contacts", icon: Users, aliases: ["/leads"] },
     { label: "Empresas", path: "/companies", icon: Building2 },
   ] },
-  { id: "negocios", label: "Negócios", icon: Briefcase, entryPath: "/deals", items: [
+  { id: "negocios", label: "Pipeline", icon: Briefcase, entryPath: "/deals", items: [
     { label: "Funil", path: "/deals", icon: Handshake },
     { label: "Produtos", path: "/produtos", icon: Package },
     { label: "Orçamentos", path: "/orcamentos", icon: Receipt },

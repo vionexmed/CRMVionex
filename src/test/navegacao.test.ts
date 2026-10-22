@@ -274,7 +274,7 @@ describe("a estrutura de grupos", () => {
 
   it("os nomes dizem o que o grupo tem", () => {
     expect(NAV_GRUPOS.map((g) => g.label)).toEqual([
-      "Painel", "Atividades", "Clientes", "Negócios", "Comunicação", "Análise",
+      "Painel", "Atividades", "Clientes", "Pipeline", "Comunicação", "Análise",
     ]);
   });
 });

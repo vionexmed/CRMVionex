@@ -13,7 +13,7 @@ import type { SearchCategory } from "@/lib/api/global-search";
 const categories: { key: SearchCategory; label: string; icon: LucideIcon }[] = [
   { key: "contacts", label: "Contatos", icon: Users },
   { key: "companies", label: "Empresas", icon: Building2 },
-  { key: "deals", label: "Negócios", icon: Handshake },
+  { key: "deals", label: "Pipeline", icon: Handshake },
 ];
 /** Título de grupo no V1: caixa-alta pequena, como os rótulos de seção da casca. */
 const GRUPO = "[&_[cmdk-group-heading]]:text-label [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide";

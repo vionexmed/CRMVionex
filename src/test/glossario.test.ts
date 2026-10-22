@@ -69,8 +69,14 @@ describe("'Pipeline' não aparece na interface", () => {
    * propósito: nomeia onde o problema estava, e uma varredura genérica não
    * consegue distinguir rótulo de identificador sem parser.
    */
+  /*
+   * EXCEÇÃO DECIDIDA PELO DONO: "Pipeline" é o nome da ÁREA e da tela de
+   * Negócios (menu, título, "Voltar para o Pipeline"), no lugar de "Negócios".
+   * `Deals.tsx` sai desta lista por isso. O FUNIL em si (a entidade, com suas
+   * etapas) continua se chamando Funil em Configurações, nas pílulas e nos
+   * avisos -- só o nome da área mudou.
+   */
   const arquivos = [
-    "src/pages/Deals.tsx",
     "src/components/onboarding/PipelineStep.tsx",
     "src/components/onboarding/CompleteStep.tsx",
     "src/components/onboarding/OnboardingModal.tsx",
