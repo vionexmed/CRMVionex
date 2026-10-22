@@ -53,8 +53,17 @@ describe("selos da lateral", () => {
     lateral();
     await waitFor(() => expect(screen.getByRole("link", { name: "Atividades" })).toHaveAccessibleDescription("5 atrasadas"));
     await waitFor(() => expect(screen.getByRole("link", { name: "Comunicação" })).toHaveAccessibleDescription("12 não lidas"));
-    // Nome, segmento e plano da organização, não um rótulo fixo.
-    expect(await screen.findByText("Clínicas · Plano Pro")).toBeVisible();
+    // O topo da lateral é o LOGO ORIGINAL da Vionex (símbolo + "vionex"), não
+    // um quadrado com inicial nem o nome escrito à mão.
+    expect(screen.getByRole("img", { name: "Vionex" })).toBeVisible();
+  });
+
+  /** Configurações fica fixa no canto inferior, e marca quando está aberta. */
+  it("Configurações vive no rodapé da lateral", () => {
+    lateral();
+    const link = screen.getByRole("link", { name: "Configurações" });
+    expect(link).toHaveAttribute("href", "/settings");
+    expect(link.closest("[data-sidebar=\"footer\"]")).not.toBeNull();
   });
 
   /**

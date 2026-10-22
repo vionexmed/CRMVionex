@@ -1,11 +1,12 @@
 import type { CSSProperties } from "react";
-import { ChevronsUpDown, LogOut, PanelLeftClose } from "lucide-react";
+import { ChevronsUpDown, LogOut, PanelLeftClose, Settings } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import vionexLogo from "@/assets/vionex-logo-sidebar.png";
 import { useAuth } from "@/contexts/AuthContext";
-import { Sidebar, SidebarContent, SidebarHeader, useSidebar } from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, useSidebar } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ACCOUNT_ITEMS, getActiveNavItem, getActiveSection, getVisibleNavigation } from "./navegacao";
-import { useAtrasadasDaLateral, useNaoLidasDaLateral, useOrganizacaoDaLateral } from "./useContagensDaLateral";
+import { useAtrasadasDaLateral, useNaoLidasDaLateral } from "./useContagensDaLateral";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -60,13 +61,9 @@ export function AppSidebar() {
   const activeItem = getActiveNavItem(pathname);
   const name = profile?.name || "Usuário";
   const closeMobile = () => { if (isMobile) setOpenMobile(false); };
-  const { data: org } = useOrganizacaoDaLateral();
   const { data: atrasadas } = useAtrasadasDaLateral();
   const { data: naoLidas } = useNaoLidasDaLateral();
-  const nomeDaOrg = org?.nome || "Vionex";
-  // Sem segmento nem plano cadastrados, o papel de quem está logado ainda diz
-  // algo útil -- melhor que uma linha vazia sob o nome.
-  const detalheDaOrg = org?.detalhe || (isAdmin ? "Administração" : "Comercial");
+  const emConfiguracoes = pathname === "/settings" || pathname.startsWith("/settings/");
   const selos: Record<string, { valor: number | null | undefined; tom: "perigo" | "neutro"; rotulo: string }> = {
     atividades: { valor: atrasadas, tom: "perigo", rotulo: "atrasadas" },
     comunicacao: { valor: naoLidas, tom: "neutro", rotulo: "não lidas" },
@@ -79,16 +76,12 @@ export function AppSidebar() {
           <DropdownMenuTrigger asChild>
             <button type="button" aria-label="Conta e configurações"
               className={cn("flex min-h-[34px] w-full items-start gap-2.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring", collapsed && "justify-center")}>
-              <span aria-hidden="true" className="mt-px flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-base font-bold text-sidebar-primary-foreground">
-                {nomeDaOrg.charAt(0).toUpperCase()}
-              </span>
-              {!collapsed && <>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-base font-bold leading-5 tracking-tight text-white">{nomeDaOrg}</span>
-                  <span className="mt-0.5 block truncate text-label text-sidebar-muted">{detalheDaOrg}</span>
-                </span>
-                <ChevronsUpDown aria-hidden="true" className="mt-[10px] h-4 w-4 shrink-0 text-sidebar-muted" />
-              </>}
+              {/* O LOGO ORIGINAL da Vionex (símbolo + "vionex" em minúsculas), e não
+                  um quadrado com inicial: é a marca que a equipe reconhece.
+                  Recolhida, só o símbolo -- a imagem é cortada pela esquerda. */}
+              <img src={vionexLogo} alt="Vionex"
+                className={cn("shrink-0 object-contain", collapsed ? "h-9 w-9 object-cover object-left" : "h-10 w-auto max-w-[150px] object-left")} />
+              {!collapsed && <ChevronsUpDown aria-hidden="true" className="ml-auto mt-[11px] h-4 w-4 shrink-0 text-sidebar-muted" />}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="bottom" className="w-60">
@@ -153,7 +146,7 @@ export function AppSidebar() {
                         return <li key={sub.path} style={{ "--vx-i": i } as CSSProperties}>
                           <Link to={sub.path} onClick={closeMobile} aria-current={atual ? "page" : undefined} tabIndex={selected ? undefined : -1}
                             className={cn("flex h-[29px] items-center rounded-md px-2.5 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring max-md:h-11",
-                              atual ? "bg-sidebar-accent font-semibold text-white" : "text-sidebar-muted hover:bg-sidebar-accent/60 hover:text-sidebar-foreground")}>
+                              atual ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground" : "text-sidebar-muted hover:bg-sidebar-accent/60 hover:text-sidebar-foreground")}>
                             <span className="truncate">{sub.label}</span>
                           </Link>
                         </li>;
@@ -166,6 +159,25 @@ export function AppSidebar() {
           </ul>
         </nav>
       </SidebarContent>
+      {/*
+        CONFIGURAÇÕES FIXA NO CANTO INFERIOR ESQUERDO. Quem configura o CRM
+        (equipe, integrações, aparência) procurava o item no menu da conta, que
+        agora é o logo do topo; aqui ele fica sempre à vista, sob a navegação, e
+        marcado quando alguma tela de configuração está aberta.
+      */}
+      <SidebarFooter className="gap-0 border-t border-sidebar-border px-3.5 py-3">
+        {(() => {
+          const link = <Link to="/settings" onClick={closeMobile} aria-label="Configurações" aria-current={emConfiguracoes ? "page" : undefined}
+            className={cn("vx-nav-item relative flex h-[38px] w-full items-center rounded-lg text-sm text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring max-md:h-11",
+              collapsed ? "justify-center px-0" : "gap-3 pl-[11px] pr-[11px]", emConfiguracoes ? "vx-nav-active font-semibold" : "font-normal")}>
+            <Settings aria-hidden="true" className="h-[19px] w-[19px] shrink-0" />
+            {!collapsed && <span className="truncate pt-[2px] leading-4">Configurações</span>}
+          </Link>;
+          return collapsed
+            ? <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right" sideOffset={8}>Configurações</TooltipContent></Tooltip>
+            : link;
+        })()}
+      </SidebarFooter>
     </Sidebar>
   );
 }
