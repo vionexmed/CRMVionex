@@ -373,7 +373,17 @@
   }
   /* Era `rgba(255,255,255,0.06)`: branco fixo, que assume barra lateral
    * escura. No tema claro o realce simplesmente não aparecia. */
-  .vx-nav-item:hover { background: hsl(var(--sidebar-accent)) !important; color: hsl(var(--sidebar-accent-foreground)); }
+  /*
+   * O hover NÃO vale para o item ativo.
+   *
+   * O ativo tem fundo e cor de texto com `!important`. O `:hover` tem mais
+   * especificidade e trocava SÓ o fundo (para o cinza do hover), enquanto a
+   * cor do texto do ativo continuava valendo: texto branco sobre fundo claro
+   * no tema claro (e texto escuro sobre fundo escuro no escuro). Era o "pisca
+   * e fica branco" ao passar o mouse sobre o item da tela atual.
+   */
+  .vx-nav-item:hover:not(.vx-nav-active) { background: hsl(var(--sidebar-accent)) !important; color: hsl(var(--sidebar-accent-foreground)); }
+  .vx-nav-active:hover { filter: brightness(0.95); }
   .vx-nav-item svg { color: hsl(var(--sidebar-muted)); }
 
   /* ── KPI Card Variants ────────────────────────────────── */
