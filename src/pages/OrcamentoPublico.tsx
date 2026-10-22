@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { formatarMoeda, formatarData } from "@/lib/formato";
-import { CartaoDaProposta } from "@/components/orcamentos/CartaoDaProposta";
-import { dataCurtaSemPonto } from "@/lib/orcamento-resumo";
+import { formatarData } from "@/lib/formato";
+import { DocumentoDeOrcamento, type SituacaoDoDocumento } from "@/components/orcamentos/DocumentoDeOrcamento";
 import { cn } from "@/lib/utils";
 
 type ItemPublico = {
@@ -21,6 +20,13 @@ type OrcamentoPublicoDados = {
   empresa: string | null;
   /** "Hospital São Lucas · Dr. Henrique Prado": para quem é a proposta. */
   para?: string | null;
+  /** Quem emite: só os dados que a empresa escolheu pôr nos documentos. */
+  emitente?: { razao_social?: string; cnpj?: string; endereco?: string; telefone?: string; email?: string; site?: string } | null;
+  /** Empresa e pessoa do cliente, SEM e-mail nem telefone: o link pode ser encaminhado. */
+  cliente?: string | null;
+  contato?: string | null;
+  responsavel?: string | null;
+  emitido_em?: string | null;
   /** Condições de pagamento que o cliente lê (não é a observação interna). */
   condicoes?: string | null;
   status: string;
@@ -128,31 +134,39 @@ export default function OrcamentoPublico() {
   const aprovado = dados.status === "aprovado";
   const podeDecidir = !decidido && !dados.expirado;
 
-  const marca = dados.empresa ?? "Vionex";
-  const linhas = dados.itens.map((item) => ({
-    nome: item.nome,
-    apoio: item.descricao
-      || `${item.quantidade} ${item.unidade} × ${formatarMoeda(item.preco_unit, dados.moeda)}${item.desconto > 0 ? ` − ${formatarMoeda(item.desconto, dados.moeda)}` : ""}`,
-    valor: item.total,
-  }));
+  // Vencido só importa enquanto não decidido: o que o cliente já respondeu não "expira".
+  const situacao = (dados.expirado && !decidido ? "expirado" : dados.status) as SituacaoDoDocumento;
 
   return (
     <div className="min-h-screen bg-background px-4 py-8">
-      {/* O MESMO cartão da prévia no CRM: quem vende e quem lê veem o mesmo
-          documento. Só tokens, para seguir o tema do navegador. */}
-      <article className="mx-auto max-w-md">
-        <div className="rounded-lg border border-border bg-surface-2 p-3">
-          <CartaoDaProposta
-            marca={marca}
-            validade={dados.valido_ate ? dataCurtaSemPonto(dados.valido_ate) : null}
-            vencida={dados.expirado}
-            para={dados.para || dados.titulo || `Orçamento #${dados.numero}`}
-            linhas={linhas}
-            desconto={dados.desconto}
-            total={dados.total}
-            moeda={dados.moeda}
-            condicoes={dados.condicoes}
-          >
+      {/* O MESMO documento da prévia no CRM: quem vende e quem lê veem a mesma
+          folha. O formulário de resposta vai dentro do quadro de aceite. */}
+      <article className="mx-auto max-w-[842px]">
+        <DocumentoDeOrcamento
+          dados={{
+            numero: dados.numero,
+            titulo: dados.titulo,
+            situacao,
+            emitidoEm: dados.emitido_em ?? null,
+            validoAte: dados.valido_ate,
+            moeda: dados.moeda,
+            emitente: { ...(dados.emitente ?? {}), nome: dados.empresa ?? "Vionex" },
+            destinatario: {
+              cliente: dados.cliente || dados.para || dados.titulo || `Orçamento #${dados.numero}`,
+              contato: dados.contato,
+            },
+            responsavel: dados.responsavel,
+            itens: dados.itens.map((i) => ({
+              nome: i.nome, descricao: i.descricao, unidade: i.unidade, quantidade: i.quantidade,
+              preco_unit: i.preco_unit, desconto: i.desconto, total: i.total,
+            })),
+            subtotal: dados.subtotal,
+            desconto: dados.desconto,
+            total: dados.total,
+            condicoes: dados.condicoes,
+            token: token ?? "",
+          }}
+        >
             {decidido ? (
               <div className="rounded-md bg-surface-2 p-4 text-center">
                 <span className={cn(
@@ -232,11 +246,10 @@ export default function OrcamentoPublico() {
                 </Button>
               </div>
             )}
-          </CartaoDaProposta>
-        </div>
+        </DocumentoDeOrcamento>
       </article>
 
-      <p className="mx-auto max-w-md py-4 text-center text-label text-muted-foreground">
+      <p className="vx-nao-imprime mx-auto max-w-md py-4 text-center text-label text-muted-foreground">
         Este orçamento foi enviado por {dados.empresa ?? "seu contato"} · Nº {dados.numero}.
       </p>
     </div>

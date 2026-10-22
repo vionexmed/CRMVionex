@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { EmpresaNosDocumentos } from "@/components/settings/EmpresaNosDocumentos";
 
 /** Só organização: o perfil pessoal virou aba própria (ProfileTab), visível a todos. */
 export function GeneralTab({ orgId }: { orgId: string | null }) {
@@ -109,6 +110,8 @@ export function GeneralTab({ orgId }: { orgId: string | null }) {
           <div className="flex justify-end"><Button size="sm" className="h-8 text-xs" onClick={saveOrg}>Salvar Organização</Button></div>
         </CardContent>
       </Card>
+
+      <EmpresaNosDocumentos />
 
       <Card>
         <CardHeader>

@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
 
     const { data: orc, error } = await admin
       .from("orcamentos")
-      .select("id, org_id, numero, titulo, status, valido_ate, desconto, moeda, contact_id, deal_id, visto_em, decidido_em, decidido_por, motivo_recusa")
+      .select("id, org_id, owner_id, created_at, numero, titulo, status, valido_ate, desconto, moeda, contact_id, deal_id, visto_em, decidido_em, decidido_por, motivo_recusa")
       .eq("token", token)
       .maybeSingle();
 
@@ -120,7 +120,24 @@ Deno.serve(async (req) => {
 
     // O nome da empresa que ENVIA, para o cliente saber de quem é o orçamento.
     const { data: org } = await admin
-      .from("organizations").select("name").eq("id", orc.org_id).maybeSingle();
+      .from("organizations").select("name, settings").eq("id", orc.org_id).maybeSingle();
+
+    /*
+      O EMITENTE do documento: `settings.empresa`, o que o admin escolheu pôr
+      nos documentos. Campo a campo e só string, para um json estranho nunca
+      vazar outra coisa de `settings` (que guarda configuração interna).
+    */
+    const bruta = (org?.settings as Record<string, unknown> | null)?.empresa as Record<string, unknown> | undefined;
+    const emitente: Record<string, string> = {};
+    for (const k of ["razao_social", "cnpj", "endereco", "telefone", "email", "site"]) {
+      const v = bruta?.[k];
+      if (typeof v === "string" && v.trim()) emitente[k] = v.trim();
+    }
+
+    // Nome (só o nome) de quem é responsável: falha aqui não derruba a página.
+    const { data: dono } = orc.owner_id
+      ? await admin.from("profiles").select("name").eq("id", orc.owner_id).maybeSingle()
+      : { data: null };
 
     /*
       Para quem é a proposta, e as condições que o CLIENTE lê.
@@ -151,6 +168,13 @@ Deno.serve(async (req) => {
       titulo: orc.titulo,
       empresa: org?.name ?? null,
       para,
+      emitente,
+      // Empresa e pessoa SEPARADAS e sem e-mail/telefone: o link pode ser
+      // encaminhado, e contato de terceiros não deve ir junto.
+      cliente: empresaDoCliente?.name ?? (nomeDaPessoa || null),
+      contato: empresaDoCliente?.name ? (nomeDaPessoa || null) : null,
+      responsavel: (dono as { name?: string | null } | null)?.name ?? null,
+      emitido_em: orc.created_at,
       condicoes: extra?.condicoes ?? null,
       status: orc.status,
       valido_ate: orc.valido_ate,
