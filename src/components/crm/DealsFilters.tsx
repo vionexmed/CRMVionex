@@ -4,6 +4,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import { BarraDeFiltros } from "@/components/layout/BarraDeAcoes";
@@ -22,9 +23,11 @@ interface DealsFiltersProps {
   filters: DealFilters;
   onFiltersChange: (f: DealFilters) => void;
   members: Profile[];
+  /** Controles extras do painel (os sinais do quadro), depois dos campos. */
+  children?: ReactNode;
 }
 
-export function DealsFilters({ filters, onFiltersChange, members }: DealsFiltersProps) {
+export function DealsFilters({ filters, onFiltersChange, members, children }: DealsFiltersProps) {
   const hasFilters = Object.values(filters).some((v) => v !== undefined && v !== "");
 
   return (
@@ -86,6 +89,8 @@ export function DealsFilters({ filters, onFiltersChange, members }: DealsFilters
           onChange={(e) => onFiltersChange({ ...filters, closeDateTo: e.target.value || undefined })}
         />
       </div>
+
+      {children && <div className="flex items-end self-end">{children}</div>}
 
       {hasFilters && (
         <Button

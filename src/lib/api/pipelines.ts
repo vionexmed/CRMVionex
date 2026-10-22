@@ -35,6 +35,21 @@ export const pipelinesApi = {
     return data;
   },
 
+  /**
+   * Uma etapa nova no FIM do funil (o "+ Nova coluna" do quadro). Insere uma
+   * linha só, sem reescrever a ordem das outras: a etapa de entrada continua
+   * sendo a de menor `order`.
+   */
+  criarEtapa: async (orgId: string, pipelineId: string, nome: string, ordem: number, cor: string): Promise<void> => {
+    const { data, error } = await supabase
+      .from(TABLES.PIPELINE_STAGES)
+      .insert({ org_id: orgId, pipeline_id: pipelineId, name: nome, order: ordem, color: cor, win_probability: 0 })
+      .select("id");
+    if (error) throw error;
+    // O RLS recusa em silêncio: sem linha devolvida, nada foi criado.
+    if (!data || data.length === 0) throw new Error("Sem permissão para criar etapas neste funil.");
+  },
+
   saveStages: async (
     orgId: string,
     pipelineId: string,

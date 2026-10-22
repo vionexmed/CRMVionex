@@ -16,7 +16,7 @@
  * trocável e o tema escuro redefine as duas. E vão em `style`, não em atributo
  * de apresentação, porque `var()` em atributo SVG não é garantido.
  */
-import { useId, type ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { formatarNumero, pluralizar } from "@/lib/formato";
 import { useHoverTooltip } from "./svg/useHoverTooltip";
@@ -53,6 +53,7 @@ export function GraficoEvolucao({
   projecao,
   acao,
   altura = 174,
+  embutido = false,
 }: {
   titulo: string;
   /** Singular e plural do que se conta: "lead"/"leads". */
@@ -69,6 +70,8 @@ export function GraficoEvolucao({
   projecao: { diasNoPeriodo: number; nomeDoPeriodo: string } | null;
   acao?: ReactNode;
   altura?: number;
+  /** Dentro de um cartão que já tem título: sem título nem respiro lateral. */
+  embutido?: boolean;
 }) {
   const idGrad = useId().replace(/:/g, "");
   const total = pontos.length;
@@ -98,9 +101,9 @@ export function GraficoEvolucao({
     : null;
 
   return (
-    <div className="min-w-0">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-[var(--respiro)] pt-[calc(var(--respiro)-3px)]">
-        <p className="text-sm font-semibold">{titulo}</p>
+    <div className="min-w-0" style={embutido ? ({ "--respiro": "0px" } as CSSProperties) : undefined}>
+      <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 px-[var(--respiro)] pt-[calc(var(--respiro)-3px)]", embutido ? "justify-end" : "justify-between")}>
+        {!embutido && <p className="text-sm font-semibold">{titulo}</p>}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral">
           <span className="flex items-center gap-1.5">
             <span aria-hidden className="h-[3px] w-3.5 rounded-full bg-primary" />

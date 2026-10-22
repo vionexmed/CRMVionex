@@ -38,7 +38,7 @@ export function TabelaDeOrcamentos({
   nomeDoResponsavel: (id: string | null) => string | null;
 }) {
   return (
-    <div className="vx-table !rounded-none !border-0 [--row-h:52px] [&_thead_th]:!h-10 [&_tbody_td]:!py-[7px]">
+    <div className="vx-table min-h-0 overflow-auto !rounded-none !border-0 [--row-h:52px] [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-10 [&_thead_th]:!h-10 [&_tbody_td]:!py-[7px]">
       <table className="w-full table-fixed [&_td]:whitespace-nowrap">
         {/* Larguras fixas: com layout automático a coluna do cliente engolia o
             espaço e empurrava Situação e responsável para fora do cartão. */}

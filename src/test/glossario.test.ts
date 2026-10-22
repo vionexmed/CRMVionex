@@ -82,8 +82,23 @@ describe("'Pipeline' não aparece na interface", () => {
 
   // "Pipeline" com maiúscula em literal ou entre tags é sempre rótulo: o
   // identificador do código é `pipeline`, `pipelineId`, `usePipelines`.
+  /**
+   * A ÚNICA exceção é o nome da TELA de /deals, "Pipeline", pedido pelo padrão
+   * da plataforma: é o título da página, e o funil continua se chamando Funil
+   * em todo o resto (subtítulo, aba dos funis, menus). Tirada só a prop
+   * `title="Pipeline"`, nenhum outro "Pipeline" pode sobrar no arquivo.
+   */
+  const semTituloDaTela = (arq: string, src: string) =>
+    arq === "src/pages/Deals.tsx" ? src.replace('title="Pipeline"', "") : src;
+
   it.each(arquivos)("%s não mostra 'Pipeline' capitalizado", (arq) => {
-    expect(semComentarios(ler(arq))).not.toMatch(/["> ]Pipelines?\b/);
+    expect(semTituloDaTela(arq, semComentarios(ler(arq)))).not.toMatch(/["> ]Pipelines?\b/);
+  });
+
+  it("Deals.tsx usa 'Pipeline' só como título da tela", () => {
+    const src = semComentarios(ler("src/pages/Deals.tsx"));
+    // Rótulo é "Pipeline" depois de aspas, `>` ou espaço; `selectedPipeline` não conta.
+    expect(src.match(/["> ]Pipelines?\b/g) ?? []).toEqual(['"Pipeline']);
   });
 
   // "pipeline" minúsculo dentro de frase — "Nome do pipeline", "ao pipeline".

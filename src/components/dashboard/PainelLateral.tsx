@@ -302,7 +302,7 @@ export function AtendimentoAgora({ tempoResposta, aguardando, carregando, period
  * Mensagens recebidas por hora: quando a fila enche. O pico leva a cor cheia
  * e o rótulo embaixo dele; as outras horas ficam no tom claro da marca.
  */
-function BarrasPorHora({ dados, carregando, falhou }: {
+export function BarrasPorHora({ dados, carregando, falhou }: {
   dados: { hora: number; total: number }[] | undefined;
   carregando: boolean;
   falhou: boolean;

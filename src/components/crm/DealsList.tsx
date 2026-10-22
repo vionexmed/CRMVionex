@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 type Stage = Database["public"]["Tables"]["pipeline_stages"]["Row"];
 
 
-type SortKey = "title" | "value" | "close_date" | "probability" | "status" | "created_at";
+export type SortKey = "title" | "value" | "close_date" | "probability" | "status" | "created_at" | "updated_at";
 
 interface DealsListProps {
   deals: DealWithRelations[];
@@ -29,13 +29,18 @@ interface DealsListProps {
   onBatchAction: (action: "won" | "lost" | "delete") => void;
   /** Exclusão em lote é restrita a admin/owner */
   canDelete?: boolean;
+  /**
+   * A ordem de partida, vinda do chip "Ordenação" da página (a mesma que o
+   * servidor aplicou). Os cabeçalhos continuam reordenando a página à vista.
+   */
+  ordemInicial?: SortKey;
 }
 
 export function DealsList({
   deals, stages, selectedDeals, onSelectionChange, onDealClick, onBatchAction,
-  canDelete = true,
+  canDelete = true, ordemInicial = "created_at",
 }: DealsListProps) {
-  const { sortKey, sortDir, toggleSort } = useOrdenacao<SortKey>("created_at");
+  const { sortKey, sortDir, toggleSort } = useOrdenacao<SortKey>(ordemInicial);
 
 
   const sorted = [...deals].sort((a, b) => {
@@ -47,6 +52,7 @@ export function DealsList({
       case "close_date": cmp = (a.close_date || "").localeCompare(b.close_date || ""); break;
       case "status": cmp = (a.status || "").localeCompare(b.status || ""); break;
       case "created_at": cmp = (a.created_at || "").localeCompare(b.created_at || ""); break;
+      case "updated_at": cmp = (a.updated_at || a.created_at || "").localeCompare(b.updated_at || b.created_at || ""); break;
     }
     return sortDir === "asc" ? cmp : -cmp;
   });
@@ -80,7 +86,7 @@ export function DealsList({
   }, [stages]);
 
   return (
-    <div className="space-y-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {selectedDeals.size > 0 && (
         <BarraDeSelecao
           quantidade={selectedDeals.size}
@@ -102,9 +108,9 @@ export function DealsList({
         </BarraDeSelecao>
       )}
 
-      <div className="vx-table">
-        <Table>
-          <TableHeader>
+      <div className="vx-table min-h-0 overflow-auto">
+        <Table containerClassName="overflow-visible">
+          <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow>
               <TableHead className="w-10">
                 <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />

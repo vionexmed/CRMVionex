@@ -42,3 +42,14 @@ export function useSavePipelineStages() {
     onSuccess: () => qc.invalidateQueries({ queryKey: pipelinesKeys.stages(orgId ?? "") }),
   });
 }
+
+/** "+ Nova coluna" do quadro: cria a etapa depois da última do funil. */
+export function useCriarEtapa() {
+  const qc = useQueryClient();
+  const { orgId } = useOrg();
+  return useMutation({
+    mutationFn: ({ pipelineId, nome, ordem, cor }: { pipelineId: string; nome: string; ordem: number; cor: string }) =>
+      pipelinesApi.criarEtapa(orgId!, pipelineId, nome, ordem, cor),
+    onSuccess: () => qc.invalidateQueries({ queryKey: pipelinesKeys.stages(orgId ?? "") }),
+  });
+}

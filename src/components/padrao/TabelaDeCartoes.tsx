@@ -10,8 +10,10 @@ interface Contexto {
   grade: string;
   larguraMinima: number;
   comCheckbox: boolean;
+  /** A tabela rola por dentro: o cabeçalho fica preso no topo. */
+  preencher: boolean;
 }
-const TabelaContext = React.createContext<Contexto>({ grade: "1fr", larguraMinima: 0, comCheckbox: false });
+const TabelaContext = React.createContext<Contexto>({ grade: "1fr", larguraMinima: 0, comCheckbox: false, preencher: false });
 
 export interface TabelaDeCartoesProps {
   /** CSS grid-template-columns das colunas de dados, ex.: "2fr 1fr 1fr 8rem". */
@@ -20,6 +22,12 @@ export interface TabelaDeCartoesProps {
   comCheckbox?: boolean;
   /** Abaixo dessa largura (px) a tabela rola na horizontal, dentro do contêiner. */
   larguraMinima?: number;
+  /**
+   * A TABELA É A ÚNICA ÁREA DE ROLAGEM da tela: ocupa o espaço que sobra
+   * (`flex-1 min-h-0`), rola nos dois eixos por dentro e prende o cabeçalho no
+   * topo. Exige que o pai seja um flex-col de altura definida (`Pagina preencher`).
+   */
+  preencher?: boolean;
   rotulo?: string;
   children: React.ReactNode;
   className?: string;
@@ -33,12 +41,12 @@ export interface TabelaDeCartoesProps {
  * tela estreita a página não ganhe barra de rolagem própria. O espaço de 4px
  * em volta (`p-1`) existe para a sombra dos cartões não ser cortada pelo overflow.
  */
-function Raiz({ colunas, comCheckbox = false, larguraMinima = 880, rotulo, children, className }: TabelaDeCartoesProps) {
+function Raiz({ colunas, comCheckbox = false, larguraMinima = 880, preencher = false, rotulo, children, className }: TabelaDeCartoesProps) {
   const grade = comCheckbox ? `${COLUNA_DO_CHECKBOX} ${colunas}` : colunas;
-  const valor = React.useMemo(() => ({ grade, larguraMinima, comCheckbox }), [grade, larguraMinima, comCheckbox]);
+  const valor = React.useMemo(() => ({ grade, larguraMinima, comCheckbox, preencher }), [grade, larguraMinima, comCheckbox, preencher]);
   return (
     <TabelaContext.Provider value={valor}>
-      <div className={cn("w-full overflow-x-auto p-1", className)} data-tabela-de-cartoes>
+      <div className={cn("w-full p-1", preencher ? "min-h-0 flex-1 overflow-auto" : "overflow-x-auto", className)} data-tabela-de-cartoes>
         <div role="table" aria-label={rotulo} className="flex flex-col gap-2" style={{ minWidth: larguraMinima }}>
           {children}
         </div>
@@ -54,12 +62,19 @@ export interface CabecalhoProps {
 }
 
 function Cabecalho({ rotulos, className }: CabecalhoProps) {
-  const { grade, comCheckbox } = React.useContext(TabelaContext);
+  const { grade, comCheckbox, preencher } = React.useContext(TabelaContext);
   return (
     <div
       role="row"
-      className={cn("grid items-center gap-3 rounded-lg bg-card px-4 py-3 text-sm text-muted-foreground shadow-card", className)}
-      style={{ gridTemplateColumns: grade }}
+      className={cn(
+        "grid items-center gap-3 rounded-lg bg-card px-4 py-3 text-sm text-muted-foreground shadow-card [&>*]:min-w-0",
+        // Preso no topo enquanto as linhas rolam. A sombra dura na cor do fundo
+        // tapa o vão de 8px entre o cabeçalho e a primeira linha, senão os
+        // cartões passam visíveis por ali.
+        preencher && "sticky top-0 z-10",
+        className,
+      )}
+      style={{ gridTemplateColumns: grade, ...(preencher ? { boxShadow: "var(--shadow-card), 0 8px 0 0 hsl(var(--background))" } : {}) }}
     >
       {comCheckbox && <div role="columnheader" aria-label="Seleção" />}
       {rotulos.map((r, i) => (
@@ -100,7 +115,9 @@ function Linha({ children, selecionada = false, onClick, onSelecionadaChange, ro
         }
       }}
       className={cn(
-        "grid items-center gap-3 rounded-lg border border-transparent bg-card px-4 py-3 shadow-card transition-shadow hover:shadow-card-hover",
+        // `[&>*]:min-w-0`: célula nenhuma pode ser mais larga que a própria
+        // coluna e invadir a vizinha (conteúdo longo trunca dentro dela).
+        "grid items-center gap-3 rounded-lg border border-transparent bg-card px-4 py-3 shadow-card transition-shadow hover:shadow-card-hover [&>*]:min-w-0",
         clicavel && "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring",
         selecionada && "border-primary",
         className,

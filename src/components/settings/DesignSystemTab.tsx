@@ -11,11 +11,11 @@ import { TOKENS_CLARO, TOKENS_ESCURO, hslParaHex } from "./tokens";
  * estilo inline é de propósito, e nunca hex (o hex abaixo é só o rótulo).
  */
 const DIRECOES = [
-  { value: "blue", nome: "A · Azul Vionex", curto: "A — Azul Vionex", hex: "#2F5BEA", lateral: "lateral navy",
+  { value: "blue", nome: "A · Azul Vionex", curto: "A — Azul Vionex", hex: hslParaHex(ACCENT_COLORS.blue.light) ?? "", lateral: "lateral navy",
     desc: "Confiança e clareza, com contraste forte na navegação.", barra: "hsl(222 55% 12%)", fundo: "hsl(220 23% 97%)" },
-  { value: "violet", nome: "B · Violeta", curto: "B — Violeta", hex: "#6D4AFF", lateral: "lateral grafite",
+  { value: "violet", nome: "B · Violeta", curto: "B — Violeta", hex: hslParaHex(ACCENT_COLORS.violet.light) ?? "", lateral: "lateral grafite",
     desc: "Moderna e tecnológica, com um tom mais jovem.", barra: "hsl(250 25% 11%)", fundo: "hsl(250 23% 97%)" },
-  { value: "emerald", nome: "C · Esmeralda", curto: "C — Esmeralda", hex: "#0B8A6B", lateral: "lateral verde-escura",
+  { value: "emerald", nome: "C · Esmeralda", curto: "C — Esmeralda", hex: hslParaHex(ACCENT_COLORS.emerald.light) ?? "", lateral: "lateral verde-escura",
     desc: "Saúde e cuidado, próxima do universo das clínicas.", barra: "hsl(165 55% 9%)", fundo: "hsl(160 23% 96%)" },
 ] as const;
 
@@ -29,11 +29,18 @@ const FONTES_CARTOES = [
 ] as const;
 
 const GRUPOS_TOKENS: { titulo: string; nomes: string[] }[] = [
-  { titulo: "Superfícies", nomes: ["--background", "--card", "--surface-2", "--muted", "--secondary", "--border", "--input"] },
-  { titulo: "Texto", nomes: ["--foreground", "--muted-foreground", "--accent", "--accent-foreground"] },
-  { titulo: "Marca", nomes: ["--primary", "--primary-foreground", "--sidebar-background", "--sidebar-foreground"] },
-  { titulo: "Estados", nomes: ["--success", "--success-soft", "--warning", "--warning-soft", "--destructive", "--destructive-soft", "--info", "--info-soft", "--neutral", "--neutral-soft"] },
+  { titulo: "Neutros · superfícies", nomes: ["--background", "--surface-2", "--secondary", "--muted", "--card", "--popover"] },
+  { titulo: "Neutros · linhas e texto", nomes: ["--border", "--input", "--muted-foreground", "--foreground"] },
+  { titulo: "Marca", nomes: ["--primary", "--primary-hover", "--primary-active", "--ring", "--accent", "--accent-foreground", "--primary-foreground"] },
+  { titulo: "Sucesso", nomes: ["--success", "--success-fill", "--success-soft", "--success-border", "--success-foreground"] },
+  { titulo: "Atenção", nomes: ["--warning", "--warning-fill", "--warning-soft", "--warning-border", "--warning-foreground"] },
+  { titulo: "Perigo", nomes: ["--destructive", "--destructive-fill", "--destructive-soft", "--destructive-border", "--destructive-foreground"] },
+  { titulo: "Informação e neutro", nomes: ["--info", "--info-fill", "--info-soft", "--info-border", "--info-foreground", "--neutral", "--neutral-soft"] },
+  { titulo: "Lateral", nomes: ["--sidebar-background", "--sidebar-foreground", "--sidebar-muted", "--sidebar-accent", "--sidebar-border"] },
 ];
+
+const NUMEROS = [1, 2, 3, 4, 5, 6, 7, 8];
+const ETAPAS = [1, 2, 3, 4, 5, 6];
 
 const ESCALA_TEXTO = [
   { classe: "text-label", rotulo: "label", px: "11px", uso: "rótulo, selo, legenda" },
@@ -67,11 +74,11 @@ function Amostra({ nome }: { nome: string }) {
   const claro = TOKENS_CLARO[nome], escuro = TOKENS_ESCURO[nome];
   return (
     <li className="flex items-center gap-3 py-1.5">
-      <span className="h-8 w-8 shrink-0 rounded-md border border-border" style={{ backgroundColor: `hsl(var(${nome}))` }} aria-hidden="true" />
+      <span className="h-8 w-8 shrink-0 rounded-md border border-border" style={{ backgroundColor: hslParaHex(claro) ? `hsl(var(${nome}))` : `var(${nome})` }} aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-medium">{nome}</p>
         <p className="truncate text-label text-muted-foreground">
-          claro {hslParaHex(claro) ?? claro} · escuro {hslParaHex(escuro) ?? escuro}
+          claro {hslParaHex(claro) ?? (claro?.startsWith("color-mix") ? "derivado da marca" : claro)} · escuro {hslParaHex(escuro) ?? (escuro?.startsWith("color-mix") ? "derivado da marca" : escuro)}
         </p>
       </div>
     </li>
@@ -169,6 +176,59 @@ export function DesignSystemTab() {
               <ul className="mt-2 divide-y divide-border">{g.nomes.map((n) => <Amostra key={n} nome={n} />)}</ul>
             </div>
           ))}
+        </div>
+      </Secao>
+
+      <Secao titulo="Gráficos" nota="chart-1 é a marca; 2 a 8 variam em luminosidade, não só em matiz">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+            <p className={rotuloSecao}>Categorias</p>
+            <div className="mt-3 flex gap-2">
+              {NUMEROS.map((n) => (
+                <div key={n} className="min-w-0 flex-1 text-center">
+                  <div className="h-10 rounded-md" style={{ backgroundColor: `hsl(var(--chart-${n}))` }} aria-hidden="true" />
+                  <p className="mt-1 text-label text-muted-foreground">{n}</p>
+                </div>
+              ))}
+            </div>
+            <ul className="mt-3 divide-y divide-border">{["--chart-1", "--chart-2", "--chart-3", "--chart-4"].map((n) => <Amostra key={n} nome={n} />)}</ul>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+            <p className={rotuloSecao}>Escala do funil (segue a cor de destaque)</p>
+            <div className="mt-3 flex gap-2">
+              {ETAPAS.map((n) => (
+                <div key={n} className="min-w-0 flex-1 text-center">
+                  <div className="h-10 rounded-md" style={{ backgroundColor: `var(--stage-${n})` }} aria-hidden="true" />
+                  <p className="mt-1 text-label text-muted-foreground">{n}</p>
+                </div>
+              ))}
+            </div>
+            <ul className="mt-3 divide-y divide-border">{["--chart-5", "--chart-6", "--chart-7", "--chart-8", "--stage-end"].map((n) => <Amostra key={n} nome={n} />)}</ul>
+          </div>
+        </div>
+      </Secao>
+
+      <Secao titulo="Pastéis" nota="avatar e selo: fundo pastel, texto escuro (no escuro, o inverso)">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {NUMEROS.map((n) => (
+              <li key={n} className="flex items-center gap-3">
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+                  style={{ backgroundColor: `hsl(var(--pastel-${n}))`, color: `hsl(var(--pastel-${n}-fg))` }}
+                  aria-hidden="true"
+                >
+                  A
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">pastel-{n}</p>
+                  <p className="truncate text-label text-muted-foreground">
+                    {hslParaHex(TOKENS_CLARO[`--pastel-${n}`])} · {hslParaHex(TOKENS_CLARO[`--pastel-${n}-fg`])}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </Secao>
 

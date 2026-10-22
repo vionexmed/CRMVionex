@@ -7,6 +7,7 @@
  * um nome só, sem dizer por quê. O usuário lê isso como dashboard quebrado — foi
  * exatamente a queixa que originou o drill-down.
  */
+import { fontesDoPainel } from "./fontes-do-painel";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
@@ -146,7 +147,7 @@ describe("o painel lateral e a prévia contam a mesma história", () => {
     // Sem o total não há com o que comparar a soma dos toques.
     const painel = readFileSync("src/components/dashboard/MetricLeadsSheet.tsx", "utf8");
     expect(painel).toMatch(/total:\s*number\s*\|\s*null/);
-    expect(readFileSync("src/pages/Dashboard.tsx", "utf8")).toMatch(/total=\{/);
+    expect(fontesDoPainel()).toMatch(/total=\{/);
   });
 });
 

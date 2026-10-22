@@ -28,18 +28,24 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export const useTheme = () => useContext(ThemeContext);
 
+/** Texto sobre o preenchimento de marca: branco no claro, o azul-noite do tema escuro no escuro. */
+export const FOREGROUND_DA_MARCA = { light: "0 0% 100%", dark: "215 79% 7%" } as const;
+
+/**
+ * As seis cores de destaque, harmonizadas em OKLCH: no claro todas na mesma
+ * luminosidade (L 0,51-0,55, a que dá 4,5:1 com texto branco e como texto sobre
+ * fundo, cartão e coluna) e no escuro todas em L 0,70 (4,5:1 com o foreground
+ * escuro). O croma é o mesmo (0,12-0,21) até onde o gamut sRGB deixa: verde,
+ * teal e laranja saturam menos nessa luminosidade, e forçar o croma estouraria
+ * a cor.
+ */
 export const ACCENT_COLORS: Record<string, { light: string; dark: string }> = {
-  // Cada variante mantém 4,5:1 para texto sobre superfícies e dentro do botão.
-  // Azul Vionex é o azul do padrão da plataforma (#4A83F7 medido), no tom que
-  // passa 4,5:1 com texto branco e como texto sobre fundo, cartão e coluna.
-  blue: { light: "221 83% 53%", dark: "217 91% 68%" },
-  // Violeta e Esmeralda um pouco mais escuros que o hex de referência: no tom
-  // original, texto da cor sobre a coluna cinza ficava abaixo de 4,5:1.
-  violet: { light: "252 100% 62%", dark: "250 100% 78%" },
-  emerald: { light: "165 85% 25%", dark: "164 63% 51%" },
-  teal: { light: "187 100% 25%", dark: "187 100% 35%" },
-  orange: { light: "25 95% 34%", dark: "25 95% 53%" },
-  rose: { light: "347 77% 45%", dark: "347 77% 63%" },
+  blue: { light: "220 80% 50%", dark: "219 99% 70%" },
+  violet: { light: "257 53% 55%", dark: "254 99% 76%" },
+  emerald: { light: "158 97% 23%", dark: "156 68% 43%" },
+  teal: { light: "185 97% 25%", dark: "185 95% 39%" },
+  orange: { light: "29 98% 32%", dark: "25 77% 56%" },
+  rose: { light: "342 66% 46%", dark: "347 96% 68%" },
 };
 
 /** Pilhas de fonte. A de Inter é a mesma do index.css (o padrão); a do sistema é a reserva dela. */
@@ -127,10 +133,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const palette = ACCENT_COLORS[color] || ACCENT_COLORS.blue;
     const val = isDark ? palette.dark : palette.light;
     root.style.setProperty("--primary", val);
-    root.style.setProperty("--primary-foreground", isDark ? "211 68% 7%" : "0 0% 100%");
+    const fg = isDark ? FOREGROUND_DA_MARCA.dark : FOREGROUND_DA_MARCA.light;
+    root.style.setProperty("--primary-foreground", fg);
     root.style.setProperty("--ring", val);
     root.style.setProperty("--sidebar-primary", val);
-    root.style.setProperty("--sidebar-primary-foreground", isDark ? "211 68% 7%" : "0 0% 100%");
+    root.style.setProperty("--sidebar-primary-foreground", fg);
     root.style.setProperty("--sidebar-ring", val);
   };
 

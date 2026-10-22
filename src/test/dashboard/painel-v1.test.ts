@@ -6,6 +6,7 @@
  * funil e um cartão de pendências. Cada um desses é um número ou um texto que
  * alguém lê e em que confia -- e cada um quebra EM SILÊNCIO se a fonte mudar.
  */
+import { fontesDoPainel } from "./fontes-do-painel";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { rotulosDoPeriodo, dataDoDia, diaComSemana } from "@/components/dashboard/periodo-do-painel";
@@ -124,7 +125,7 @@ describe("as pendências seguem o critério da tela de destino", () => {
 });
 
 describe("o gráfico diário conta o que o card conta", () => {
-  const PAINEL = ler("src/pages/Dashboard.tsx");
+  const PAINEL = fontesDoPainel();
 
   /**
    * `respostas` na série são MENSAGENS recebidas; a taxa do card é leads que
@@ -132,7 +133,7 @@ describe("o gráfico diário conta o que o card conta", () => {
    * contradizendo -- o defeito que o CLAUDE.md registra em "Métricas do painel".
    */
   it("só leads e abordagens têm série diária", () => {
-    const i = PAINEL.indexOf("const SERIE_DA_METRICA");
+    const i = PAINEL.indexOf("const SERIE: Partial");
     const bloco = PAINEL.slice(i, PAINEL.indexOf("};", i));
     expect(bloco).toContain('coluna: "leads"');
     expect(bloco).toContain('coluna: "abordagens"');
@@ -142,7 +143,7 @@ describe("o gráfico diário conta o que o card conta", () => {
 
   /** O banco devolve o mês inteiro, com zero nos dias que ainda não vieram. */
   it("dia futuro não entra no gráfico", () => {
-    expect(PAINEL).toMatch(/\.filter\(\(p\) => p\.dia\.slice\(0, 10\) <= hoje\)/);
+    expect(PAINEL).toMatch(/\.filter\(\(p\) => p\.dia\.slice\(0, 10\) <= d\.hoje\)/);
   });
 
   it("a comparação vem da mesma função SQL da linha cheia", () => {

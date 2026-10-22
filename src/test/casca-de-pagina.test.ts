@@ -89,6 +89,9 @@ describe("as telas internas usam a mesma casca", () => {
 
   it.each(COM_CASCA)("%s monta PageShell", (arquivo) => {
     const src = semComentarios(readFileSync(arquivo, "utf8"));
+    // As telas já no padrão da plataforma usam `Pagina` (mesmo papel de casca).
+    const noPadrao = src.includes('from "@/components/padrao"') && src.includes("<Pagina");
+    if (noPadrao) return;
     expect(src).toContain('from "@/components/layout/PageShell"');
     expect(src).toContain("<PageShell");
   });
@@ -122,7 +125,7 @@ describe("as telas internas usam a mesma casca", () => {
     // no arquivo inteiro reprovaria `SecuritySettings`, que tem `AuditLogTab` e
     // `SessionsTab` no escopo do módulo -- sub-componentes que decidem o
     // próprio respiro com razão.
-    expect(src, "a raiz não abre em PageShell").toMatch(/\n {2}return \(\n {4}<PageShell/);
+    expect(src, "a raiz não abre em PageShell").toMatch(/\n {2}return \(\n {4}<(PageShell|Pagina)\b/);
   });
 
   it("o PageShell é quem fixa o ritmo vertical", () => {
@@ -172,7 +175,7 @@ describe("o PageHeader não carrega prop morta", () => {
   });
 });
 
-describe("Negócios usa o controle segmentado compartilhado", () => {
+describe("Negócios usa um controle compartilhado para a visão", () => {
   const src = semComentarios(readFileSync("src/pages/Deals.tsx", "utf8"));
 
   /**
@@ -180,8 +183,16 @@ describe("Negócios usa o controle segmentado compartilhado", () => {
    * próprias e sem `aria-pressed` -- nenhuma das quatro anunciava a seleção
    * para leitor de tela.
    */
-  it("monta SegmentedControl", () => {
-    expect(src).toContain("<SegmentedControl<ViewMode>");
+  /**
+   * No padrão da plataforma a troca de visão mora no menu de pontos da barra.
+   * Continua sendo um controle compartilhado que ANUNCIA a seleção: um grupo
+   * de rádio do menu (`aria-checked`), e não pílulas escritas à mão.
+   */
+  it("a visão é um grupo de rádio do menu compartilhado", () => {
+    expect(src).toContain("<DropdownMenuRadioGroup value={viewMode}");
+    for (const v of ["kanban", "list", "forecast"]) {
+      expect(src).toContain(`<DropdownMenuRadioItem value="${v}">`);
+    }
   });
 
   it("não sobrou grupo de pílulas à mão", () => {

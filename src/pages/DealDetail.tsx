@@ -412,7 +412,7 @@ export default function DealDetail() {
         controles para a mesma coisa, e a barra clicável não dizia o nome de
         etapa nenhuma.
       */}
-      <section aria-label="Resumo do negócio" className="space-y-5 rounded-lg border border-border bg-card p-5">
+      <section aria-label="Resumo do negócio" className="space-y-5 rounded-lg bg-card p-5 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <Iniciais nome={identidade.nomeIniciais} forma={identidade.forma} tamanho="lg" />

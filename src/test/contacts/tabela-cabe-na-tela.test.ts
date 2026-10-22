@@ -72,7 +72,7 @@ describe("a tabela não volta a ter coluna morta", () => {
    * dado, uma delas consumindo uma coluna.
    */
   it("o e-mail vive sob o nome, sempre visível", () => {
-    expect(codigo).toMatch(/block truncate text-xs tabular-nums text-muted-foreground">\s*\{c\.email \? formatarEmail\(c\.email\)/);
+    expect(codigo).toMatch(/<CelulaDeNome[\s\S]{0,120}apoio=\{c\.email \? formatarEmail\(c\.email\)/);
     expect(codigo).not.toMatch(/sm:hidden">\{formatarEmail/);
   });
 
@@ -86,21 +86,22 @@ describe("a tabela não volta a ter coluna morta", () => {
    * para achar uma.
    */
   it("a tabela não desenha avatar", () => {
-    const tabela = codigo.slice(codigo.indexOf("<TableHeader>"), codigo.indexOf("</Table>"));
-    expect(tabela).not.toMatch(/<Avatar/);
+    // O padrão da plataforma tem avatar pastel na célula de nome (CelulaDeNome);
+    // o que continua proibido é o primitivo `Avatar` com foto.
+    expect(codigo).not.toMatch(/<Avatar/);
   });
 
   it("situação e origem são colunas separadas", () => {
-    expect(codigo).toMatch(/<TableCell><LifecycleBadge/);
+    expect(codigo).toMatch(/<LifecycleBadge stage=/);
     expect(codigo).toMatch(/<OriginBadge metadata=/);
   });
 
-  it("são nove cabeçalhos: a caixa de seleção e as oito colunas de dados", () => {
-    // `<TableHead[\s>]` e não `<TableHead`: o segundo casa com `<TableHeader>`
-    // também, e o teste contava sete. Prefixo mordendo prefixo -- terceira vez
-    // que essa família de erro aparece nesta sessão.
-    const cabecalhos = (codigo.match(/<TableHead[\s>]/g) || []).length;
-    expect(cabecalhos, "mudou o número de colunas").toBe(9);
+  it("o cabeçalho tem seleção, nome, tipo, as sete colunas escondíveis, data e menu", () => {
+    expect(codigo).toContain("<TabelaDeCartoes.Cabecalho");
+    for (const id of ["estagio", "empresa", "origem", "pontuacao", "responsavel", "ultimoContato", "proximaAtividade"]) {
+      expect(codigo, `coluna ${id} saiu do cabeçalho`).toMatch(new RegExp(`${id}: (ordenavel\\(|")`));
+    }
+    expect(codigo).toContain('ordenavel("Data de criação", "created_at")');
   });
 });
 

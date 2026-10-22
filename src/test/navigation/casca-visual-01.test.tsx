@@ -35,10 +35,10 @@ import { AppHeader } from "@/components/layout/AppHeader";
 
 afterEach(() => { cleanup(); banco.respostas = {}; });
 
-function lateral(onOpenSearch?: () => void) {
+function lateral() {
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={["/contacts"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <TooltipProvider><SidebarProvider><AppSidebar onOpenSearch={onOpenSearch} /></SidebarProvider></TooltipProvider>
+      <TooltipProvider><SidebarProvider><AppSidebar /></SidebarProvider></TooltipProvider>
     </MemoryRouter>
   </QueryClientProvider>);
 }
@@ -52,18 +52,26 @@ describe("selos da lateral", () => {
     };
     lateral();
     await waitFor(() => expect(screen.getByRole("link", { name: "Atividades" })).toHaveAccessibleDescription("5 atrasadas"));
-    await waitFor(() => expect(screen.getByRole("link", { name: "Comunicação" })).toHaveAccessibleDescription("12 não lidas"));
+    await waitFor(() => expect(screen.getByRole("link", { name: "Atendimento" })).toHaveAccessibleDescription("12 não lidas"));
     // O topo da lateral é o LOGO ORIGINAL da Vionex (símbolo + "vionex"), não
     // um quadrado com inicial nem o nome escrito à mão.
     expect(screen.getByRole("img", { name: "Vionex" })).toBeVisible();
   });
 
-  /** Configurações fica fixa no canto inferior, e marca quando está aberta. */
-  it("Configurações vive no rodapé da lateral", () => {
+  /** Configurações fica fixa no canto inferior, abre o menu da conta e marca quando está aberta. */
+  it("a engrenagem do rodapé abre o menu da conta; a logo não abre menu", async () => {
     lateral();
-    const link = screen.getByRole("link", { name: "Configurações" });
-    expect(link).toHaveAttribute("href", "/settings");
-    expect(link.closest("[data-sidebar=\"footer\"]")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Conta e configurações" })).toBeNull();
+    expect(screen.getByRole("img", { name: "Vionex" }).closest("a")).toHaveAttribute("href", "/dashboard");
+    const engrenagem = screen.getByRole("button", { name: "Configurações" });
+    expect(engrenagem.closest("[data-sidebar=\"footer\"]")).not.toBeNull();
+    expect(engrenagem).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.keyDown(engrenagem, { key: "Enter" });
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByText("lucas@example.test")).toBeVisible();
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent)).toEqual([
+      "Configurações", "Equipe", "Meu e-mail", "Integrações", "Segurança", "Recolher menu lateral", "Sair",
+    ]);
   });
 
   /**
@@ -78,7 +86,7 @@ describe("selos da lateral", () => {
     };
     lateral();
     await waitFor(() => expect(screen.getByRole("link", { name: "Atividades" })).toHaveAccessibleDescription("3 atrasadas"));
-    const comunicacao = screen.getByRole("link", { name: "Comunicação" });
+    const comunicacao = screen.getByRole("link", { name: "Atendimento" });
     expect(comunicacao).not.toHaveAttribute("aria-describedby");
     expect(within(comunicacao).queryByText("0")).toBeNull();
   });
@@ -90,9 +98,9 @@ describe("selos da lateral", () => {
     expect(screen.getByRole("link", { name: "Atividades" })).not.toHaveAttribute("aria-describedby");
   });
 
-  it("o menu da conta mora no bloco da organização e não há Financeiro", () => {
+  it("o menu da conta mora na engrenagem do rodapé e não há Financeiro", () => {
     lateral();
-    expect(screen.getByRole("button", { name: "Conta e configurações" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Configurações" })).toBeVisible();
     // Financeiro aparece nas capturas, mas o módulo não existe: item sem tela
     // seria uma porta para lugar nenhum.
     expect(screen.queryByRole("link", { name: /Financeiro/ })).toBeNull();
@@ -112,11 +120,11 @@ describe("o que era da barra superior", () => {
     expect(ajuda.closest("[data-sidebar=\"footer\"]")).not.toBeNull();
   });
 
-  it("Buscar abre a busca compartilhada pelo topo da lateral", () => {
-    const abrir = vi.fn();
-    lateral(abrir);
+  it("Buscar abre a busca DENTRO da lateral, no topo", () => {
+    lateral();
     fireEvent.click(screen.getByRole("button", { name: /Buscar no CRM/ }));
-    expect(abrir).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("combobox", { name: "Buscar no CRM" })).toBeVisible();
+    expect(screen.getByRole("listbox", { name: "Resultados da busca" })).toBeVisible();
   });
 
   it("o selo de notificações carrega o total no nome acessível", () => {

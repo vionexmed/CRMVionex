@@ -141,7 +141,7 @@ describe("os rótulos não se repetem", () => {
     const src = readFileSync("src/components/layout/AppSidebar.tsx", "utf8");
     // O bloco cravado tinha o texto "Principal" solto no JSX.
     expect(src).not.toMatch(/>\s*Principal\s*</);
-    expect(src).toContain("getVisibleNavigation");
+    expect(src).toContain("getListaDaLateral");
   });
 
   it("a barra do celular lê a mesma fonte", () => {

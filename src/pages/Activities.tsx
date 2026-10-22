@@ -447,6 +447,7 @@ export default function Activities() {
 
   return (
     <PageShell
+      preencherAltura
       title="Atividades"
       contagem={{ valor: filtered.length, unidade: "atividade" }}
       meta={
@@ -492,6 +493,7 @@ export default function Activities() {
         aconteceu, o resto por vencimento): é o que separa "o que vence quando"
         de "o que já aconteceu", e a ordem das abas põe as duas últimas no fim.
       */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
       <VisoesDaLista<DateFilter>
         className="mt-1"
         rotulo="Período"
@@ -586,9 +588,9 @@ export default function Activities() {
 
       {/* Table view */}
       {viewMode === "list" && (
-        <div className="vx-table">
-          <Table>
-            <TableHeader>
+        <div className="vx-table min-h-0 overflow-auto">
+          <Table containerClassName="overflow-visible">
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead className="w-10">
                   <Checkbox
@@ -795,7 +797,7 @@ export default function Activities() {
 
       {/* Calendar View */}
       {viewMode === "calendar" && (
-        <div className="space-y-3">
+        <div className="min-h-0 space-y-3 overflow-y-auto">
           <div className="flex items-center justify-between">
             <Button variant="outline" size="sm" onClick={() => setCalMonth((p) => {
               const d = new Date(p.year, p.month - 1);
@@ -840,6 +842,8 @@ export default function Activities() {
           </div>
         </div>
       )}
+
+      </div>
 
       {/* Create / Edit Modal */}
       <ActivityCreateEditModal

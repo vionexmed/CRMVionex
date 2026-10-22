@@ -87,6 +87,15 @@ export function formatarData(d: string | Date | null | undefined): string {
   return isNaN(data.getTime()) ? "—" : dataDia.format(data);
 }
 
+const dataPorExtenso = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" });
+
+/** "21 de outubro de 2026" — datas de criação nas listas do padrão da plataforma. */
+export function formatarDataPorExtenso(d: string | Date | null | undefined): string {
+  if (!d) return "—";
+  const data = typeof d === "string" ? new Date(d) : d;
+  return isNaN(data.getTime()) ? "—" : dataPorExtenso.format(data);
+}
+
 /** "12/09/2026 14:30" — para registro e auditoria, onde a hora é o dado. */
 export function formatarDataHora(d: string | Date | null | undefined): string {
   if (!d) return "—";

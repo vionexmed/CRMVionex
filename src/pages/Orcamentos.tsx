@@ -111,6 +111,7 @@ export default function Orcamentos() {
 
   return (
     <PageShell
+      preencherAltura
       title="Orçamentos"
       actions={
         <>
@@ -123,6 +124,7 @@ export default function Orcamentos() {
         </>
       }
     >
+      <div className="flex min-h-0 flex-1 flex-col">
       {!isLoading && !isError && orcamentos.length > 0 && (
         <div role="group" aria-label="Resumo dos orçamentos" className="!mt-5 [&_.mt-1\.5]:!mt-0">
           <FaixaDeIndicadores>
@@ -166,8 +168,8 @@ export default function Orcamentos() {
         </div>
       )}
 
-      <div className="!mt-[22px] grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
-        <Card className="min-w-0 overflow-hidden">
+      <div className="!mt-[22px] grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
+        <Card className="flex min-h-0 min-w-0 flex-col overflow-hidden">
           <VisoesDaLista<Filtro>
             rotulo="Situação do orçamento"
             valor={filtro}
@@ -213,7 +215,7 @@ export default function Orcamentos() {
             />
           ) : (
             <>
-              <div className="hidden md:block">
+              <div className="hidden min-h-0 flex-1 flex-col md:flex">
                 <TabelaDeOrcamentos
                   orcamentos={visiveis}
                   selecionadoId={telaLarga ? selecionado?.id : null}
@@ -221,7 +223,7 @@ export default function Orcamentos() {
                   nomeDoResponsavel={nomeDoResponsavel}
                 />
               </div>
-              <ul className="divide-y divide-border md:hidden">
+              <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto md:hidden">
                 {visiveis.map((o) => (
                   <LinhaDeOrcamento key={o.id} orcamento={o} aoAbrir={abrir} />
                 ))}
@@ -231,7 +233,7 @@ export default function Orcamentos() {
         </Card>
 
         {telaLarga && selecionado && !isLoading && !isError && (
-          <div className="sticky top-4">
+          <div className="min-h-0 overflow-y-auto">
             <PreviaDeOrcamento
               key={selecionado.id}
               orcamento={selecionado}
@@ -239,6 +241,7 @@ export default function Orcamentos() {
             />
           </div>
         )}
+      </div>
       </div>
 
       <ConstrutorDeOrcamento

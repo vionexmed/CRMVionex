@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Iniciais } from "@/components/layout/ListaV1";
+import { corPastel } from "@/components/padrao";
 import { EstagioSelo, OrigemSelo } from "@/components/clientes/CelulasDeCliente";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -355,11 +356,17 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
 
   return (
     <Sheet open={!!contact} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent aria-describedby={undefined} className="w-[520px] sm:max-w-[520px] overflow-y-auto p-0">
+      <SheetContent aria-describedby={undefined} className="w-[520px] bg-background sm:max-w-[520px] overflow-y-auto p-0">
         {/* Header */}
-        <div className="border-b border-border p-6">
+        <div className="border-b border-border bg-card p-6">
           <div className="flex items-start gap-4">
-            <Iniciais nome={`${contact.first_name} ${contact.last_name ?? ""}`} tamanho="lg" className="h-12 w-12 text-sm" />
+            <span
+              aria-hidden="true"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+              style={{ backgroundColor: corPastel(`${contact.first_name} ${contact.last_name ?? ""}`).fundo, color: corPastel(`${contact.first_name} ${contact.last_name ?? ""}`).texto }}
+            >
+              {(contact.first_name ?? "?").trim().charAt(0).toUpperCase()}
+            </span>
             <div className="min-w-0 flex-1">
               <SheetTitle className="vx-titulo-painel">{contact.first_name} {contact.last_name}</SheetTitle>
               {contact.title && <p className="text-sm text-muted-foreground">{contact.title}</p>}
@@ -659,7 +666,7 @@ export function ContactDrawer({ contact, onClose, onUpdate, companies }: Contact
                 <Button onClick={handleSave} className="w-full"><Save className="mr-2 h-4 w-4" />Salvar alterações</Button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 rounded-lg bg-card p-4 shadow-card">
                 <h3 className="vx-titulo-secao">Dados do contato</h3>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   {contact.email && (

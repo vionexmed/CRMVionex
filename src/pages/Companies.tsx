@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { PageShell } from "@/components/layout/PageShell";
+import { Pagina, BarraDeFerramentas, BotaoTracejado, BotaoDeIcone } from "@/components/padrao";
 import { Building2 as Building2Icon } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,11 +7,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOrg } from "@/hooks/useOrg";
 import { useCompanyFromSearch } from "@/hooks/queries/useGlobalSearch";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChipAdicionarFiltro, ChipDeFiltro, Iniciais, LinhaDeFiltros } from "@/components/layout/ListaV1";
+import { ChipDeFiltro, Iniciais } from "@/components/layout/ListaV1";
 import { ResponsavelCelula } from "@/components/clientes/CelulasDeCliente";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -20,7 +20,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, LayoutGrid, List, Upload, Download,
+  Plus, PlusCircle, Menu, LayoutGrid, List, Upload, Download,
   Trash2, X,
 } from "lucide-react";
 import { mensagemErro } from "@/lib/erro-supabase";
@@ -186,32 +186,19 @@ export default function Companies() {
   if (!orgId) return <SemOrganizacao />;
 
   return (
-    <PageShell
-      title="Empresas"
-      contagem={{ valor: filtered.length, unidade: "empresa" }}
-      actions={
-        <>
-          <SegmentedControl<ViewMode>
-            rotuloGrupo="Visualização"
-            valor={viewMode}
-            onChange={setViewMode}
-            opcoes={[
-              { valor: "table", rotulo: "Tabela", icone: List },
-              { valor: "cards", rotulo: "Cartões", icone: LayoutGrid },
-            ]}
-          />
-          <Button variant="outline" onClick={() => setCsvOpen(true)} aria-label="Importar CSV" className="hidden sm:flex">
-            <Upload className="mr-1.5 h-3.5 w-3.5" />Importar CSV
-          </Button>
-          <Button onClick={() => setCreateOpen(true)} aria-label="Criar nova empresa">
-            <Plus className="mr-1 sm:mr-2 h-4 w-4" /><span className="hidden sm:inline">Nova empresa</span><span className="sm:hidden">Nova</span>
-          </Button>
-        </>
+    <Pagina
+      preencher
+      titulo="Empresas"
+      subtitulo="Consulte, crie, modifique ou remova suas empresas"
+      acao={
+        <Button onClick={() => setCreateOpen(true)} aria-label="Criar nova empresa">
+          Nova empresa
+        </Button>
       }
     >
-      {recordId && detail.isPending && <p role="status" className="text-sm text-muted-foreground">Abrindo empresa…</p>}
+      {recordId && detail.isPending && <p role="status" className="shrink-0 text-sm text-muted-foreground">Abrindo empresa…</p>}
       {recordId && (detail.isError || (detail.isSuccess && !drawerCompany)) && (
-        <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
+        <div role="alert" className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border pb-4">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">{detail.isError ? "Não foi possível abrir empresa" : "Empresa indisponível"}</p>
             <p className="text-xs text-muted-foreground">{detail.isError ? mensagemErro(detail.error) : "O registro foi removido ou você não tem acesso nesta organização."}</p>
@@ -223,34 +210,51 @@ export default function Companies() {
 
 
 
-      <LinhaDeFiltros
-        direita={
-          <Button variant="outline" size="sm" onClick={exportCSV} aria-label="Exportar CSV">
-            <Download className="mr-1.5 h-3.5 w-3.5" />Exportar
-          </Button>
-        }
+      <BarraDeFerramentas
+        busca={{ valor: search, onChange: setSearch, placeholder: "Pesquisar…", rotulo: "Buscar empresas" }}
+        contador={filtered.length}
       >
-        <div className="relative">
-          <Search aria-hidden="true" className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
-          <Input aria-label="Buscar empresas" placeholder="Buscar empresas…" className="h-8 w-56 pl-8 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <SegmentedControl<ViewMode>
+          rotuloGrupo="Visualização"
+          valor={viewMode}
+          onChange={setViewMode}
+          opcoes={[
+            { valor: "table", rotulo: "Tabela", icone: List },
+            { valor: "cards", rotulo: "Cartões", icone: LayoutGrid },
+          ]}
+        />
+        <BotaoTracejado icone={<PlusCircle aria-hidden="true" />} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}>
+          Filtros
+        </BotaoTracejado>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <BotaoDeIcone aria-label="Mais opções da lista" icone={<Menu aria-hidden="true" />} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => setCsvOpen(true)}><Upload aria-hidden="true" className="mr-2 h-4 w-4" />Importar CSV</DropdownMenuItem>
+            <DropdownMenuItem onSelect={exportCSV}><Download aria-hidden="true" className="mr-2 h-4 w-4" />Exportar</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </BarraDeFerramentas>
+      {(filters.industry || filters.size || filters.ownerId) && (
+        <div role="group" aria-label="Filtros aplicados" className="flex shrink-0 flex-wrap items-center gap-2">
+          {filters.industry && (
+            <ChipDeFiltro ativo onRemover={() => setFilters({ ...filters, industry: undefined })} rotuloRemover="Remover filtro de indústria">
+              Indústria: {filters.industry}
+            </ChipDeFiltro>
+          )}
+          {filters.size && (
+            <ChipDeFiltro ativo onRemover={() => setFilters({ ...filters, size: undefined })} rotuloRemover="Remover filtro de tamanho">
+              Tamanho: {filters.size}
+            </ChipDeFiltro>
+          )}
+          {filters.ownerId && (
+            <ChipDeFiltro ativo onRemover={() => setFilters({ ...filters, ownerId: undefined })} rotuloRemover="Remover filtro de responsável">
+              Responsável: {members.find((m) => m.id === filters.ownerId)?.name || members.find((m) => m.id === filters.ownerId)?.email || "—"}
+            </ChipDeFiltro>
+          )}
         </div>
-        {filters.industry && (
-          <ChipDeFiltro ativo onRemover={() => setFilters({ ...filters, industry: undefined })} rotuloRemover="Remover filtro de indústria">
-            Indústria: {filters.industry}
-          </ChipDeFiltro>
-        )}
-        {filters.size && (
-          <ChipDeFiltro ativo onRemover={() => setFilters({ ...filters, size: undefined })} rotuloRemover="Remover filtro de tamanho">
-            Tamanho: {filters.size}
-          </ChipDeFiltro>
-        )}
-        {filters.ownerId && (
-          <ChipDeFiltro ativo onRemover={() => setFilters({ ...filters, ownerId: undefined })} rotuloRemover="Remover filtro de responsável">
-            Responsável: {members.find((m) => m.id === filters.ownerId)?.name || members.find((m) => m.id === filters.ownerId)?.email || "—"}
-          </ChipDeFiltro>
-        )}
-        <ChipAdicionarFiltro onClick={() => setShowFilters(!showFilters)} />
-      </LinhaDeFiltros>
+      )}
 
       {showFilters && (
         <BarraDeFiltros>
@@ -309,6 +313,7 @@ export default function Companies() {
         </BarraDeSelecao>
       )}
 
+      <div className="flex min-h-0 flex-1 flex-col">
       {carregando && <LoadingState linhas={8} />}
 
       {!carregando && falhou && (
@@ -338,10 +343,9 @@ export default function Companies() {
       )}
 
       {!carregando && !falhou && filtered.length > 0 && viewMode === "table" && (
-        <div className="vx-table">
-          <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+        <div className="vx-table min-h-0 overflow-auto">
+          <Table containerClassName="overflow-visible">
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead className="w-10"><Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todas" /></TableHead>
                 <TableHead><SortHeader rotulo="Empresa" campo="name" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /></TableHead>
@@ -379,12 +383,11 @@ export default function Companies() {
               ))}
             </TableBody>
           </Table>
-          </div>
         </div>
       )}
 
       {!carregando && !falhou && filtered.length > 0 && viewMode === "cards" && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid min-h-0 auto-rows-min grid-cols-2 content-start gap-3 overflow-y-auto p-1 md:grid-cols-3 lg:grid-cols-4">
           {paginated.map((c) => (
             <Card key={c.id} className="cursor-pointer transition-colors hover:border-primary/40" onClick={() => setDrawerCompany(c)}>
               <CardContent className="space-y-2">
@@ -404,17 +407,21 @@ export default function Companies() {
         </div>
       )}
 
-      <Paginacao
-        pagina={page}
-        totalPaginas={totalPages}
-        total={sorted.length}
-        unidade="empresa"
-        onMudar={setPage}
-      />
+      </div>
+
+      <div className="shrink-0">
+        <Paginacao
+          pagina={page}
+          totalPaginas={totalPages}
+          total={sorted.length}
+          unidade="empresa"
+          onMudar={setPage}
+        />
+      </div>
 
       <CompanyDrawer key={`${user?.id}:${orgId}:${recordId}`} company={drawerCompany} onClose={() => setDrawerCompany(null)} onUpdate={invalidate} />
       <CompanyCreateModal open={createOpen} onOpenChange={setCreateOpen} onCreated={invalidate} />
       <CSVImportModal open={csvOpen} onOpenChange={setCsvOpen} onImported={invalidate} entityType="companies" />
-    </PageShell>
+    </Pagina>
   );
 }

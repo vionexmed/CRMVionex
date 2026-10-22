@@ -5,47 +5,107 @@
 @layer base {
   :root {
     /*
-     * O PADRÃO DA PLATAFORMA.
+     * A PALETA DA PLATAFORMA (gerada em OKLCH, gravada em HSL).
      *
-     * Fundo cinza muito claro, cartões brancos sem borda (sombra suave), lateral
-     * branca com borda fina, UMA cor de marca por tela. Verde fica reservado para o que fechou (o fim da escala do funil);
-     * vermelho, âmbar e azul-info são estado, não identidade.
+     * Neutros frios de croma constante; UM azul de marca em escala; estado
+     * (verde, âmbar, vermelho, azul-info) que não briga com a marca; oito
+     * categorias de gráfico que variam em luminosidade; oito pastéis de avatar.
+     * Verde fica reservado para o que fechou (fim da escala do funil).
      *
      * A cor de marca é trocável em tempo de execução: `ThemeContext` reescreve
-     * `--primary`, `--ring` e `--sidebar-primary`. Por isso nada aqui crava o
-     * azul -- tudo o que é "cor de destaque" deriva destes três tokens.
+     * `--primary`, `--ring` e `--sidebar-primary`. Nada aqui crava o azul: tudo
+     * o que é "cor de destaque" deriva destes três tokens.
+     * `--background` e `--muted` têm valores diferentes (kanban de coluna cinza).
      */
-    /* Superfícies. A página é um degrau ACIMA da coluna (`--muted`) e o cartão é
-       branco: página, coluna e cartão têm três valores, senão o kanban de coluna
-       cinza com cartão branco some (ver CLAUDE.md). */
-    --background: 0 0% 98%;            /* #FAFAFA: o cinza muito claro do padrão (#F9F9F9) */
-    --foreground: 222 39% 11%;         /* #111827 */
-    --card: 0 0% 100%;
-    --card-foreground: 222 39% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 39% 11%;
-    /* Faixa de cabeçalho de tabela, hover de linha, bloco secundário. */
-    --surface-2: 220 20% 97%;          /* #F6F7F9 */
-    /* Marca */
-    --primary: 221 83% 53%;            /* #2463EB: o azul do padrão (#4A83F7) no tom que passa 4,5:1 */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;          /* #F3F4F6 */
-    --secondary-foreground: 222 39% 11%;
-    /* A coluna do quadro e o fundo de campo desativado. Um degrau abaixo da
-       página, nunca igual a ela. */
-    --muted: 220 14% 95%;              /* #F1F2F4 */
-    /* #5D6679: o #667085 do Visual 01 escurecido dois passos. Sobre a coluna
-       (`--muted`) ele dava 4,2:1, abaixo do mínimo AA de 4,5:1 para texto. */
-    --muted-foreground: 220 9% 42%;
-    /* Seleção suave: fundo azul-info e texto no azul escuro. */
-    --accent: 214 88% 97%;             /* #F0F6FE: o fundo da pílula azul do padrão */
-    --accent-foreground: 224 76% 45%;  /* #1B47C6 */
-    --destructive: 4 76% 40%;          /* #B42318 */
-    --destructive-foreground: 0 0% 100%;
-    --border: 215 22% 91%;             /* #E2E7EE: divisória e borda da lateral */
-    /* Borda de CAMPO: um passo mais forte que a divisória. */
-    --input: 214 8% 86%;               /* #D8DBDF: borda de campo e de controle secundário */
-    --ring: 221 83% 53%;
+    /* Neutros: matiz frio constante (~214°), croma mínimo. Degraus distintos entre si. */
+    --background: 214 47% 98%;          /* #F8FAFC */
+    --card: 0 0% 100%;                  /* #FFFFFF */
+    --card-foreground: 214 34% 12%;     /* #141D29 */
+    --popover: 0 0% 100%;               /* #FFFFFF */
+    --popover-foreground: 214 34% 12%;  /* #141D29 */
+    --surface-2: 214 29% 96%;           /* #F2F4F8 */
+    --secondary: 214 24% 94%;           /* #ECEFF3 */
+    --secondary-foreground: 214 34% 12%;/* #141D29 */
+    --muted: 214 20% 92%;               /* #E7EAEF */
+    --muted-foreground: 214 10% 41%;    /* #5E6773 */
+    --foreground: 214 34% 12%;          /* #141D29 */
+    --border: 214 20% 89%;              /* #DDE2E9 */
+    --input: 214 15% 83%;               /* #CDD3DA */
+    /* Marca: o azul, em escala. Hover e ativo escurecem (claro) ou clareiam (escuro) a cor de destaque em uso. */
+    --primary: 220 80% 50%;             /* #195EE6 */
+    --primary-foreground: 0 0% 100%;    /* #FFFFFF */
+    --ring: 220 80% 50%;                /* foco = marca */
+    --primary-hover: color-mix(in oklch, hsl(var(--primary)), black 12%);
+    --primary-active: color-mix(in oklch, hsl(var(--primary)), black 22%);
+    --accent: 218 99% 97%;              /* fundo suave da marca #F0F5FF */
+    --accent-foreground: 220 75% 40%;   /* texto sobre o suave #194DB3 */
+    /* Estado: texto/preenchimento, foreground, fundo suave, borda suave e preenchimento vivo (ponto, barra, anel; sem texto). */
+    --success: 153 98% 21%;             /* #016A3B */
+    --success-foreground: 0 0% 100%;    /* #FFFFFF */
+    --success-soft: 137 65% 94%;        /* #E6FAEB */
+    --success-border: 139 52% 83%;      /* #BDEACB */
+    --success-fill: 154 96% 33%;        /* #03A55F */
+    --warning: 41 99% 24%;              /* #7A5301 */
+    --warning-foreground: 0 0% 100%;    /* #FFFFFF */
+    --warning-soft: 40 85% 94%;         /* #FDF4E3 */
+    --warning-border: 40 70% 81%;       /* #F0DAAD */
+    --warning-fill: 42 97% 38%;         /* #BF8603 */
+    --destructive: 356 73% 42%;         /* #B91D27 */
+    --destructive-foreground: 0 0% 100%;/* #FFFFFF */
+    --destructive-soft: 4 99% 97%;      /* #FFF1F0 */
+    --destructive-border: 3 99% 90%;    /* #FFCFCC */
+    --destructive-fill: 359 86% 61%;    /* #F14649 */
+    --info: 199 98% 30%;                /* #026897 */
+    --info-foreground: 0 0% 100%;       /* #FFFFFF */
+    --info-soft: 205 100% 96%;          /* #EBF6FF */
+    --info-border: 204 100% 86%;        /* #B8E2FF */
+    --info-fill: 201 72% 47%;           /* #2292CE */
+    --alerta: 359 86% 61%;              /* vermelho vivo de aviso da casca; fundo, não texto */
+    --neutral: 214 13% 35%;             /* #4E5865 */
+    --neutral-soft: 214 37% 95%;        /* #EEF2F7 */
+    /* Gráfico: 1 = marca; 2-8 variam em luminosidade (leitura por daltonismo), não só em matiz. */
+    --chart-1: var(--primary);
+    --chart-2: 25 87% 58%;              /* #F18437 */
+    --chart-3: 109 46% 40%;             /* #489537 */
+    --chart-4: 1 53% 40%;               /* #9C3230 */
+    --chart-5: 266 48% 42%;             /* #64389F */
+    --chart-6: 48 77% 58%;              /* #E6C541 */
+    --chart-7: 192 62% 54%;             /* #41B5D2 */
+    --chart-8: 214 13% 54%;             /* #7A8899 */
+    --stage-end: #038149;               /* fim da escala: verde de venda (OKLCH L/C iguais ao da marca) */
+    --stage-1: hsl(var(--primary));
+    --stage-2: color-mix(in oklch, hsl(var(--primary)) 80%, var(--stage-end));
+    --stage-3: color-mix(in oklch, hsl(var(--primary)) 60%, var(--stage-end));
+    --stage-4: color-mix(in oklch, hsl(var(--primary)) 40%, var(--stage-end));
+    --stage-5: color-mix(in oklch, hsl(var(--primary)) 20%, var(--stage-end));
+    --stage-6: var(--stage-end);
+    /* Pastéis (avatar, selo): fundo claro com texto escuro no mesmo matiz; no escuro, fundo profundo com texto claro. */
+    --pastel-1: 353 99% 95%;            /* #FFE6E9 */
+    --pastel-1-fg: 348 44% 31%;         /* #722C3A */
+    --pastel-2: 18 100% 93%;            /* #FFE6DB */
+    --pastel-2-fg: 21 74% 26%;          /* #733411 */
+    --pastel-3: 40 91% 89%;             /* #FCEBC9 */
+    --pastel-3-fg: 44 99% 18%;          /* #5B4300 */
+    --pastel-4: 109 63% 90%;            /* #DBF6D5 */
+    --pastel-4-fg: 109 51% 22%;         /* #26551B */
+    --pastel-5: 171 78% 88%;            /* #C9F8F1 */
+    --pastel-5-fg: 175 98% 17%;         /* #01564F */
+    --pastel-6: 203 100% 93%;           /* #DBF1FF */
+    --pastel-6-fg: 198 99% 22%;         /* #014E70 */
+    --pastel-7: 239 99% 96%;            /* #EBEBFF */
+    --pastel-7-fg: 245 33% 36%;         /* #433E7A */
+    --pastel-8: 316 99% 95%;            /* #FFE6F8 */
+    --pastel-8-fg: 311 37% 30%;         /* #69305E */
+    /* Lateral: branca no claro, a mais funda no escuro. O item ativo usa --sidebar-primary (a cor de destaque). */
+    --sidebar-background: 0 0% 100%;    /* #FFFFFF */
+    --sidebar-foreground: 214 27% 15%;  /* #1C2531 */
+    --sidebar-muted: 214 10% 41%;       /* #5E6773 */
+    --sidebar-primary: 220 80% 50%;     /* #195EE6 */
+    --sidebar-primary-foreground: 0 0% 100%;/* #FFFFFF */
+    --sidebar-accent: 214 24% 94%;      /* #ECEFF3 */
+    --sidebar-accent-foreground: 214 34% 12%;/* #141D29 */
+    --sidebar-border: 214 20% 89%;      /* #DDE2E9 */
+    --sidebar-ring: 220 80% 50%;        /* #195EE6 */
     /* Cantos: cartão 8px, controle 6px, selo 4px. */
     /* Fonte da interface: Inter (carregada no index.html, com `display=swap`) e a
        pilha do sistema de reserva. O ThemeContext troca este valor (Inter × Sistema). */
@@ -65,137 +125,113 @@
     /* Medidas do sistema: altura de controle e de linha de tabela. */
     --control-h: 36px;
     --row-h: 40px;
-
-    /*
-     * LATERAL BRANCA no tema claro (a mais funda no escuro), com borda direita.
-     *
-     * O item ativo é TEXTO E ÍCONE na cor de marca, sem preenchimento; o hover
-     * é cinza muito claro. `--sidebar-primary` é o que a troca
-     * de cor de destaque reescreve, então o item ativo acompanha a escolha.
-     */
-    --sidebar-background: 0 0% 100%;         /* branca, com o logo original no topo */
-    --sidebar-foreground: 217 24% 17%;       /* texto dos itens, quase preto */
-    --sidebar-muted: 220 9% 42%;            /* ícone, grupo, atalho: 5,4:1 sobre o branco */
-    --sidebar-primary: 221 83% 53%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 96%;           /* hover cinza muito claro */
-    --sidebar-accent-foreground: 217 24% 17%;
-    --sidebar-border: 215 22% 91%;
-    --sidebar-ring: 221 83% 53%;
-    /* Estado. Cada um tem o texto e o fundo suave do selo. */
-    --success: 155 82% 22%;            /* #0A6640 */
-    --success-foreground: 0 0% 100%;
-    --success-soft: 148 45% 94%;       /* #E7F6EE */
-    --warning: 38 92% 28%;             /* #8A5A06 */
-    --warning-foreground: 0 0% 100%;
-    --warning-soft: 39 94% 93%;        /* #FEF3DE */
-    --destructive-soft: 357 82% 96%;   /* #FDEBEC */
-    /* O vermelho VIVO dos avisos da casca (selo de atrasadas na lateral, ponto
-       do sininho), o #E5484D do Visual 01. Não é `--destructive`: aquele é
-       escurecido para texto vermelho sobre fundo claro passar no AA, e sobre o
-       navy ele vira marrom. Aqui o vermelho é FUNDO, com texto branco em peso
-       semibold, ou um ponto sem texto. */
-    --alerta: 358 75% 59%;             /* #E5484D */
-    --info: 221 73% 42%;               /* #1D4FB8 */
-    --info-foreground: 0 0% 100%;
-    --info-soft: 219 91% 96%;          /* #EAF1FE */
-    --neutral: 216 18% 34%;            /* #475467: "em aberto" */
-    --neutral-soft: 216 17% 94%;       /* #EEF0F3 */
-    /* Gráfico: a marca primeiro, depois categorias que não competem com ela. */
-    --chart-1: var(--primary);
-    --chart-2: 176 80% 37%;            /* #13A89E */
-    --chart-3: 36 88% 59%;             /* #F2A93B */
-    --chart-4: 220 17% 61%;            /* #8C97AD */
-    --chart-5: 262 70% 60%;            /* violeta: quinta série / etapa */
-    /* Escala do funil: da marca ao verde de venda, em seis passos. O começo é
-       `--primary`, então ela muda junto com a cor de destaque. */
-    --stage-end: #0B7F4F;
-    --stage-1: hsl(var(--primary));
-    --stage-2: color-mix(in oklab, hsl(var(--primary)) 80%, var(--stage-end));
-    --stage-3: color-mix(in oklab, hsl(var(--primary)) 60%, var(--stage-end));
-    --stage-4: color-mix(in oklab, hsl(var(--primary)) 40%, var(--stage-end));
-    --stage-5: color-mix(in oklab, hsl(var(--primary)) 20%, var(--stage-end));
-    --stage-6: var(--stage-end);
     /* Identidade de terceiros: não seguem tema nem cor de destaque. */
     --vx-purple: #5B21B6;
     --vx-meta: #1877F2;
     --vx-meta-bg: #EEF4FF;
     --vx-google: #EA4335;
     --vx-google-bg: #FDE8E8;
-    /* Sombras de uso geral (menu, arraste, janela). As do cartão vêm logo
-       abaixo. */
+    /* Sombras (tinta fria, a mesma dos neutros). As do cartão vêm logo abaixo. */
     --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
     --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.06);
     --shadow-md: 0 12px 24px -6px rgba(16, 24, 40, 0.16), 0 4px 8px -4px rgba(16, 24, 40, 0.06);
     --shadow-lg: 0 20px 40px -12px rgba(16, 24, 40, 0.22);
     /* O PADRÃO DA PLATAFORMA: cartão branco SEM borda, separado do fundo por
-       uma sombra suave. `card-hover` é um degrau acima (cartão clicável sob o
-       cursor); `pop` é o que flutua (menu, janela, gaveta). Tailwind expõe os
-       três como `shadow-card`, `shadow-card-hover` e `shadow-pop`. */
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
-    --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.16), 0 4px 10px -4px rgba(0, 0, 0, 0.08);
+       uma sombra suave. `card-hover` é um degrau acima; `pop` é o que flutua. */
+    --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+    --shadow-card-hover: 0 4px 12px rgba(16, 24, 40, 0.08), 0 1px 3px rgba(16, 24, 40, 0.06);
+    --shadow-pop: 0 12px 32px -8px rgba(16, 24, 40, 0.16), 0 4px 10px -4px rgba(16, 24, 40, 0.08);
   }
 
   .dark {
-    /* Escuro: não é inversão. Página mais funda que o cartão, e o cartão sobe
-       em luz para se levantar do fundo. */
-    --background: 220 13% 8%;          /* #121418 */
-    --foreground: 220 14% 95%;
-    --card: 220 12% 12%;               /* #1B1E22: o cartão sobe em luz */
-    --card-foreground: 220 14% 95%;
-    --popover: 220 12% 13%;
-    --popover-foreground: 220 14% 95%;
-    --surface-2: 220 11% 15%;
-    --primary: 217 91% 68%;            /* azul claro: 4,5:1 sobre fundo e cartão */
-    --primary-foreground: 211 68% 7%;  /* #06121F */
-    --secondary: 220 10% 17%;
-    --secondary-foreground: 220 14% 95%;
-    --muted: 220 13% 10%;
-    --muted-foreground: 220 9% 64%;
-    --accent: 217 40% 18%;
-    --accent-foreground: 217 91% 78%;
-    --destructive: 0 91% 73%;          /* #F97B7B */
-    --destructive-foreground: 354 42% 14%;
-    --border: 220 9% 20%;
-    --input: 220 8% 28%;
-    --ring: 217 91% 68%;
-    /* A lateral continua a mais funda da tela, como no claro. */
-    --sidebar-background: 220 14% 6%;
-    --sidebar-foreground: 220 14% 85%;
-    --sidebar-muted: 220 9% 60%;
-    --sidebar-primary: 217 91% 68%;
-    --sidebar-primary-foreground: 211 68% 7%;
-    --sidebar-accent: 220 10% 13%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 220 10% 15%;
-    --sidebar-ring: 217 91% 68%;
-    /* No escuro o texto de estado clareia e o fundo vira um tom saturado e
-       profundo do mesmo matiz; o texto SOBRE o preenchimento passa a ser escuro. */
-    --success: 153 64% 58%;            /* #4FD99A */
-    --success-foreground: 157 53% 11%;
-    --success-soft: 157 53% 11%;       /* #0D2A1F */
-    --warning: 39 90% 63%;             /* #F5B84A */
-    --warning-foreground: 39 53% 12%;
-    --warning-soft: 39 53% 12%;        /* #2D220E */
-    --destructive-soft: 354 42% 14%;   /* #341518 */
-    --alerta: 358 75% 59%;             /* o mesmo: fundo de selo, não texto */
-    --info: 217 89% 75%;               /* #84B0F8 */
-    --info-foreground: 219 53% 16%;
-    --info-soft: 219 53% 16%;          /* #13223D */
-    --neutral: 216 15% 75%;            /* #B4BCC8 */
-    --neutral-soft: 219 34% 17%;       /* #1C2639 */
-    --chart-2: 175 57% 51%;            /* #3CC9BE */
-    --chart-3: 38 88% 66%;             /* #F5BD5E */
-    --chart-4: 222 17% 56%;            /* #7C88A3 */
-    --chart-5: 263 70% 72%;
-    --stage-end: #34C77B;
+    /* Escuro: não é inversão. Fundo profundo levemente azulado; as superfícies sobem em luz; a marca clareia. */
+    /* Neutros: matiz frio constante (~214°), croma mínimo. Degraus distintos entre si. */
+    --background: 214 29% 6%;           /* #0B0F14 */
+    --card: 214 19% 11%;                /* #171B21 */
+    --card-foreground: 214 41% 95%;     /* #EDF2F7 */
+    --popover: 214 17% 14%;             /* #1E232A */
+    --popover-foreground: 214 41% 95%;  /* #EDF2F7 */
+    --surface-2: 214 18% 13%;           /* #1B2027 */
+    --secondary: 214 16% 16%;           /* #22282F */
+    --secondary-foreground: 214 41% 95%;/* #EDF2F7 */
+    --muted: 214 23% 9%;                /* #12161C */
+    --muted-foreground: 214 12% 63%;    /* #959FAC */
+    --foreground: 214 41% 95%;          /* #EDF2F7 */
+    --border: 214 14% 19%;              /* #2A3037 */
+    --input: 214 11% 26%;               /* #3B414A */
+    /* Marca: o azul, em escala. Hover e ativo escurecem (claro) ou clareiam (escuro) a cor de destaque em uso. */
+    --primary: 219 99% 70%;             /* #679CFE */
+    --primary-foreground: 215 79% 7%;   /* #040F20 */
+    --ring: 219 99% 70%;                /* foco = marca */
+    --primary-hover: color-mix(in oklch, hsl(var(--primary)), white 10%);
+    --primary-active: color-mix(in oklch, hsl(var(--primary)), white 18%);
+    --accent: 219 52% 19%;              /* fundo suave da marca #17294A */
+    --accent-foreground: 218 99% 86%;   /* texto sobre o suave #B8D2FF */
+    /* Estado: texto/preenchimento, foreground, fundo suave, borda suave e preenchimento vivo (ponto, barra, anel; sem texto). */
+    --success: 143 60% 67%;             /* #78DD9F */
+    --success-foreground: 143 77% 6%;   /* #041B0D */
+    --success-soft: 146 65% 11%;        /* #0A2E1A */
+    --success-border: 151 84% 17%;      /* #07502D */
+    --success-fill: 149 63% 48%;        /* #2DC878 */
+    --warning: 38 86% 65%;              /* #F3BA59 */
+    --warning-foreground: 39 100% 5%;   /* #1A1100 */
+    --warning-soft: 42 100% 10%;        /* #332400 */
+    --warning-border: 44 99% 17%;       /* #563F00 */
+    --warning-fill: 41 82% 48%;         /* #DF9F16 */
+    --destructive: 5 99% 82%;           /* #FFABA4 */
+    --destructive-foreground: 0 51% 9%; /* #230B0B */
+    --destructive-soft: 1 41% 17%;      /* #3D1A1A */
+    --destructive-border: 0 42% 29%;    /* #692B2B */
+    --destructive-fill: 3 99% 73%;      /* #FE7D76 */
+    --info: 203 100% 75%;               /* #80CEFF */
+    --info-foreground: 204 95% 7%;      /* #011523 */
+    --info-soft: 201 89% 13%;           /* #042A3F */
+    --info-border: 199 99% 21%;         /* #01496B */
+    --info-fill: 202 87% 63%;           /* #4FB7F3 */
+    --alerta: 359 86% 61%;              /* vermelho vivo de aviso da casca; fundo, não texto */
+    --neutral: 214 17% 75%;             /* #B4BECA */
+    --neutral-soft: 214 21% 15%;        /* #1E252E */
+    --chart-1: var(--primary);
+    --chart-2: 23 100% 71%;             /* #FFA46B */
+    --chart-3: 109 43% 54%;             /* #6ABC57 */
+    --chart-4: 3 57% 60%;               /* #D3655F */
+    --chart-5: 264 57% 63%;             /* #966BD6 */
+    --chart-6: 48 91% 68%;              /* #F8DA63 */
+    --chart-7: 193 80% 69%;             /* #71D4EF */
+    --chart-8: 214 17% 63%;             /* #919FB1 */
+    --stage-end: #39D080;               /* fim da escala: verde de venda (OKLCH L/C iguais ao da marca) */
+    /* Pastéis (avatar, selo): fundo claro com texto escuro no mesmo matiz; no escuro, fundo profundo com texto claro. */
+    --pastel-1: 349 37% 21%;            /* #492229 */
+    --pastel-1-fg: 352 99% 88%;         /* #FFC2CA */
+    --pastel-2: 19 57% 18%;             /* #482414 */
+    --pastel-2-fg: 18 100% 84%;         /* #FFC6AD */
+    --pastel-3: 43 92% 12%;             /* #3B2B02 */
+    --pastel-3-fg: 40 73% 76%;          /* #EED195 */
+    --pastel-4: 109 38% 15%;            /* #1D3518 */
+    --pastel-4-fg: 109 48% 78%;         /* #B6E2AC */
+    --pastel-5: 175 100% 11%;           /* #003833 */
+    --pastel-5-fg: 172 64% 74%;         /* #92E7DC */
+    --pastel-6: 199 85% 15%;            /* #063247 */
+    --pastel-6-fg: 202 100% 82%;        /* #A3DDFF */
+    --pastel-7: 244 29% 23%;            /* #2C2A4C */
+    --pastel-7-fg: 240 99% 91%;         /* #D1D1FF */
+    --pastel-8: 312 31% 20%;            /* #43233C */
+    --pastel-8-fg: 314 81% 86%;         /* #F8BEEB */
+    /* Lateral: branca no claro, a mais funda no escuro. O item ativo usa --sidebar-primary (a cor de destaque). */
+    --sidebar-background: 217 40% 4%;   /* #06090E */
+    --sidebar-foreground: 214 14% 85%;  /* #D3D8DE */
+    --sidebar-muted: 214 7% 63%;        /* #9AA0A7 */
+    --sidebar-primary: 219 99% 70%;     /* #679CFE */
+    --sidebar-primary-foreground: 215 79% 7%;/* #040F20 */
+    --sidebar-accent: 214 22% 10%;      /* #14191F */
+    --sidebar-accent-foreground: 0 0% 100%;/* #FFFFFF */
+    --sidebar-border: 214 17% 13%;      /* #1C2027 */
+    --sidebar-ring: 219 99% 70%;        /* #679CFE */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.40);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
     --shadow-md: 0 14px 28px rgba(0, 0, 0, 0.50);
     --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.60);
-    /* No escuro a sombra é mais densa: o cartão já se separa pela luz, e a
-       sombra só assenta a borda. */
+    /* No escuro o cartão já se separa pela luz; a sombra só assenta a borda. */
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.30);
     --shadow-card-hover: 0 6px 16px rgba(0, 0, 0, 0.50), 0 1px 3px rgba(0, 0, 0, 0.40);
     --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, 0.65), 0 4px 12px -4px rgba(0, 0, 0, 0.45);
@@ -471,38 +507,65 @@
     box-shadow: 0 0 0 1px hsl(var(--primary));
   }
 
-  /* ── Módulos da lateral: abrir sem saltar ───────────────────────────────
-     A altura vai de 0 a 100% pelo grid (0fr → 1fr), que mede o conteúdo sozinho
-     -- animar `height` exigiria um número cravado, e a lista cresce com os
-     módulos. O fechado some da tabulação e da leitura de tela só DEPOIS de
-     terminar de fechar (o atraso em `visibility`), senão o conteúdo sumiria no
-     meio da animação. Os itens entram um depois do outro (`--vx-i`).
-     Sem `transform` em ancestral: a lateral não contém nada `position: fixed`,
-     e o deslocamento é só nos itens, de poucos pixels. */
-  .vx-submenu {
-    display: grid;
-    grid-template-rows: 0fr;
-    opacity: 0;
-    visibility: hidden;
-    transition: grid-template-rows 280ms var(--motion-ease), opacity 200ms ease, visibility 0s linear 280ms;
+  /* ── Lateral: lista plana e busca que expande ───────────────────────────
+     Aditivo e só por token (`--sidebar-*`). Nada aqui usa `transform` em
+     ancestral de tela: o campo anima ALTURA e borda; o deslocamento de poucos
+     pixels é só nos itens (opção do painel e itens da lista ao voltar). */
+  .vx-lateral-rotulo {
+    padding: 0 10px; margin-bottom: 4px; height: 20px; display: flex; align-items: center;
+    font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: hsl(var(--sidebar-muted));
   }
-  .vx-submenu[data-open="true"] {
-    grid-template-rows: 1fr;
-    opacity: 1;
-    visibility: visible;
-    transition: grid-template-rows 280ms var(--motion-ease), opacity 220ms ease 40ms, visibility 0s;
+  .vx-busca-campo {
+    display: flex; align-items: center; gap: 8px; height: 36px; width: 100%;
+    padding: 0 8px 0 10px; border-radius: 6px;
+    border: 1px solid hsl(var(--sidebar-border)); background: hsl(var(--sidebar-background));
+    transition: height 240ms var(--motion-ease), border-color 200ms ease, box-shadow 200ms ease, background-color 150ms ease;
   }
-  .vx-submenu > ul { min-height: 0; overflow: hidden; }
-  .vx-submenu li {
-    opacity: 0;
-    transform: translateY(-4px);
-    transition: opacity 180ms ease, transform 220ms var(--motion-ease);
+  .vx-busca-campo[data-aberta="false"]:hover { background: hsl(var(--sidebar-accent)); }
+  .vx-busca-campo[data-aberta="true"] {
+    height: 40px; border-color: hsl(var(--sidebar-ring));
+    box-shadow: 0 0 0 3px hsl(var(--sidebar-ring) / 0.18);
   }
-  .vx-submenu[data-open="true"] li {
-    opacity: 1;
-    transform: none;
-    transition-delay: calc(70ms + var(--vx-i, 0) * 45ms);
+  .vx-busca-gatilho {
+    display: flex; flex: 1; min-width: 0; height: 100%; align-items: center; gap: 8px;
+    font-size: 0.875rem; color: hsl(var(--sidebar-muted)); border-radius: 4px;
   }
+  .vx-busca-gatilho:focus-visible { outline: 2px solid hsl(var(--sidebar-ring)); outline-offset: 2px; }
+  .vx-busca-campo input.vx-busca-input {
+    flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent;
+    box-shadow: none; outline: none; font-size: 0.875rem; color: hsl(var(--sidebar-foreground));
+    animation: vxBuscaEntra 200ms var(--motion-ease) backwards;
+  }
+  .vx-busca-campo input.vx-busca-input::placeholder { color: hsl(var(--sidebar-muted)); }
+  .vx-busca-fechar {
+    display: flex; height: 24px; min-width: 24px; align-items: center; justify-content: center; flex-shrink: 0;
+    padding: 0 4px; border-radius: 4px; color: hsl(var(--sidebar-muted));
+  }
+  .vx-busca-fechar:hover { background: hsl(var(--sidebar-accent)); color: hsl(var(--sidebar-foreground)); }
+  .vx-busca-fechar:focus-visible, .vx-busca-acao:focus-visible { outline: 2px solid hsl(var(--sidebar-ring)); outline-offset: 1px; }
+  .vx-busca-painel { transition: opacity 140ms ease; }
+  .vx-busca-painel[data-saindo="true"] { opacity: 0; }
+  .vx-busca-grupo + .vx-busca-grupo { margin-top: 12px; }
+  .vx-busca-rotulo {
+    padding: 0 10px; margin: 8px 0 4px; font-size: 0.6875rem; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; color: hsl(var(--sidebar-muted));
+  }
+  .vx-busca-opcao {
+    display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 10px; margin-bottom: 2px;
+    border-radius: 6px; cursor: pointer; color: hsl(var(--sidebar-foreground));
+    animation: vxBuscaEntra 200ms var(--motion-ease) backwards; animation-delay: calc(var(--vx-i, 0) * 18ms);
+  }
+  .vx-busca-opcao svg { color: hsl(var(--sidebar-muted)); }
+  .vx-busca-opcao[data-ativo="true"] { background: hsl(var(--sidebar-accent)); box-shadow: inset 2px 0 0 hsl(var(--sidebar-primary)); }
+  .vx-busca-opcao[data-ativo="true"] svg { color: hsl(var(--sidebar-primary)); }
+  .vx-busca-todos { min-height: 32px; color: hsl(var(--sidebar-primary)); }
+  .vx-busca-acao {
+    min-height: 32px; padding: 0 4px; border-radius: 4px; font-size: 0.75rem; color: hsl(var(--sidebar-primary));
+  }
+  .vx-busca-acao:hover { text-decoration: underline; }
+  .vx-lista[data-volta="true"] li { animation: vxBuscaEntra 200ms var(--motion-ease) backwards; }
+  @keyframes vxBuscaEntra { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
   /* ── Campo: foco do Visual 01 ─────────────────────────── */
   /* Borda na cor de marca e halo suave de 3px, em vez do anel com recuo. Vale
@@ -776,6 +839,7 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  .vx-busca-opcao, .vx-busca-input, .vx-lista li { animation: none !important; }
   .vx-page, .vx-fade-up, .vx-stagger > *, .vx-shimmer, .vx-pulse-dot,
   .vx-grow-w, .vx-grow-h, .onboarding-slide-in,
   .vx-dialog, .vx-sheet, .vx-overlay { animation: none !important; }

@@ -19,9 +19,16 @@ export type NavSection = {
   icon: ElementType;
   entryPath: string;
   items: NavItem[];
+  /**
+   * Rótulo de EXIBIÇÃO do grupo na lateral (lista plana). Seções vizinhas com o
+   * mesmo `grupo` formam um bloco só; sem `grupo`, o bloco não tem rótulo.
+   * `label`, ids, aliases e `entryPath` seguem servindo rota, trilha do celular
+   * e testes: o grupo é só apresentação.
+   */
+  grupo?: string;
 };
 
-/** Fonte única: a lateral mostra áreas; os módulos vivem dentro de cada área. */
+/** Fonte única: a lateral lista cada página como item de primeiro nível, agrupadas por `grupo`. */
 export const NAV_SECTIONS: NavSection[] = [
   { id: "painel", label: "Painel", icon: LayoutDashboard, entryPath: "/dashboard", items: [
     { label: "Visão geral", path: "/dashboard", icon: LayoutDashboard },
@@ -29,12 +36,12 @@ export const NAV_SECTIONS: NavSection[] = [
   { id: "atividades", label: "Atividades", icon: Activity, entryPath: "/activities", items: [
     { label: "Atividades", path: "/activities", icon: Activity, aliases: ["/tasks"] },
   ] },
-  { id: "clientes", label: "Clientes", icon: Users, entryPath: "/contacts", items: [
+  { id: "clientes", label: "Clientes", grupo: "Clientes", icon: Users, entryPath: "/contacts", items: [
     { label: "Contatos", path: "/contacts", icon: Users, aliases: ["/leads"] },
     { label: "Empresas", path: "/companies", icon: Building2 },
   ] },
-  { id: "negocios", label: "Negócios", icon: Briefcase, entryPath: "/deals", items: [
-    { label: "Funil", path: "/deals", icon: Handshake },
+  { id: "negocios", label: "Negócios", grupo: "Vendas", icon: Briefcase, entryPath: "/deals", items: [
+    { label: "Pipeline", path: "/deals", icon: Handshake },
     { label: "Produtos", path: "/produtos", icon: Package },
     { label: "Orçamentos", path: "/orcamentos", icon: Receipt },
   ] },
@@ -46,18 +53,18 @@ export const NAV_SECTIONS: NavSection[] = [
    * Atendimento leva até ela --, e por isso é alias: abrir a caixa mantém
    * Comunicação acesa. As rotas antigas de canal redirecionam para cá.
    */
-  { id: "comunicacao", label: "Comunicação", icon: MessageSquare, entryPath: "/atendimento", items: [
+  { id: "comunicacao", label: "Comunicação", grupo: "Comunicação", icon: MessageSquare, entryPath: "/atendimento", items: [
     { label: "Atendimento", path: "/atendimento", icon: MessageSquare, aliases: ["/conversations", "/instagram", "/inbox", "/comunicacao"] },
   ] },
-  { id: "analise", label: "Análise", icon: BarChart3, entryPath: "/reports", items: [
+  { id: "analise", label: "Análise", grupo: "Análise", icon: BarChart3, entryPath: "/reports", items: [
     { label: "Relatórios", path: "/reports", icon: BarChart3 },
     { label: "Marketing", path: "/marketing/visao-geral", icon: Megaphone, adminOnly: true, aliases: ["/marketing"] },
   ] },
 ];
 
 export const ACCOUNT_ITEMS: NavItem[] = [
-  { label: "Equipe", path: "/team", icon: UsersRound },
   { label: "Configurações", path: "/settings", icon: Settings },
+  { label: "Equipe", path: "/team", icon: UsersRound },
   { label: "Meu e-mail", path: "/settings/email", icon: Mail },
   { label: "Integrações", path: "/settings/integrations", icon: Plug, adminOnly: true },
   { label: "Segurança", path: "/settings/security", icon: Shield, adminOnly: true },
@@ -66,6 +73,25 @@ export const ACCOUNT_ITEMS: NavItem[] = [
 export function getVisibleNavigation(isAdmin: boolean): NavSection[] {
   return NAV_SECTIONS.map((section) => ({ ...section, items: section.items.filter((item) => isAdmin || !item.adminOnly) }))
     .filter((section) => section.items.length > 0);
+}
+
+export type ItemDaLateral = { item: NavItem; secao: NavSection; rotulo: string };
+export type GrupoDaLateral = { id: string; rotulo: string | null; itens: ItemDaLateral[] };
+
+/**
+ * A lista PLANA da lateral: cada página é um item, em blocos por `grupo`.
+ * "Painel" leva o nome da área (o módulo se chama "Visão geral", mas o menu e a
+ * paleta dizem Painel).
+ */
+export function getListaDaLateral(isAdmin: boolean): GrupoDaLateral[] {
+  const grupos: GrupoDaLateral[] = [];
+  for (const secao of getVisibleNavigation(isAdmin)) {
+    const rotulo = secao.grupo ?? null;
+    let grupo = grupos[grupos.length - 1];
+    if (!grupo || grupo.rotulo !== rotulo) { grupo = { id: rotulo ?? `sem-rotulo-${grupos.length}`, rotulo, itens: [] }; grupos.push(grupo); }
+    for (const item of secao.items) grupo.itens.push({ item, secao, rotulo: item.path === "/dashboard" ? secao.label : item.label });
+  }
+  return grupos;
 }
 
 /** Limite de segmento evita marcar /deals-old como se fosse /deals. */
@@ -111,7 +137,7 @@ export function grupoDaRota(pathname: string): string | undefined {
 }
 
 /**
- * Classe do item de primeiro nível da lateral (área, Buscar, Notificações,
+ * Classe do item de primeiro nível da lateral (página, Buscar, Notificações,
  * Ajuda, Configurações): ícone de 20px + rótulo de 14px, 36px de altura.
  * Ativo = `.vx-nav-active` (texto e ícone na cor de marca, sem fundo).
  */

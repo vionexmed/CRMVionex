@@ -145,7 +145,7 @@ describe("a tela de Leads saiu inteira", () => {
   });
 
   it("os cartões do painel apontam para o filtro", () => {
-    const painel = semComentarios(ler("src/pages/Dashboard.tsx"));
+    const painel = semComentarios(ler("src/components/dashboard/indicadores.ts"));
     expect(painel).not.toMatch(/href: "\/leads"/);
     expect(painel).toMatch(/href: "\/contacts\?estagio=lead"/);
   });

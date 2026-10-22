@@ -9,6 +9,7 @@
  * O estilo escolhido (Attio/Linear) resolve por tipografia: rótulo pequeno,
  * número grande, variação pequena. E por faixa em vez de cartões soltos.
  */
+import { fontesDoPainel } from "./fontes-do-painel";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
@@ -16,7 +17,7 @@ const semComentarios = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 
 const TILE = semComentarios(readFileSync("src/components/dashboard/StatCard.tsx", "utf8"));
-const PAINEL = semComentarios(readFileSync("src/pages/Dashboard.tsx", "utf8"));
+const PAINEL = semComentarios(fontesDoPainel());
 const GRAFICOS = semComentarios(readFileSync("src/components/dashboard/SdrCharts.tsx", "utf8"));
 
 describe("o tile de métrica tem presença sem competir", () => {
@@ -69,17 +70,16 @@ describe("o tile de métrica tem presença sem competir", () => {
  * `value="indicadores"`); o Visual 01 tirou as abas e os indicadores vieram
  * para depois do funil, na mesma página. A âncora mudou, a regra não.
  */
-const ANCORA_FAIXA = "faixa={";
 const ANCORA_INDICADORES = "GROUPS.map((group)";
 
 describe("indicadores agrupados em faixas", () => {
-  it("o destaque usa uma faixa com divisórias", () => {
-    const i = PAINEL.indexOf(ANCORA_FAIXA);
-    const bloco = PAINEL.slice(i, i + 700);
-    expect(bloco).toContain("vx-metrics-strip");
-    expect(bloco).toMatch(/grid grid-cols-2[^"\n]*lg:grid-cols-4/);
-    expect(bloco).toContain("emFaixa");
-    expect(bloco).not.toContain("gap-3");
+  it("o destaque são cartões soltos na grade do padrão, não uma faixa", () => {
+    // Padrão da plataforma: cinco cartões brancos com sombra, o selecionado com
+    // borda azul. A faixa com divisórias ficou só nos grupos de baixo.
+    expect(PAINEL).toContain("<GradeDeIndicadores>");
+    expect(PAINEL).toContain("IndicadorDeMetrica");
+    expect(PAINEL).not.toContain("vx-metrics-strip");
+    expect(PAINEL).toMatch(/selecionado=\{k === metrica\}/);
   });
 
   it("os indicadores usam a faixa", () => {
@@ -169,7 +169,7 @@ describe("indicadores agrupados em faixas", () => {
   it("o esqueleto leva as bordas da célula", () => {
     const i = PAINEL.indexOf(ANCORA_INDICADORES);
     const bloco = PAINEL.slice(i, i + 1400);
-    const iEsqueleto = bloco.indexOf("isLoading ? (");
+    const iEsqueleto = bloco.indexOf("carregando ? (");
     expect(iEsqueleto).toBeGreaterThan(-1);
     expect(bloco.slice(iEsqueleto, iEsqueleto + 400)).toMatch(/border-l border-t border-border/);
   });

@@ -11,19 +11,20 @@ import { cn } from "@/lib/utils";
 
 /* ---------- Avatar pastel ---------- */
 
-/** Matizes (graus HSL) da paleta pastel; espaçados para nomes diferentes parecerem diferentes. */
-const MATIZES = [350, 20, 45, 90, 150, 185, 215, 260, 290, 320];
+/** Quantos pares `--pastel-N` / `--pastel-N-fg` o index.css define (oito matizes). */
+export const TOTAL_DE_PASTEIS = 8;
 
 /**
  * Cor estável derivada do nome: mesmo nome, mesma cor, em qualquer tela e sessão.
- * Fundo claro e texto escuro do mesmo matiz (contraste > 4.5:1); como o fundo é
- * sempre claro, a combinação continua legível dentro do tema escuro.
+ * Os valores vêm dos tokens `--pastel-N` (fundo) e `--pastel-N-fg` (texto), que
+ * têm par claro e escuro: fundo pastel com texto escuro no claro, fundo profundo
+ * com texto claro no escuro, ambos acima de 7:1.
  */
 export function corPastel(nome: string): { fundo: string; texto: string } {
   let h = 0;
   for (const ch of nome.trim().toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const matiz = MATIZES[h % MATIZES.length];
-  return { fundo: `hsl(${matiz} 80% 92%)`, texto: `hsl(${matiz} 60% 30%)` };
+  const n = (h % TOTAL_DE_PASTEIS) + 1;
+  return { fundo: `hsl(var(--pastel-${n}))`, texto: `hsl(var(--pastel-${n}-fg))` };
 }
 
 export interface CelulaDeNomeProps {

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
@@ -174,6 +175,33 @@ describe("CelulaDeNome", () => {
     expect(corPastel("Ana Prado")).toEqual(corPastel("  ana prado "));
     const cores = new Set(["Ana", "Bruno", "Carla", "Diego", "Elisa", "Fábio", "Gil"].map((n) => corPastel(n).fundo));
     expect(cores.size).toBeGreaterThan(2);
+  });
+
+  it("corPastel só usa tokens --pastel-N que o index.css define, nos dois temas", () => {
+    const css = readFileSync("src/index.css", "utf8");
+    const claro = css.split(":root {")[1].split("\n  }")[0];
+    const escuro = css.split("\n  .dark {")[1].split("\n  }")[0];
+    const nomes = ["Ana", "Bruno", "Carla", "Diego", "Elisa", "Fábio", "Gil", "Helena", "Igor", "Júlia", "Kléber", "Lia"];
+    const usados = new Set<number>();
+    for (const nome of nomes) {
+      const { fundo, texto } = corPastel(nome);
+      const n = Number(fundo.match(/--pastel-(\d+)\)/)![1]);
+      expect(texto).toBe(`hsl(var(--pastel-${n}-fg))`);
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(n).toBeLessThanOrEqual(8);
+      usados.add(n);
+    }
+    expect(usados.size).toBeGreaterThan(3);
+    for (let n = 1; n <= 8; n++) {
+      for (const bloco of [claro, escuro]) {
+        expect(bloco).toMatch(new RegExp(`--pastel-${n}:\\s*[\\d.]+ [\\d.]+% [\\d.]+%`));
+        expect(bloco).toMatch(new RegExp(`--pastel-${n}-fg:\\s*[\\d.]+ [\\d.]+% [\\d.]+%`));
+      }
+    }
+    // Estabilidade: os nomes de referência continuam caindo nos mesmos pastéis.
+    expect(corPastel("Ana Prado")).toEqual(corPastel("ANA PRADO"));
+    const dourado: Record<string, number> = {"Ana Prado": 7, "Bruno": 7, "Carla": 2, "Lucas Sapuppo": 1};
+    for (const [nome, n] of Object.entries(dourado)) expect(corPastel(nome).fundo).toBe(`hsl(var(--pastel-${n}))`);
   });
 
   it("renderiza inicial e o mesmo estilo em duas montagens", () => {

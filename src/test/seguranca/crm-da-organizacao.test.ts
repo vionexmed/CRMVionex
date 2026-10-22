@@ -226,7 +226,7 @@ describe("a tela devolve o que a abertura tirou", () => {
   /** E o que NÃO afrouxou junto: exportar a base e excluir contato seguem de
    *  quem responde pela organização. */
   it("exportar e excluir continuam de admin", () => {
-    expect(CONTATOS).toMatch(/isAdmin && \([\s\S]{0,300}exportCSV/);
+    expect(CONTATOS).toMatch(/isAdmin (&& \([\s\S]{0,300}|\? )exportCSV/);
     expect(CONTATOS).toMatch(/isAdmin && \([\s\S]{0,300}pedirExclusao/);
   });
 });

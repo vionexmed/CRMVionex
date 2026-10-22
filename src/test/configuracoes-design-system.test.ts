@@ -7,8 +7,13 @@ const sem = (p: string) => readFileSync(p, "utf8").replace(/\/\*[\s\S]*?\*\//g, 
 describe("Configurações: Perfil e Design system", () => {
   it("lê os tokens do CSS, claro e escuro", () => {
     const { claro, escuro } = lerTokens(readFileSync("src/index.css", "utf8"));
-    // O azul do padrão da plataforma, no tom que passa 4,5:1.
-    expect(hslParaHex(claro["--primary"])).toBe("#2463EB");
+    // O azul da marca, no tom que passa 4,5:1 com texto branco.
+    expect(hslParaHex(claro["--primary"])).toBe("#195EE6");
+    // Os grupos novos da paleta existem nos dois temas.
+    for (const nome of ["--chart-8", "--pastel-8", "--pastel-8-fg", "--success-border", "--warning-fill", "--primary-hover"]) {
+      expect(claro[nome], nome).toBeTruthy();
+      expect(escuro[nome], nome).toBeTruthy();
+    }
     expect(escuro["--background"]).not.toBe(claro["--background"]);
   });
 
