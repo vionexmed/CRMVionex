@@ -168,15 +168,23 @@ describe("a lateral ancora a tela", () => {
     bloco(escopo).match(new RegExp(`${token}:\\s*([^;]+);`))?.[1]?.trim();
 
   /**
-   * VISUAL 01: a lateral é NAVY, a parte mais escura da tela.
-   *
-   * Ela ancora a tela pela esquerda e deixa a luz onde o trabalho está. O teste
-   * trava a RELAÇÃO com a página, não o hex: um ajuste de tom não reprova.
+   * A LATERAL É BRANCA NO CLARO, com o logo original no topo (pedido do dono;
+   * era navy). Ela precisa ficar MAIS CLARA que a página para se ler como um
+   * plano acima dela, sem depender de sombra. O teste trava a relação, não o
+   * hex: um ajuste para 99% não reprova.
    */
-  it("no claro a lateral é bem mais escura que a página", () => {
+  it("no claro a lateral é mais clara que a página, para se destacar dela", () => {
     const lum = (v?: string) => Number(v?.match(/(\d+)%\s*$/)?.[1] ?? 0);
-    expect(lum(valor(":root {", "--background")) - lum(valor(":root {", "--sidebar-background")))
-      .toBeGreaterThan(50);
+    expect(lum(valor(":root {", "--sidebar-background")))
+      .toBeGreaterThan(lum(valor(":root {", "--background")));
+  });
+
+  /** O texto da lateral clara tem contraste: item e rótulo escuros, nunca branco. */
+  it("no claro o texto da lateral é escuro", () => {
+    const lum = (v?: string) => Number(v?.match(/(\d+)%\s*$/)?.[1] ?? 100);
+    expect(lum(valor(":root {", "--sidebar-foreground"))).toBeLessThan(40);
+    expect(lum(valor(":root {", "--sidebar-muted"))).toBeLessThan(50);
+    expect(lum(valor(":root {", "--sidebar-accent-foreground"))).toBeLessThan(40);
   });
 
   /**

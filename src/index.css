@@ -66,20 +66,21 @@
     --row-h: 40px;
 
     /*
-     * LATERAL NAVY, de ponta a ponta.
+     * LATERAL BRANCA no tema claro (navy no escuro), de ponta a ponta.
      *
-     * O item ativo é preenchido com a cor de marca e texto branco; o hover é um
-     * degrau acima do navy. `--sidebar-primary` é o que a troca de cor de
-     * destaque reescreve, então o item ativo acompanha a escolha do usuário.
+     * Era navy no Visual 01; passou a branca com o logo original da Vionex,
+     * por pedido do dono. O item ativo continua preenchido com a cor de marca e
+     * texto branco; o hover é cinza claro. `--sidebar-primary` é o que a troca
+     * de cor de destaque reescreve, então o item ativo acompanha a escolha.
      */
-    --sidebar-background: 218 65% 12%;       /* #0B1A33 */
-    --sidebar-foreground: 219 37% 85%;       /* #C9D3E6 */
-    --sidebar-muted: 220 20% 59%;            /* #8391AC: ícone, grupo, atalho */
+    --sidebar-background: 0 0% 100%;         /* branca, com o logo original no topo */
+    --sidebar-foreground: 220 14% 26%;       /* texto dos itens */
+    --sidebar-muted: 221 13% 42%;            /* ícone, grupo, atalho: 5,4:1 sobre o branco */
     --sidebar-primary: 226 82% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 219 43% 18%;           /* hover */
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 218 43% 19%;
+    --sidebar-accent: 220 14% 95%;           /* hover e módulo atual */
+    --sidebar-accent-foreground: 222 22% 16%;
+    --sidebar-border: 220 13% 91%;
     --sidebar-ring: 226 82% 55%;
     /* Estado. Cada um tem o texto e o fundo suave do selo. */
     --success: 155 82% 22%;            /* #0A6640 */
