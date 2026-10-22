@@ -144,9 +144,16 @@ describe("as fontes pedem só os pesos usados", () => {
    * no caminho crítico, e nenhum peso pedido que ninguém usa. O <link> fica só
    * com a monoespaçada dos números.
    */
-  it("o <link> pede só a monoespaçada", () => {
+  /**
+   * O padrão da plataforma usa INTER. Ela vem no MESMO <link> da monoespaçada
+   * (um pedido só), com `display=swap` -- o texto aparece na fonte do sistema
+   * enquanto a Inter chega -- e só nos quatro pesos praticados.
+   */
+  it("o <link> pede Inter e a monoespaçada, nos pesos usados", () => {
     const familias = [...HTML.matchAll(/family=([A-Za-z+]+):/g)].map((m) => m[1]);
-    expect(familias).toEqual(["JetBrains+Mono"]);
+    expect(familias).toEqual(["Inter", "JetBrains+Mono"]);
+    expect(HTML).toMatch(/family=Inter:wght@400;500;600;700&/);
+    expect(HTML).toMatch(/display=swap/);
   });
 
   it("as famílias antigas não voltam pelo <link>", () => {
@@ -173,13 +180,16 @@ describe("as fontes pedem só os pesos usados", () => {
     expect(declaradas.length).toBeGreaterThan(0);
     for (const f of declaradas) expect(f, f).toBe("var(--font-ui)");
     const raiz = CSS.match(/--font-ui: ([^;]+);/)?.[1].trim() ?? "";
-    expect(raiz.startsWith("-apple-system, BlinkMacSystemFont")).toBe(true);
+    // Inter primeiro, a pilha do sistema logo atrás como reserva.
+    expect(raiz.startsWith("Inter, -apple-system, BlinkMacSystemFont")).toBe(true);
     const TEMA = readFileSync("src/contexts/ThemeContext.tsx", "utf8");
     expect(TEMA).toContain(raiz);
+    expect(TEMA).toContain("-apple-system, BlinkMacSystemFont, 'SF Pro Text'");
     expect(TW).toContain("sans: ['var(--font-ui)']");
     expect(TW).toContain("heading: ['var(--font-ui)']");
-    // Inter só é baixada sob demanda, nunca pelo index.html.
-    expect(HTML).not.toContain("family=Inter");
+    // Inter vem do <link> com o id que o ThemeContext reconhece, para não
+    // pedi-la duas vezes.
+    expect(HTML).toContain('id="fc-font-inter"');
   });
 
   it("JetBrains não pede o peso 600", () => {

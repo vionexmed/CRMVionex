@@ -22,7 +22,7 @@ const ThemeContext = createContext<ThemeContextType>({
   setDensity: () => {},
   accentColor: "blue",
   setAccentColor: () => {},
-  font: "system",
+  font: "inter",
   setFont: () => {},
 });
 
@@ -30,8 +30,9 @@ export const useTheme = () => useContext(ThemeContext);
 
 export const ACCENT_COLORS: Record<string, { light: string; dark: string }> = {
   // Cada variante mantém 4,5:1 para texto sobre superfícies e dentro do botão.
-  // Azul Vionex, Violeta e Esmeralda são as três direções do Visual 01.
-  blue: { light: "226 82% 55%", dark: "225 100% 74%" },
+  // Azul Vionex é o azul do padrão da plataforma (#4A83F7 medido), no tom que
+  // passa 4,5:1 com texto branco e como texto sobre fundo, cartão e coluna.
+  blue: { light: "221 83% 53%", dark: "217 91% 68%" },
   // Violeta e Esmeralda um pouco mais escuros que o hex de referência: no tom
   // original, texto da cor sobre a coluna cinza ficava abaixo de 4,5:1.
   violet: { light: "252 100% 62%", dark: "250 100% 78%" },
@@ -41,7 +42,7 @@ export const ACCENT_COLORS: Record<string, { light: string; dark: string }> = {
   rose: { light: "347 77% 45%", dark: "347 77% 63%" },
 };
 
-/** Pilhas de fonte. A do sistema é a mesma do index.css; Inter só vale depois de carregada. */
+/** Pilhas de fonte. A de Inter é a mesma do index.css (o padrão); a do sistema é a reserva dela. */
 export const FONTES: Record<Fonte, { nome: string; pilha: string }> = {
   system: {
     nome: "SF Pro Text",
@@ -53,7 +54,10 @@ export const FONTES: Record<Fonte, { nome: string; pilha: string }> = {
   },
 };
 
-/** Inter vem do Google Fonts SÓ quando alguém a escolhe: o index.html não paga por ela. */
+/**
+ * Inter já vem pelo <link id="fc-font-inter"> do index.html. Isto só cobre o
+ * documento que não tem o <link> (testes, telas montadas fora do index).
+ */
 function carregarInter() {
   if (document.getElementById("fc-font-inter")) return;
   const link = document.createElement("link");
@@ -86,7 +90,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   });
 
   const [font, setFontState] = useState<Fonte>(() => {
-    try { return localStorage.getItem("fc-font") === "inter" ? "inter" : "system"; } catch { return "system"; }
+    // Inter é o padrão; "Sistema" continua valendo para quem o escolheu.
+    try { return localStorage.getItem("fc-font") === "system" ? "system" : "inter"; } catch { return "inter"; }
   });
 
   const applyTheme = (t: Theme) => {

@@ -299,7 +299,8 @@ describe("o cabeçalho não mantém lista própria", () => {
    * pode apontar para a raiz.
    */
   it("nenhum elo do caminho leva ao login", () => {
-    expect(HEADER).not.toMatch(/href: "\/"/);
-    expect(HEADER).toContain("href: section.entryPath");
+    // A trilha saiu com a barra superior do desktop; a barra do celular só
+    // nomeia a tela. Se voltar a ter elo, ele não pode apontar para a raiz.
+    expect(HEADER).not.toMatch(/href: "\/"|to="\/"/);
   });
 });

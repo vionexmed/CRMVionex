@@ -109,7 +109,7 @@ export default {
         neutral: { DEFAULT: "hsl(var(--neutral))", soft: "hsl(var(--neutral-soft))" },
         "surface-2": "hsl(var(--surface-2))",
         chart: {
-          1: "hsl(var(--chart-1))", 2: "hsl(var(--chart-2))", 3: "hsl(var(--chart-3))", 4: "hsl(var(--chart-4))",
+          1: "hsl(var(--chart-1))", 2: "hsl(var(--chart-2))", 3: "hsl(var(--chart-3))", 4: "hsl(var(--chart-4))", 5: "hsl(var(--chart-5))",
         },
         stage: {
           1: "var(--stage-1)", 2: "var(--stage-2)", 3: "var(--stage-3)",
@@ -135,6 +135,17 @@ export default {
         lg: "var(--radius)",                 /* 8px — superfícies */
         md: "var(--radius-control)",   /* 6px — controles */
         sm: "var(--radius-control)",   /* 6px — pequenos elementos */
+      },
+      /*
+       * Sombras do padrão da plataforma. `card` é a do cartão branco sem borda,
+       * `card-hover` um degrau acima (cartão clicável sob o cursor), `pop` a do
+       * que flutua (menu, janela, gaveta). Os valores moram em index.css, com
+       * par no tema escuro.
+       */
+      boxShadow: {
+        card: "var(--shadow-card)",
+        "card-hover": "var(--shadow-card-hover)",
+        pop: "var(--shadow-pop)",
       },
       height: { control: "var(--control-h)", row: "var(--row-h)" },
       transitionDuration: { 180: "180ms", 240: "240ms" },

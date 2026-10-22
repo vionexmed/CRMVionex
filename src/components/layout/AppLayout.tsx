@@ -100,7 +100,7 @@ export function AppLayout() {
   }
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={onSidebarOpenChange} style={{ "--sidebar-width": "248px", "--sidebar-width-icon": "64px" } as CSSProperties}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={onSidebarOpenChange} style={{ "--sidebar-width": "226px", "--sidebar-width-icon": "57px" } as CSSProperties}>
       {/*
         A CASCA É FIXA; quem rola é o CONTEÚDO.
 
@@ -117,14 +117,17 @@ export function AppLayout() {
         conteúdo em vez de rolar -- a correção não vale nada sem ele.
       */}
       <div className="flex h-dvh w-full overflow-hidden">
-        <AppSidebar />
+        <AppSidebar onOpenSearch={onOpenSearch} />
         <div className="flex min-h-0 flex-1 flex-col min-w-0">
-          <AppHeader onOpenSearch={onOpenSearch} />
+          {/* Sem barra superior no desktop (padrão da plataforma): o cabeçalho
+              de cada tela vive no conteúdo. No celular fica a barra compacta
+              com o botão de menu. */}
+          {isMobile && <AppHeader onOpenSearch={onOpenSearch} />}
           {/* Os módulos da área abrem DENTRO da lateral. A faixa de abas só
               aparece quando a lateral não pode mostrá-los: no celular, onde ela
               vive escondida, e com a lateral recolhida em ícones. */}
           {activeSection && !communication && (isMobile || !sidebarOpen) && <AreaNavigation sectionId={activeSection} />}
-          <main className={cn("vx-page min-h-0 min-w-0 flex-1 overflow-y-auto bg-background", communication ? "p-0" : "p-4 md:p-7", "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-7")}>
+          <main className={cn("vx-page min-h-0 min-w-0 flex-1 overflow-y-auto bg-background", communication ? "p-0" : "p-4 md:px-8 md:py-7", "pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-8")}>
             <Outlet />
           </main>
         </div>

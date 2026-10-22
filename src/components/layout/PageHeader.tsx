@@ -50,32 +50,28 @@ export function PageHeader({
 
   return (
     /*
-     * VISUAL 01: título grande com a contagem AO LADO, em cinza -- "Contatos
-     * 1.284". O rótulo da área saiu daqui porque a trilha da barra superior já
-     * diz onde a pessoa está; repetir em cima do título era a mesma informação
-     * duas vezes no mesmo palmo de tela. Sem régua embaixo: quem vem logo abaixo
-     * (abas de visão, filtros) já desenha a própria linha.
+     * PADRÃO DA PLATAFORMA: título de 24px em negrito, subtítulo cinza logo
+     * abaixo e a ação primária à direita, no topo. Sem régua embaixo e sem
+     * barra superior acima -- este é o cabeçalho da tela.
+     *
+     * A contagem não fica mais colada ao título como número solto: vira o
+     * contador discreto "N resultados", o mesmo que a barra de ferramentas das
+     * listas mostra ao lado da busca.
      */
-    /*
-     * `md:pt-2.5` soma 10px ao respiro de 28px do <main>: na referência o
-     * título fica 38px abaixo da barra superior, e o resto da página (que não
-     * tem cabeçalho) continua a 28px. `min-h` de um controle (34px) faz o
-     * título cair no mesmo lugar com ou sem botões ao lado.
-     */
-    <header className="shrink-0 md:pt-2.5">
-      <div className="flex flex-col gap-3 sm:min-h-[34px] sm:flex-row sm:items-center sm:justify-between">
+    <header className="shrink-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="vx-titulo-tela break-words">
-            {title}
+          <div className="flex flex-wrap items-baseline gap-x-3">
+            <h1 className="vx-titulo-tela break-words">{title}</h1>
             {contagem && (
               // `tabular-nums` porque o número muda sob os olhos -- sem largura
               // fixa de dígito, o total "pula" a cada filtro aplicado.
-              <span className="ml-2.5 align-baseline text-sm font-normal tabular-nums text-muted-foreground">
-                {formatarNumero(contagem.valor)}
-                <span className="sr-only"> {unidade}</span>
+              <span className="text-sm tabular-nums text-muted-foreground">
+                {formatarNumero(contagem.valor)} {contagem.valor === 1 ? "resultado" : "resultados"}
+                <span className="sr-only"> ({unidade})</span>
               </span>
             )}
-          </h1>
+          </div>
           {description && <p className="vx-subtitulo-tela">{description}</p>}
           {meta && <div className="mt-2">{meta}</div>}
         </div>

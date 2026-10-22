@@ -7,7 +7,8 @@ const sem = (p: string) => readFileSync(p, "utf8").replace(/\/\*[\s\S]*?\*\//g, 
 describe("Configurações: Perfil e Design system", () => {
   it("lê os tokens do CSS, claro e escuro", () => {
     const { claro, escuro } = lerTokens(readFileSync("src/index.css", "utf8"));
-    expect(hslParaHex(claro["--primary"])).toBe("#2E5AEA");
+    // O azul do padrão da plataforma, no tom que passa 4,5:1.
+    expect(hslParaHex(claro["--primary"])).toBe("#2463EB");
     expect(escuro["--background"]).not.toBe(claro["--background"]);
   });
 

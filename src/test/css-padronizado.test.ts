@@ -30,6 +30,15 @@ const TSX = (function varrer(dir: string, saida: string[] = []): string[] {
   }
   return saida;
 })("src");
+/** Os `.ts` também montam classe (ex.: `classeDoItemDaLateral` em navegacao.ts). */
+const TS = (function varrer(dir: string, saida: string[] = []): string[] {
+  for (const nome of readdirSync(dir)) {
+    const caminho = join(dir, nome);
+    if (statSync(caminho).isDirectory()) varrer(caminho, saida);
+    else if (nome.endsWith(".ts") && !nome.endsWith(".test.ts")) saida.push(caminho);
+  }
+  return saida;
+})("src");
 
 describe("toda tabela usa a mesma moldura", () => {
   it("nenhuma monta a borda à mão", () => {
@@ -149,7 +158,7 @@ describe("a cor padrão de etapa vem de um lugar só", () => {
 describe("nenhuma classe .vx-* morta", () => {
   it("toda classe declarada é usada", () => {
     const declaradas = [...CSS.matchAll(/^\s*\.(vx-[a-z0-9-]+)\s*\{/gm)].map((m) => m[1]);
-    const fonte = TSX.map((f) => readFileSync(f, "utf8")).join("\n") + CSS;
+    const fonte = [...TSX, ...TS].map((f) => readFileSync(f, "utf8")).join("\n") + CSS;
     const mortas = [...new Set(declaradas)].filter((c) => {
       // Conta só usos FORA da própria declaração.
       const ocorrencias = fonte.split(c).length - 1;

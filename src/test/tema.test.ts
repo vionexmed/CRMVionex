@@ -216,15 +216,17 @@ describe("a lateral ancora a tela", () => {
    * lateral. Tem de ler `--sidebar-primary` e não um valor cravado, senão a
    * troca de cor de destaque deixaria o item ativo na cor antiga.
    */
-  it("o item ativo usa a cor de destaque da lateral", () => {
+  it("o item ativo usa a cor de destaque da lateral, sem preenchimento", () => {
     // Lido SEM comentários (CSS_LIMPO): a regra tem prosa dentro do bloco, e
     // medir a prosa foi exatamente o que deixou um teste anterior verde
     // guardando uma regra que não existia mais.
     const i = CSS_LIMPO.indexOf(".vx-nav-active {");
     expect(i, "regra .vx-nav-active não encontrada").toBeGreaterThan(-1);
     const b = CSS_LIMPO.slice(i, CSS_LIMPO.indexOf("}", i));
-    expect(b).toContain("hsl(var(--sidebar-primary))");
-    expect(b).toContain("hsl(var(--sidebar-primary-foreground))");
+    // Padrão da plataforma: TEXTO na cor de marca, fundo transparente -- nada
+    // de pastilha preenchida.
+    expect(b).toMatch(/(^|[^-])color: hsl\(var\(--sidebar-primary\)\)/m);
+    expect(b).not.toMatch(/background: hsl\(var\(--sidebar-primary\)\)/);
     expect(b).not.toMatch(/#[0-9a-f]{3,6}|rgba?\(/i);
     // Sem barra lateral colorida: era um traço de 2px competindo com a linha
     // de separação da coluna.

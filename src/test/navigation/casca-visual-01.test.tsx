@@ -6,7 +6,7 @@
  * nada -- e não aparece em captura de tela.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -35,10 +35,10 @@ import { AppHeader } from "@/components/layout/AppHeader";
 
 afterEach(() => { cleanup(); banco.respostas = {}; });
 
-function lateral() {
+function lateral(onOpenSearch?: () => void) {
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={["/contacts"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <TooltipProvider><SidebarProvider><AppSidebar /></SidebarProvider></TooltipProvider>
+      <TooltipProvider><SidebarProvider><AppSidebar onOpenSearch={onOpenSearch} /></SidebarProvider></TooltipProvider>
     </MemoryRouter>
   </QueryClientProvider>);
 }
@@ -99,15 +99,47 @@ describe("selos da lateral", () => {
   });
 });
 
-describe("barra superior", () => {
-  it("ajuda leva a um lugar de verdade", () => {
-    render(<MemoryRouter initialEntries={["/contacts"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={vi.fn()} /></SidebarProvider></MemoryRouter>);
-    expect(screen.getByRole("link", { name: /Ajuda/ })).toHaveAttribute("href", expect.stringMatching(/^mailto:suporte@/));
+/**
+ * O padrão da plataforma não tem barra superior no desktop: o que morava nela
+ * foi para a lateral (Buscar no topo da lista; Notificações e Ajuda no rodapé)
+ * e o "+ Novo" global saiu -- cada tela tem a sua ação primária.
+ */
+describe("o que era da barra superior", () => {
+  it("ajuda leva a um lugar de verdade, no rodapé da lateral", () => {
+    lateral();
+    const ajuda = screen.getByRole("link", { name: /Ajuda/ });
+    expect(ajuda).toHaveAttribute("href", expect.stringMatching(/^mailto:suporte@/));
+    expect(ajuda.closest("[data-sidebar=\"footer\"]")).not.toBeNull();
   });
 
-  it("o sininho é um ponto, e o total vai no nome acessível", () => {
+  it("Buscar abre a busca compartilhada pelo topo da lateral", () => {
+    const abrir = vi.fn();
+    lateral(abrir);
+    fireEvent.click(screen.getByRole("button", { name: /Buscar no CRM/ }));
+    expect(abrir).toHaveBeenCalledTimes(1);
+  });
+
+  it("o selo de notificações carrega o total no nome acessível", () => {
     const sino = readFileSync("src/components/crm/NotificationBell.tsx", "utf8");
-    expect(sino).toMatch(/aria-label=\{naoLidas > 0 \? `Notificações: /);
+    expect(sino).toMatch(/naoLidas > 0 \? `Notificações: /);
+    expect(sino).toContain("aria-label={rotuloAcessivel}");
     expect(sino).toContain("bg-alerta");
+    // Mora no rodapé da lateral.
+    const lat = readFileSync("src/components/layout/AppSidebar.tsx", "utf8");
+    expect(lat.slice(lat.indexOf("<SidebarFooter"))).toContain("<NotificationBell");
+  });
+
+  it("no desktop não há barra superior nem \"+ Novo\" global", () => {
+    const casca = readFileSync("src/components/layout/AppLayout.tsx", "utf8");
+    expect(casca).toContain("{isMobile && <AppHeader");
+    const barra = readFileSync("src/components/layout/AppHeader.tsx", "utf8");
+    expect(barra).not.toContain("Criar novo registro");
+    expect(barra).toContain("md:hidden");
+  });
+
+  it("a barra do celular tem o botão de menu e o nome da tela", () => {
+    render(<MemoryRouter initialEntries={["/contacts"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={vi.fn()} /></SidebarProvider></MemoryRouter>);
+    expect(screen.getByRole("button", { name: "Alternar navegação lateral" })).toBeVisible();
+    expect(screen.getByRole("banner")).toHaveTextContent("Contatos");
   });
 });

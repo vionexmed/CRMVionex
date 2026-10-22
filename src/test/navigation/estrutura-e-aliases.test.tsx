@@ -93,7 +93,7 @@ describe("sidebar primária e acionador compartilhado", () => {
     expect(within(nav).queryByRole("link", { name: "Instagram" })).toBeNull();
   });
 
-  it("a busca mora na barra superior e abre a busca compartilhada", () => {
+  it("a barra do celular abre a busca compartilhada", () => {
     const open = vi.fn();
     render(<MemoryRouter initialEntries={["/dashboard"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={open} /></SidebarProvider></MemoryRouter>);
     fireEvent.click(screen.getAllByRole("button", { name: /Buscar no CRM/ })[0]);
@@ -119,18 +119,23 @@ function CurrentRoute() {
   return <><output data-testid="route">{location.pathname}{location.search}{location.hash}</output><button onClick={() => navigate(-1)}>Voltar</button><button onClick={() => navigate(1)}>Avançar</button></>;
 }
 
-describe("breadcrumbs e navegação interna", () => {
-  it("identifica área e módulo ao abrir Atendimento diretamente", () => {
+// Sem barra superior no desktop, quem diz "onde estou" é a LATERAL (área e
+// módulo marcados) e, no celular, o nome da tela na barra compacta.
+describe("onde estou e navegação interna", () => {
+  it("identifica área e tela ao abrir Atendimento diretamente", () => {
+    sidebar("/atendimento?canal=instagram");
+    expect(screen.getByRole("link", { name: "Comunicação" })).toHaveAttribute("aria-current", "page");
+    cleanup();
     render(<MemoryRouter initialEntries={["/atendimento?canal=instagram"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={vi.fn()} /></SidebarProvider></MemoryRouter>);
-    expect(screen.getByRole("navigation", { name: "breadcrumb" })).toHaveTextContent("Comunicação");
-    expect(screen.getByRole("navigation", { name: "breadcrumb" })).toHaveTextContent("Atendimento");
+    expect(screen.getByRole("banner")).toHaveTextContent("Atendimento");
   });
 
-  it("a caixa de e-mail completa se nomeia na trilha, dentro de Comunicação", () => {
+  it("a caixa de e-mail completa se nomeia na barra do celular, dentro de Comunicação", () => {
+    sidebar("/inbox");
+    expect(screen.getByRole("link", { name: "Comunicação" })).toHaveAttribute("aria-current");
+    cleanup();
     render(<MemoryRouter initialEntries={["/inbox"]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><SidebarProvider><AppHeader onOpenSearch={vi.fn()} /></SidebarProvider></MemoryRouter>);
-    const trilha = screen.getByRole("navigation", { name: "breadcrumb" });
-    expect(trilha).toHaveTextContent("Comunicação");
-    expect(trilha).toHaveTextContent("Caixa de e-mail");
+    expect(screen.getByRole("banner")).toHaveTextContent("Caixa de e-mail");
   });
 
   it("mobile mantém Clientes ativo dentro de Empresas", () => {

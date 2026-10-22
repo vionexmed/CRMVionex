@@ -1,4 +1,5 @@
 import type { ElementType } from "react";
+import { cn } from "@/lib/utils";
 import {
   Activity, AlertTriangle, BarChart3, Briefcase, Building2, Handshake,
   LayoutDashboard, Mail, Megaphone, MessageSquare,
@@ -107,4 +108,14 @@ export function gruposDoMenuMais(isAdmin: boolean): GrupoNav[] {
 export function grupoDaRota(pathname: string): string | undefined {
   const destination = destinations.find((destination) => matches(cleanPath(pathname), destination.path));
   return destination ? destination.section?.label ?? "Conta" : undefined;
+}
+
+/**
+ * Classe do item de primeiro nível da lateral (área, Buscar, Notificações,
+ * Ajuda, Configurações): ícone de 20px + rótulo de 14px, 36px de altura.
+ * Ativo = `.vx-nav-active` (texto e ícone na cor de marca, sem fundo).
+ */
+export function classeDoItemDaLateral(recolhida: boolean, ativo: boolean) {
+  return cn("vx-nav-item relative flex h-9 w-full items-center rounded-md text-sm text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring max-md:h-11",
+    recolhida ? "justify-center px-0" : "gap-3 px-2.5", ativo ? "vx-nav-active" : "font-normal");
 }
