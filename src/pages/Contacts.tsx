@@ -76,7 +76,7 @@ import { Paginacao } from "@/components/layout/Paginacao";
 type Contact = Database["public"]["Tables"]["contacts"]["Row"];
 
 /** Larguras (px) da tabela, medidas na referência; com `table-fixed` elas valem de verdade. */
-const LARGURA = { check: 38, nome: 240, estagio: 113, empresa: 195, origem: 113, pontuacao: 91, responsavel: 95, ultimoContato: 118, proximaAtividade: 190 } as const;
+const LARGURA = { check: 38, nome: 240, estagio: 113, empresa: 195, origem: 200, pontuacao: 91, responsavel: 95, ultimoContato: 118, proximaAtividade: 190 } as const;
 type SortKey = "name" | "email" | "status" | "created_at" | "title" | "lifecycle_stage" | "lead_score" | "last_contact";
 type ViewMode = "table" | "cards" | "owner";
 
