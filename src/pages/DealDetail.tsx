@@ -226,7 +226,7 @@ export default function DealDetail() {
         <div className="flex justify-center gap-2">
           <Button onClick={() => refetchDeal()}>Tentar novamente</Button>
           <Button variant="outline" onClick={() => navigate("/deals")}>
-            Voltar para Negócios
+            Voltar para o Pipeline
           </Button>
         </div>
       </div>
@@ -399,7 +399,7 @@ export default function DealDetail() {
     <div className="space-y-6">
       {/* Back button */}
       <button onClick={() => navigate("/deals")} className="flex min-h-8 items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" />Voltar para Negócios
+        <ArrowLeft className="h-4 w-4" />Voltar para o Pipeline
       </button>
 
       {/*

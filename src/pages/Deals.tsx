@@ -685,7 +685,7 @@ export default function Deals() {
          e editar etapas mora em Configurações → Funis e etapas ("+ Funil"). */
       preencherAltura={viewMode === "kanban"}
       className="gap-0 space-y-0 md:-mt-2.5"
-      title="Negócios"
+      title="Pipeline"
       meta={
         listFetching && viewMode === "list" ? (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">

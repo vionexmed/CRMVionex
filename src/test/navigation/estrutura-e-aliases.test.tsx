@@ -26,7 +26,7 @@ afterEach(() => { cleanup(); auth.isAdmin = false; vi.restoreAllMocks(); localSt
 describe("catálogo da navegação aprovada", () => {
   it("oferece os seis destinos na ordem de trabalho", () => {
     expect(navigation.getVisibleNavigation(false).map((section) => section.label)).toEqual([
-      "Painel", "Atividades", "Clientes", "Negócios", "Comunicação", "Análise",
+      "Painel", "Atividades", "Clientes", "Pipeline", "Comunicação", "Análise",
     ]);
   });
 
@@ -64,7 +64,7 @@ describe("catálogo da navegação aprovada", () => {
     for (const section of navigation.getVisibleNavigation(isAdmin)) {
       for (const item of section.items) expect(accessible.has(item.path), item.path).toBe(true);
     }
-    expect(navigation.ABAS_CELULAR.map((item) => item.title)).toEqual(["Painel", "Clientes", "Negócios", "Comunicação"]);
+    expect(navigation.ABAS_CELULAR.map((item) => item.title)).toEqual(["Painel", "Clientes", "Pipeline", "Comunicação"]);
     expect(navigation.gruposDoMenuMais(isAdmin).flatMap((group) => group.items).some((item) => item.adminOnly && !isAdmin)).toBe(false);
   });
 });
@@ -86,8 +86,8 @@ describe("sidebar primária e acionador compartilhado", () => {
     sidebar("/produtos");
     const nav = screen.getByRole("navigation", { name: "Navegação principal" });
     expect(linksDeArea(nav)).toHaveLength(6);
-    expect(within(nav).getByRole("link", { name: "Negócios" })).toHaveAttribute("aria-current", "true");
-    const modulos = screen.getByRole("list", { name: "Módulos de Negócios" });
+    expect(within(nav).getByRole("link", { name: "Pipeline" })).toHaveAttribute("aria-current", "true");
+    const modulos = screen.getByRole("list", { name: "Módulos de Pipeline" });
     expect(within(modulos).getByRole("link", { name: "Produtos" })).toHaveAttribute("aria-current", "page");
     // Só a área ativa abre: Comunicação não expõe os canais aqui.
     expect(within(nav).queryByRole("link", { name: "Instagram" })).toBeNull();
