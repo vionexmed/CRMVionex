@@ -74,6 +74,26 @@ export function useUpdateDeal() {
   });
 }
 
+/**
+ * Aplica a troca de etapa a UMA consulta do cache, só se ela tiver o formato de
+ * lista de negócios (`{ data: [...], count }`).
+ *
+ * A atualização otimista percorre TODAS as consultas sob `deals`, e nem todas
+ * têm esse formato: o seletor leve de negócios (`picker`) guarda um array puro,
+ * e consultas de resumo guardam outra coisa. Assumir `old.data.map` estourava
+ * "undefined is not an object (evaluating 'u.data.map')" no meio do arraste, e
+ * o negócio voltava à etapa anterior mesmo com o servidor aceitando a troca.
+ * O que não for lista de negócios passa intacto.
+ */
+export function aplicarEtapaNoCache<T>(old: T, id: string, stageId: string): T {
+  const lista = old as unknown as { data?: unknown } | null | undefined;
+  if (!lista || typeof lista !== "object" || !Array.isArray(lista.data)) return old;
+  return {
+    ...(lista as object),
+    data: (lista.data as { id?: string }[]).map((d) => (d && d.id === id ? { ...d, stage_id: stageId } : d)),
+  } as unknown as T;
+}
+
 export function useUpdateDealStage() {
   const qc = useQueryClient();
   const { orgId } = useOrg();
@@ -88,11 +108,7 @@ export function useUpdateDealStage() {
       const snapshots: Array<{ key: readonly unknown[]; data: unknown }> = [];
       keys.forEach((q) => {
         snapshots.push({ key: q.queryKey, data: q.state.data });
-        qc.setQueryData<{ data: DealWithRelations[]; count: number }>(q.queryKey, (old) =>
-          old
-            ? { ...old, data: old.data.map((d) => (d.id === id ? { ...d, stage_id: stageId } : d)) }
-            : old
-        );
+        qc.setQueryData(q.queryKey, (old: unknown) => aplicarEtapaNoCache(old, id, stageId));
       });
       return { snapshots };
     },
