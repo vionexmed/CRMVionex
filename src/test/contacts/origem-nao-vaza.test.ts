@@ -24,6 +24,6 @@ describe("o selo de origem não vaza da coluna", () => {
   });
 
   it("mantém o nome completo acessível ao passar o mouse", () => {
-    expect(trecho).toContain("title={o.label}");
+    expect(trecho).toContain("title={campanha}");
   });
 });

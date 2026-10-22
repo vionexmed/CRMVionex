@@ -84,6 +84,23 @@ export function getContactOrigin(metadata: Record<string, unknown> | null | unde
   return { key: "other", label: String((metadata as { source?: unknown }).source), color: "#0D9488" };
 }
 
+/**
+ * O NOME DA CAMPANHA que aparece na coluna Origem.
+ *
+ * A origem mostrada era o rótulo do canal ("Landing Page", "Importação"), e a
+ * pergunta de quem olha a lista é "de QUAL campanha veio?". Ordem de escolha:
+ *   1. `utm_campaign` -- o nome que a landing page ou o anúncio carregou;
+ *   2. o nome livre da origem (a planilha importada, o evento): `source` quando
+ *      não é um rótulo genérico do sistema;
+ *   3. só então o rótulo genérico (Landing Page, Importação, Manual).
+ * Nunca inventa um canal: sem dado, cai no rótulo que `getContactOrigin` dá.
+ */
+export function nomeDaCampanha(metadata: Record<string, unknown> | null | undefined): string {
+  const campanha = String((metadata as { utm_campaign?: unknown } | null)?.utm_campaign ?? "").trim();
+  if (campanha) return campanha;
+  return getContactOrigin(metadata).label;
+}
+
 /** Opções do filtro de origem na página Contatos */
 export const ORIGIN_OPTIONS: { value: string; label: string }[] = [
   { value: "cadastro_likawave", label: "Cadastro Likawave" },
