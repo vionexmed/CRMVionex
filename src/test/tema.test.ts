@@ -232,6 +232,18 @@ describe("a lateral ancora a tela", () => {
   });
 
   /**
+   * O HOVER NÃO PODE DESFAZER O ITEM ATIVO. Passar o mouse sobre o item da tela
+   * atual trocava só o fundo (o `:hover` vence em especificidade) e deixava a
+   * cor do texto do ativo: branco sobre cinza claro, ilegível, com uma piscada.
+   * Toda regra `:hover` de `.vx-nav-item` tem de excluir o `.vx-nav-active`.
+   */
+  it("o hover da lateral não se aplica ao item ativo", () => {
+    const regras = [...CSS_LIMPO.matchAll(/\.vx-nav-item:hover[^{]*\{/g)].map((m) => m[0]);
+    expect(regras.length).toBeGreaterThan(0);
+    for (const r of regras) expect(r, r).toContain(":not(.vx-nav-active)");
+  });
+
+  /**
    * No escuro a lateral continua a parte mais funda: mesma relação do claro,
    * para a tela não mudar de estrutura ao trocar de tema.
    */
